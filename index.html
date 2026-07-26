@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DSA Tracker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <div class="header-top">
+    <h1>DSA Tracker</h1>
+    <div class="header-actions">
+      <button id="exportBtn" title="Download progress as JSON">Export</button>
+      <label class="import-label" title="Load progress from JSON">Import
+        <input type="file" id="importInput" accept="application/json" hidden>
+      </label>
+    </div>
+  </div>
+  <div class="progress-row">
+    <div class="progress-bar"><div id="overallFill" class="progress-fill"></div></div>
+    <span id="overallLabel" class="progress-label"></span>
+  </div>
+  <div class="controls">
+    <input id="search" type="search" placeholder="Search problems...">
+    <div class="diff-filter">
+      <button data-diff="All" class="diff-btn active">All</button>
+      <button data-diff="Easy" class="diff-btn">Easy</button>
+      <button data-diff="Medium" class="diff-btn">Medium</button>
+      <button data-diff="Hard" class="diff-btn">Hard</button>
+    </div>
+    <select id="importanceFilter" class="filter-select">
+      <option value="All">Importance: All</option>
+      <option value="High">Importance: High</option>
+      <option value="Medium">Importance: Medium</option>
+      <option value="Low">Importance: Low</option>
+    </select>
+    <select id="freqFilter" class="filter-select">
+      <option value="All">Interview Freq: All</option>
+      <option value="Very High">Interview Freq: Very High</option>
+      <option value="High">Interview Freq: High</option>
+      <option value="Medium">Interview Freq: Medium</option>
+      <option value="Low">Interview Freq: Low</option>
+    </select>
+    <label class="hide-completed"><input type="checkbox" id="hideCompleted"> Hide completed</label>
+  </div>
+</header>
+
+<main>
+  <details id="analytics" class="analytics" open>
+    <summary>Analytics</summary>
+    <div class="analytics-grid" id="analyticsGrid"></div>
+  </details>
+  <div id="topics"></div>
+</main>
+
+<footer>
+  Progress is saved in this browser only (localStorage) — no account, no sync. Use Export regularly as a backup.
+</footer>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
