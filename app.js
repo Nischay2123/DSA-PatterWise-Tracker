@@ -1,7 +1,10 @@
 const STORE_KEY = "dsa-tracker-progress";
+const BACKUP_KEY = "dsa-tracker-progress-backup";
 const ALL_PROBLEMS = DATA.topics.flatMap((t) => t.patterns.flatMap((p) => p.problems));
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 let heatmapYearOffset = 0;
+let preFilterOpenState = null;
+let lastFilterSig = "";
 
 function loadStore() {
   try {
@@ -12,7 +15,16 @@ function loadStore() {
 }
 
 function saveStore(store) {
-  localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  } catch (e) {
+    // Private-mode Safari and full-quota browsers throw here. Silently failing
+    // would leave ticked boxes that vanish on reload, so say so once.
+    if (!saveStore.warned) {
+      saveStore.warned = true;
+      alert("Your progress could not be saved — the browser is blocking local storage (private browsing or storage is full). Changes will be lost when you reload.");
+    }
+  }
 }
 
 function getState(store, id) {
@@ -40,8 +52,12 @@ function esc(s) {
   ));
 }
 
-function renderProblem(p, store) {
+function renderProblem(p, store, ctx) {
   const st = getState(store, p.id);
+  // Searching "graphs" or "sliding window" should find problems even though those
+  // words only live on the topic/pattern, not the problem title.
+  const haystack = [p.question, ctx.topic, ctx.pattern, p.subpattern, p.platform]
+    .filter(Boolean).join(" ").toLowerCase();
   const qHtml = p.link
     ? `<a class="q-text" href="${esc(p.link)}" target="_blank" rel="noopener">${esc(p.question)}</a>`
     : `<span class="q-text">${esc(p.question)}</span>`;
@@ -53,14 +69,14 @@ function renderProblem(p, store) {
     p.originalStep || null,
   ].filter(Boolean).join(" · ");
   return `
-    <div class="problem-row ${st.done ? "done" : ""}" data-id="${p.id}" data-difficulty="${p.difficulty}" data-importance="${p.importance}" data-freq="${p.interviewFreq}" data-question="${esc(p.question.toLowerCase())}">
-      <input type="checkbox" class="done-cb" ${st.done ? "checked" : ""}>
+    <div class="problem-row ${st.done ? "done" : ""}" data-id="${p.id}" data-difficulty="${p.difficulty}" data-importance="${p.importance}" data-freq="${p.interviewFreq}" data-revise="${st.revise ? "1" : "0"}" data-question="${esc(haystack)}">
+      <input type="checkbox" class="done-cb" ${st.done ? "checked" : ""} aria-label="Mark &quot;${esc(p.question)}&quot; as done">
       <div class="q-main">
         <div class="q-line">
           ${qHtml}
           <span class="badge ${p.difficulty}">${p.difficulty}</span>
-          <button class="star-btn ${st.revise ? "active" : ""}" title="Mark for revision">&#9733;</button>
-          <button class="notes-btn">notes</button>
+          <button class="star-btn ${st.revise ? "active" : ""}" title="${st.revise ? "Unmark for revision" : "Mark for revision"}" aria-label="Mark for revision" aria-pressed="${st.revise ? "true" : "false"}">&#9733;</button>
+          <button class="notes-btn ${st.notes ? "has-notes" : ""}">notes</button>
         </div>
         <div class="detail-panel">
           <div class="meta-text">${esc(meta)}</div>
@@ -70,8 +86,8 @@ function renderProblem(p, store) {
     </div>`;
 }
 
-function renderPattern(pattern, store) {
-  const rows = pattern.problems.map((p) => renderProblem(p, store)).join("");
+function renderPattern(pattern, store, topicName) {
+  const rows = pattern.problems.map((p) => renderProblem(p, store, { topic: topicName, pattern: pattern.name })).join("");
   return `
     <details class="pattern" data-pattern="${pattern.id}">
       <summary>${esc(pattern.name)} <span data-pattern-progress="${pattern.id}"></span></summary>
@@ -80,19 +96,27 @@ function renderPattern(pattern, store) {
 }
 
 function renderTopic(topic, store) {
-  const patterns = topic.patterns.map((p) => renderPattern(p, store)).join("");
+  const patterns = topic.patterns.map((p) => renderPattern(p, store, topic.name)).join("");
   return `
     <details class="topic" data-topic="${topic.id}">
-      <summary>${esc(topic.name)} <span class="topic-progress" data-topic-progress="${topic.id}"></span></summary>
+      <summary>
+        ${esc(topic.name)}
+        <span class="topic-meter"><span class="progress-bar mini"><span class="progress-fill" data-topic-fill="${topic.id}"></span></span></span>
+        <span class="topic-progress" data-topic-progress="${topic.id}"></span>
+      </summary>
       ${patterns}
     </details>`;
 }
 
 function render() {
   const store = loadStore();
+  // #topics is rebuilt, so any remembered <details> references are now stale.
+  preFilterOpenState = null;
+  lastFilterSig = "";
   document.getElementById("topics").innerHTML = DATA.topics.map((t) => renderTopic(t, store)).join("");
   updateProgress(store);
   applyFilters();
+  updateUndoImportVisibility();
 }
 
 function updateProgress(store) {
@@ -111,6 +135,8 @@ function updateProgress(store) {
     overallTotal += topicTotal;
     const el = document.querySelector(`[data-topic-progress="${topic.id}"]`);
     if (el) el.textContent = `${topicDone}/${topicTotal}`;
+    const fill = document.querySelector(`[data-topic-fill="${topic.id}"]`);
+    if (fill) fill.style.width = (topicTotal ? Math.round((topicDone / topicTotal) * 100) : 0) + "%";
   });
   const pct = overallTotal ? Math.round((overallDone / overallTotal) * 100) : 0;
   document.getElementById("overallFill").style.width = pct + "%";
@@ -170,13 +196,40 @@ function buildHeatmapStats(store) {
   return { doneByDate, revisedByDate };
 }
 
-function heatmapLevel(count, max) {
+// Fixed thresholds rather than rebasing on the range max: a single solved problem
+// shouldn't render as the darkest green, and two years should be comparable.
+// A streak stays alive through today even before you've solved anything today —
+// it only breaks once a full day passes with nothing solved.
+function computeStreak(doneByDate) {
+  const cursor = new Date();
+  cursor.setHours(0, 0, 0, 0);
+  if (!doneByDate.get(toISODate(cursor))) cursor.setDate(cursor.getDate() - 1);
+  let streak = 0;
+  while (doneByDate.get(toISODate(cursor))) {
+    streak++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+// How many years back the record actually goes — paging past it shows nothing.
+function earliestYearOffset(store) {
+  const earliest = Object.values(store.problems)
+    .map((st) => st.completedAt || st.revisedAt)
+    .filter(Boolean)
+    .sort()[0];
+  return earliest ? new Date().getFullYear() - Number(earliest.slice(0, 4)) : 0;
+}
+
+function findNextUnsolved(store) {
+  return ALL_PROBLEMS.find((p) => !getState(store, p.id).done) || null;
+}
+
+function heatmapLevel(count) {
   if (!count) return 0;
-  if (max <= 1) return count >= 1 ? 4 : 0;
-  const ratio = count / max;
-  if (ratio >= 0.75) return 4;
-  if (ratio >= 0.5) return 3;
-  if (ratio >= 0.25) return 2;
+  if (count >= 10) return 4;
+  if (count >= 6) return 3;
+  if (count >= 3) return 2;
   return 1;
 }
 
@@ -225,16 +278,17 @@ function renderHeatmap(store) {
   }
 
   const allDays = months.flatMap((m) => m.days);
-  const maxDone = allDays.reduce((m, day) => Math.max(m, day.done), 0);
 
   const blocksHtml = months.map((month) => {
     const cells = [];
     for (let i = 0; i < month.pad; i++) cells.push(`<div class="heatmap-day empty"></div>`);
     month.days.forEach((day) => {
-      const level = heatmapLevel(day.done, maxDone);
+      const level = heatmapLevel(day.done);
       const revisedPart = day.revised ? ` · ${day.revised} revised` : "";
       const tip = `${day.done} solved${revisedPart} on ${formatDayLabel(day.date)}`;
-      cells.push(`<div class="heatmap-day" data-level="${level}" title="${esc(tip)}"></div>`);
+      // title= is mouse-only: it never fires on touch and can't be focused, which
+      // made the whole heatmap inert on phones. Custom tip handles all three inputs.
+      cells.push(`<div class="heatmap-day" data-level="${level}" data-tip="${esc(tip)}" tabindex="0" role="img" aria-label="${esc(tip)}"></div>`);
     });
     while (cells.length % 7) cells.push(`<div class="heatmap-day empty"></div>`);
     const weeksHtml = [];
@@ -248,22 +302,50 @@ function renderHeatmap(store) {
       </div>`;
   }).join("");
 
-  document.getElementById("heatmapGrid").innerHTML = `
-    <div class="heatmap-body">${blocksHtml}</div>
-    <div class="heatmap-legend">
-      <span>Less</span>
-      ${[0, 1, 2, 3, 4].map((l) => `<div class="heatmap-day" data-level="${l}"></div>`).join("")}
-      <span>More</span>
-    </div>`;
+  document.getElementById("heatmapGrid").innerHTML = `<div class="heatmap-body">${blocksHtml}</div>`;
+
+  document.getElementById("heatmapLegend").innerHTML = `
+    <span>Less</span>
+    ${[0, 1, 2, 3, 4].map((l) => `<div class="heatmap-day" data-level="${l}"></div>`).join("")}
+    <span>More</span>`;
 
   document.getElementById("heatmapYearLabel").textContent = label;
   document.getElementById("heatmapNextYear").disabled = heatmapYearOffset === 0;
+  document.getElementById("heatmapPrevYear").disabled = heatmapYearOffset >= Math.max(earliestYearOffset(store), 1);
 
   const totalDone = allDays.reduce((s, d) => s + d.done, 0);
   const totalRevised = allDays.reduce((s, d) => s + d.revised, 0);
   const activeDays = allDays.filter((d) => d.done > 0).length;
   document.getElementById("heatmapSummary").textContent =
     `${totalDone} solved · ${totalRevised} revised on ${activeDays} active day${activeDays === 1 ? "" : "s"} in this range`;
+
+  const streak = computeStreak(doneByDate);
+  document.getElementById("statStreak").textContent = streak;
+  document.getElementById("statToday").textContent = doneByDate.get(todayISO()) || 0;
+  document.getElementById("statRange").textContent = totalDone;
+
+  const next = findNextUnsolved(store);
+  const continueBtn = document.getElementById("continueBtn");
+  continueBtn.hidden = !next;
+  if (next) continueBtn.dataset.target = next.id;
+}
+
+function jumpToProblem(id) {
+  const row = document.querySelector(`.problem-row[data-id="${id}"]`);
+  if (!row) return;
+  let node = row.parentElement;
+  while (node) {
+    if (node.tagName === "DETAILS") node.open = true;
+    node = node.parentElement;
+  }
+  row.scrollIntoView({ block: "center", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+  row.classList.remove("just-jumped");
+  void row.offsetWidth; // restart the highlight if the same row is targeted twice
+  row.classList.add("just-jumped");
+}
+
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
 function applyFilters() {
@@ -272,28 +354,53 @@ function applyFilters() {
   const importance = document.getElementById("importanceFilter").value;
   const freq = document.getElementById("freqFilter").value;
   const hideCompleted = document.getElementById("hideCompleted").checked;
-  const filtersActive = !!q || diff !== "All" || importance !== "All" || freq !== "All";
+  const reviseOnly = document.getElementById("reviseOnly").checked;
+  const filtersActive = !!q || diff !== "All" || importance !== "All" || freq !== "All" || reviseOnly;
 
+  // Force-open accordions only when the filter inputs actually changed. Otherwise
+  // ticking a checkbox would re-explode every topic the user had just collapsed.
+  const sig = [q, diff, importance, freq, hideCompleted, reviseOnly].join(" ");
+  const filterChanged = sig !== lastFilterSig;
+  lastFilterSig = sig;
+
+  // Remember how the accordions were arranged before filtering so clearing the
+  // filters restores that view instead of leaving all 18 topics hanging open.
+  if (filtersActive && filterChanged && !preFilterOpenState) {
+    preFilterOpenState = new Map();
+    document.querySelectorAll("details.topic, details.pattern").forEach((d) => preFilterOpenState.set(d, d.open));
+  }
+
+  let visibleCount = 0;
   document.querySelectorAll(".problem-row").forEach((row) => {
     const matchesText = !q || row.dataset.question.includes(q);
     const matchesDiff = diff === "All" || row.dataset.difficulty === diff;
     const matchesImportance = importance === "All" || row.dataset.importance === importance;
     const matchesFreq = freq === "All" || row.dataset.freq === freq;
     const matchesCompleted = !hideCompleted || !row.classList.contains("done");
-    row.classList.toggle("filtered-out", !(matchesText && matchesDiff && matchesImportance && matchesFreq && matchesCompleted));
+    const matchesRevise = !reviseOnly || row.dataset.revise === "1";
+    const visible = matchesText && matchesDiff && matchesImportance && matchesFreq && matchesCompleted && matchesRevise;
+    if (visible) visibleCount++;
+    row.classList.toggle("filtered-out", !visible);
   });
 
   document.querySelectorAll("details.pattern").forEach((pat) => {
     const anyVisible = Array.from(pat.querySelectorAll(".problem-row")).some((r) => !r.classList.contains("filtered-out"));
     pat.classList.toggle("filtered-out", !anyVisible);
-    if (filtersActive && anyVisible) pat.open = true;
+    if (filtersActive && filterChanged && anyVisible) pat.open = true;
   });
 
   document.querySelectorAll("details.topic").forEach((topic) => {
     const anyVisible = Array.from(topic.querySelectorAll("details.pattern")).some((p) => !p.classList.contains("filtered-out"));
     topic.classList.toggle("filtered-out", !anyVisible);
-    if (filtersActive && anyVisible) topic.open = true;
+    if (filtersActive && filterChanged && anyVisible) topic.open = true;
   });
+
+  if (!filtersActive && preFilterOpenState) {
+    preFilterOpenState.forEach((wasOpen, d) => { d.open = wasOpen; });
+    preFilterOpenState = null;
+  }
+
+  document.getElementById("noResults").hidden = visibleCount > 0;
 }
 
 function mutateProblem(id, patch) {
@@ -320,8 +427,12 @@ document.getElementById("topics").addEventListener("click", (e) => {
     const revise = !getState(loadStore(), row.dataset.id).revise;
     const store = mutateProblem(row.dataset.id, { revise, revisedAt: revise ? todayISO() : null });
     starBtn.classList.toggle("active", revise);
+    starBtn.setAttribute("aria-pressed", revise ? "true" : "false");
+    starBtn.title = revise ? "Unmark for revision" : "Mark for revision";
+    row.dataset.revise = revise ? "1" : "0";
     renderAnalytics(store);
     renderHeatmap(store);
+    applyFilters();
     return;
   }
   const notesBtn = e.target.closest(".notes-btn");
@@ -336,9 +447,55 @@ document.getElementById("topics").addEventListener("focusout", (e) => {
   mutateProblem(row.dataset.id, { notes: e.target.value });
 });
 
+function showHeatmapTip(cell) {
+  const tipEl = document.getElementById("heatmapTip");
+  const card = document.getElementById("dashboard");
+  tipEl.textContent = cell.dataset.tip;
+  tipEl.hidden = false;
+  const cellBox = cell.getBoundingClientRect();
+  const cardBox = card.getBoundingClientRect();
+  const left = cellBox.left - cardBox.left + cellBox.width / 2 - tipEl.offsetWidth / 2;
+  const maxLeft = cardBox.width - tipEl.offsetWidth - 4;
+  tipEl.style.left = Math.max(4, Math.min(left, maxLeft)) + "px";
+  tipEl.style.top = cellBox.top - cardBox.top - tipEl.offsetHeight - 6 + "px";
+}
+
+function hideHeatmapTip() {
+  document.getElementById("heatmapTip").hidden = true;
+}
+
+const heatmapGridEl = document.getElementById("heatmapGrid");
+heatmapGridEl.addEventListener("pointerover", (e) => {
+  const cell = e.target.closest(".heatmap-day[data-tip]");
+  if (cell) showHeatmapTip(cell);
+});
+heatmapGridEl.addEventListener("pointerleave", hideHeatmapTip);
+heatmapGridEl.addEventListener("focusin", (e) => {
+  const cell = e.target.closest(".heatmap-day[data-tip]");
+  if (cell) showHeatmapTip(cell);
+});
+heatmapGridEl.addEventListener("focusout", hideHeatmapTip);
+// Touch: no hover exists, so a tap has to both show and pin the tip.
+heatmapGridEl.addEventListener("click", (e) => {
+  const cell = e.target.closest(".heatmap-day[data-tip]");
+  if (cell) showHeatmapTip(cell);
+});
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#heatmapGrid")) hideHeatmapTip();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") hideHeatmapTip();
+});
+
+document.getElementById("continueBtn").addEventListener("click", (e) => {
+  jumpToProblem(e.currentTarget.dataset.target);
+});
+
 document.getElementById("heatmapPrevYear").addEventListener("click", () => {
+  const store = loadStore();
+  if (heatmapYearOffset >= Math.max(earliestYearOffset(store), 1)) return;
   heatmapYearOffset++;
-  renderHeatmap(loadStore());
+  renderHeatmap(store);
 });
 
 document.getElementById("heatmapNextYear").addEventListener("click", () => {
@@ -356,33 +513,201 @@ document.querySelectorAll(".diff-btn").forEach((btn) => {
 });
 document.getElementById("search").addEventListener("input", applyFilters);
 document.getElementById("hideCompleted").addEventListener("change", applyFilters);
+document.getElementById("reviseOnly").addEventListener("change", applyFilters);
 document.getElementById("importanceFilter").addEventListener("change", applyFilters);
 document.getElementById("freqFilter").addEventListener("change", applyFilters);
+
+// <details> hides its content when closed regardless of display, so the
+// disclosure has to be forced open on wide screens where it renders inline.
+const filterMq = window.matchMedia("(max-width: 700px)");
+function syncFilterDisclosure() {
+  document.getElementById("filterDisclosure").open = !filterMq.matches;
+}
+filterMq.addEventListener("change", syncFilterDisclosure);
+syncFilterDisclosure();
+
+document.getElementById("clearFilters").addEventListener("click", () => {
+  document.getElementById("search").value = "";
+  document.getElementById("hideCompleted").checked = false;
+  document.getElementById("reviseOnly").checked = false;
+  document.getElementById("importanceFilter").value = "All";
+  document.getElementById("freqFilter").value = "All";
+  document.querySelectorAll(".diff-btn").forEach((b) => b.classList.toggle("active", b.dataset.diff === "All"));
+  applyFilters();
+});
+
+document.getElementById("importBtn").addEventListener("click", () => {
+  document.getElementById("importInput").click();
+});
 
 document.getElementById("exportBtn").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(loadStore(), null, 2)], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "dsa-tracker-progress.json";
+  // Date-stamped so a folder of backups is tellable apart when it matters most.
+  a.download = `dsa-tracker-progress-${todayISO()}.json`;
   a.click();
-  URL.revokeObjectURL(a.href);
+  // Revoking synchronously can cancel the download in some browsers.
+  setTimeout(() => URL.revokeObjectURL(a.href), 0);
 });
+
+function isValidStore(parsed) {
+  return !!parsed && typeof parsed === "object" && !Array.isArray(parsed)
+    && !!parsed.problems && typeof parsed.problems === "object" && !Array.isArray(parsed.problems);
+}
+
+function countDoneInStore(store) {
+  return Object.values(store.problems).filter((st) => st && st.done).length;
+}
 
 document.getElementById("importInput").addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
+    let parsed;
     try {
-      saveStore(JSON.parse(reader.result));
-      render();
+      parsed = JSON.parse(reader.result);
     } catch (err) {
-      alert("Invalid JSON file.");
+      alert("That file isn't valid JSON, so nothing was changed.");
+      return;
     }
+    if (!isValidStore(parsed)) {
+      alert("That doesn't look like a DSA Tracker backup — it has no \"problems\" data. Nothing was changed.");
+      return;
+    }
+    const current = loadStore();
+    const currentDone = countDoneInStore(current);
+    const incomingDone = countDoneInStore(parsed);
+    if (currentDone > 0) {
+      const ok = confirm(
+        "Replace your current progress?\n\n" +
+        `Now:  ${currentDone} solved\n` +
+        `File: ${incomingDone} solved\n\n` +
+        "Your current progress will be kept as a one-time backup you can recover with Undo import."
+      );
+      if (!ok) return;
+      localStorage.setItem(BACKUP_KEY, JSON.stringify(current));
+    }
+    saveStore(parsed);
+    render();
   };
   reader.readAsText(file);
   e.target.value = "";
 });
+
+// ISO dates sort lexically, so the earliest is just the smaller string.
+function earlierDate(a, b) {
+  if (a && b) return a < b ? a : b;
+  return a || b || null;
+}
+
+function mergeNotes(a, b) {
+  const left = (a || "").trim();
+  const right = (b || "").trim();
+  if (!left) return right;
+  if (!right) return left;
+  if (left === right) return left;
+  return `${left}\n\n--- merged ---\n\n${right}`;
+}
+
+// Union merge: a problem is solved if either copy says so, so merging can only
+// ever add progress. Never un-solves anything and never drops a note.
+function mergeStores(local, incoming) {
+  const merged = { version: 1, problems: {} };
+  const ids = new Set([...Object.keys(local.problems), ...Object.keys(incoming.problems)]);
+  ids.forEach((id) => {
+    const a = local.problems[id] || {};
+    const b = incoming.problems[id] || {};
+    const done = !!(a.done || b.done);
+    const revise = !!(a.revise || b.revise);
+    merged.problems[id] = {
+      done,
+      revise,
+      notes: mergeNotes(a.notes, b.notes),
+      // Keep the invariant the rest of the app relies on: no date without the flag.
+      completedAt: done ? earlierDate(a.completedAt, b.completedAt) : null,
+      revisedAt: revise ? earlierDate(a.revisedAt, b.revisedAt) : null,
+    };
+  });
+  return merged;
+}
+
+function summarizeMerge(local, merged) {
+  let newlySolved = 0, newlyRevised = 0, notesCombined = 0;
+  Object.keys(merged.problems).forEach((id) => {
+    const before = local.problems[id] || {};
+    const after = merged.problems[id];
+    if (after.done && !before.done) newlySolved++;
+    if (after.revise && !before.revise) newlyRevised++;
+    if (after.notes && after.notes !== (before.notes || "")) notesCombined++;
+  });
+  return { newlySolved, newlyRevised, notesCombined };
+}
+
+document.getElementById("mergeBtn").addEventListener("click", () => {
+  document.getElementById("mergeInput").click();
+});
+
+document.getElementById("mergeInput").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(reader.result);
+    } catch (err) {
+      alert("That file isn't valid JSON, so nothing was changed.");
+      return;
+    }
+    if (!isValidStore(parsed)) {
+      alert("That doesn't look like a DSA Tracker backup — it has no \"problems\" data. Nothing was changed.");
+      return;
+    }
+    const current = loadStore();
+    const merged = mergeStores(current, parsed);
+    const { newlySolved, newlyRevised, notesCombined } = summarizeMerge(current, merged);
+    if (!newlySolved && !newlyRevised && !notesCombined) {
+      alert("That file adds nothing new — everything in it is already tracked here.");
+      return;
+    }
+    const ok = confirm(
+      "Merge this backup into your progress?\n\n" +
+      `Newly solved:   ${newlySolved}\n` +
+      `Newly starred:  ${newlyRevised}\n` +
+      `Notes combined: ${notesCombined}\n\n` +
+      `Solved after merge: ${countDoneInStore(merged)} (currently ${countDoneInStore(current)})\n\n` +
+      "Nothing already solved will be un-solved. You can still Undo import afterwards."
+    );
+    if (!ok) return;
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(current));
+    saveStore(merged);
+    render();
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+});
+
+document.getElementById("undoImportBtn").addEventListener("click", () => {
+  const raw = localStorage.getItem(BACKUP_KEY);
+  if (!raw) return;
+  let backup;
+  try {
+    backup = JSON.parse(raw);
+  } catch (err) {
+    return;
+  }
+  if (!isValidStore(backup)) return;
+  if (!confirm(`Restore your progress from before the last import (${countDoneInStore(backup)} solved)?`)) return;
+  saveStore(backup);
+  localStorage.removeItem(BACKUP_KEY);
+  render();
+});
+
+function updateUndoImportVisibility() {
+  document.getElementById("undoImportBtn").hidden = !localStorage.getItem(BACKUP_KEY);
+}
 
 function selfTest() {
   const fixture = [{ id: "x1" }, { id: "x2" }, { id: "x3" }];
