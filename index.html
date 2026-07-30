@@ -12,9 +12,9 @@
     <h1>DSA Tracker</h1>
     <div class="header-actions">
       <button id="exportBtn" title="Download progress as JSON">Export</button>
-      <label class="import-label" title="Load progress from JSON">Import
-        <input type="file" id="importInput" accept="application/json" hidden>
-      </label>
+      <button id="importBtn" title="Load progress from JSON">Import</button>
+      <input type="file" id="importInput" accept="application/json" class="visually-hidden" tabindex="-1" aria-hidden="true">
+      <button id="undoImportBtn" title="Restore the progress you had before the last import" hidden>Undo import</button>
     </div>
   </div>
   <div class="progress-row">
@@ -22,27 +22,33 @@
     <span id="overallLabel" class="progress-label"></span>
   </div>
   <div class="controls">
-    <input id="search" type="search" placeholder="Search problems...">
-    <div class="diff-filter">
-      <button data-diff="All" class="diff-btn active">All</button>
-      <button data-diff="Easy" class="diff-btn">Easy</button>
-      <button data-diff="Medium" class="diff-btn">Medium</button>
-      <button data-diff="Hard" class="diff-btn">Hard</button>
-    </div>
-    <select id="importanceFilter" class="filter-select">
-      <option value="All">Importance: All</option>
-      <option value="High">Importance: High</option>
-      <option value="Medium">Importance: Medium</option>
-      <option value="Low">Importance: Low</option>
-    </select>
-    <select id="freqFilter" class="filter-select">
-      <option value="All">Interview Freq: All</option>
-      <option value="Very High">Interview Freq: Very High</option>
-      <option value="High">Interview Freq: High</option>
-      <option value="Medium">Interview Freq: Medium</option>
-      <option value="Low">Interview Freq: Low</option>
-    </select>
-    <label class="hide-completed"><input type="checkbox" id="hideCompleted"> Hide completed</label>
+    <input id="search" type="search" placeholder="Search problems..." aria-label="Search problems">
+    <details id="filterDisclosure" class="filters">
+      <summary class="filters-summary">Filters</summary>
+      <div class="filters-body">
+        <div class="diff-filter">
+          <button data-diff="All" class="diff-btn active">All</button>
+          <button data-diff="Easy" class="diff-btn">Easy</button>
+          <button data-diff="Medium" class="diff-btn">Medium</button>
+          <button data-diff="Hard" class="diff-btn">Hard</button>
+        </div>
+        <select id="importanceFilter" class="filter-select" aria-label="Filter by importance">
+          <option value="All">Importance: All</option>
+          <option value="High">Importance: High</option>
+          <option value="Medium">Importance: Medium</option>
+          <option value="Low">Importance: Low</option>
+        </select>
+        <select id="freqFilter" class="filter-select" aria-label="Filter by interview frequency">
+          <option value="All">Interview Freq: All</option>
+          <option value="Very High">Interview Freq: Very High</option>
+          <option value="High">Interview Freq: High</option>
+          <option value="Medium">Interview Freq: Medium</option>
+          <option value="Low">Interview Freq: Low</option>
+        </select>
+        <label class="hide-completed"><input type="checkbox" id="hideCompleted"> Hide completed</label>
+        <label class="hide-completed"><input type="checkbox" id="reviseOnly"> &#9733; Revision only</label>
+      </div>
+    </details>
   </div>
 </header>
 
@@ -50,13 +56,20 @@
   <section id="dashboard" class="dashboard">
     <div class="dash-head">
       <h2 class="dash-title">Activity</h2>
+      <button id="continueBtn" class="continue-btn" hidden>Continue &rarr;</button>
       <div class="heatmap-year-nav">
-        <button id="heatmapPrevYear" class="year-nav-btn" title="Previous year">&#8249;</button>
+        <button id="heatmapPrevYear" class="year-nav-btn" title="Previous year" aria-label="Previous year">&#8249;</button>
         <span id="heatmapYearLabel" class="heatmap-year-label">Current</span>
-        <button id="heatmapNextYear" class="year-nav-btn" title="Next year" disabled>&#8250;</button>
+        <button id="heatmapNextYear" class="year-nav-btn" title="Next year" aria-label="Next year" disabled>&#8250;</button>
       </div>
     </div>
+    <div class="dash-tiles">
+      <div class="stat-tile"><span class="stat-value" id="statStreak">0</span><span class="stat-label">day streak</span></div>
+      <div class="stat-tile"><span class="stat-value" id="statToday">0</span><span class="stat-label">solved today</span></div>
+      <div class="stat-tile"><span class="stat-value" id="statRange">0</span><span class="stat-label">in this range</span></div>
+    </div>
     <div class="heatmap-scroll"><div id="heatmapGrid"></div></div>
+    <div id="heatmapTip" class="heatmap-tip" role="status" aria-live="polite" hidden></div>
     <div class="dash-foot">
       <span id="heatmapSummary" class="heatmap-summary"></span>
       <div id="heatmapLegend" class="heatmap-legend"></div>
@@ -67,6 +80,7 @@
     </details>
   </section>
   <div id="topics"></div>
+  <p id="noResults" class="no-results" hidden>No problems match these filters. <button type="button" id="clearFilters" class="link-btn">Clear filters</button></p>
 </main>
 
 <footer>

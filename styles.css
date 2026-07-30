@@ -13,6 +13,14 @@
   --heat-2: #8fd19e;
   --heat-3: #4cb264;
   --heat-4: #2fa84f;
+  --tip-bg: #24242a;
+  --tip-fg: #f4f4f6;
+  --focus: #1a6dd4;
+  /* Badges carry white text, so they need their own darker shades to clear
+     WCAG AA 4.5:1 — the lighter --easy/--medium/--hard stay for fills. */
+  --badge-easy: #26863f;
+  --badge-medium: #9a6d13;
+  --badge-hard: #d2443d;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -26,10 +34,21 @@
     --heat-2: #216b39;
     --heat-3: #2a9147;
     --heat-4: #39c261;
+    --tip-bg: #3a3a42;
+    --tip-fg: #f4f4f6;
+    --focus: #6ea8f0;
   }
 }
 
 * { box-sizing: border-box; }
+
+/* Keyboard navigation had no visible indicator anywhere before this. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+.heatmap-day:focus-visible { outline-offset: 1px; }
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -48,7 +67,18 @@ header {
 .header-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 h1 { font-size: 1.2rem; margin: 0; }
 .header-actions { display: flex; gap: 8px; }
-.header-actions button, .import-label {
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.header-actions button {
   font-size: 0.85rem;
   padding: 6px 12px;
   border: 1px solid var(--border);
@@ -71,7 +101,7 @@ h1 { font-size: 1.2rem; margin: 0; }
 
 .controls { display: flex; align-items: center; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
 #search {
-  flex: 1;
+  flex: 0 1 260px;
   min-width: 160px;
   padding: 6px 10px;
   border: 1px solid var(--border);
@@ -100,6 +130,35 @@ h1 { font-size: 1.2rem; margin: 0; }
 }
 .hide-completed { font-size: 0.85rem; color: var(--muted); display: flex; align-items: center; gap: 4px; }
 
+/* Desktop: filters flow inline beside the search box.
+   Narrow: they collapse behind a toggle so the sticky header stays small.
+   (Chromium ignores `display: contents` on <details>, so the disclosure is a
+   normal flex item that runs its own flex row rather than a transparent one.) */
+.filters { flex: 1 1 auto; min-width: 0; }
+.filters-summary { display: none; }
+.filters-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+@media (max-width: 700px) {
+  .filters { flex: 1 1 100%; }
+  .filters-summary {
+    display: inline-block;
+    width: max-content;
+    font-size: 0.8rem;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .filters-summary::before { content: "▸ "; }
+  .filters[open] .filters-summary::before { content: "▾ "; }
+  .filters-body { padding-top: 10px; }
+}
+
 main { max-width: 900px; margin: 0 auto; padding: 16px 20px 60px; }
 
 details > summary {
@@ -122,11 +181,26 @@ details.topic > summary {
   gap: 10px;
   font-weight: 600;
 }
+.topic-meter { margin-left: auto; width: 90px; flex-shrink: 0; }
+.topic-meter .progress-bar, .topic-meter .progress-fill { display: block; }
 .topic-progress {
   font-weight: 400;
   font-size: 0.8rem;
   color: var(--muted);
-  margin-left: auto;
+  width: 52px;
+  flex-shrink: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.no-results { font-size: 0.85rem; color: var(--muted); text-align: center; padding: 24px 0; }
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--fg);
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 details.pattern { padding: 2px 14px 2px 30px; }
@@ -143,10 +217,23 @@ details.pattern[open] > summary { margin-bottom: 2px; }
 .pattern-body { padding-left: 12px; }
 
 .dashboard {
+  position: relative;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px 14px;
   margin-bottom: 14px;
+}
+.heatmap-tip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: var(--tip-bg);
+  color: var(--tip-fg);
+  font-size: 0.72rem;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 .dash-head {
   display: flex;
@@ -157,6 +244,33 @@ details.pattern[open] > summary { margin-bottom: 2px; }
   margin-bottom: 10px;
 }
 .dash-title { font-size: 0.95rem; font-weight: 600; margin: 0; }
+.continue-btn {
+  font-size: 0.8rem;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  margin-right: auto;
+}
+.continue-btn:hover { background: var(--row-hover); }
+.dash-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.stat-value { font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat-label { font-size: 0.7rem; color: var(--muted); }
 .dash-foot {
   display: flex;
   align-items: center;
@@ -238,6 +352,16 @@ details.pattern[open] > summary { margin-bottom: 2px; }
   gap: 8px;
   padding: 6px 0;
   border-top: 1px solid var(--row-hover);
+  /* keep jump targets clear of the sticky header */
+  scroll-margin-top: 160px;
+}
+.problem-row.just-jumped { animation: jump-flash 1.6s ease-out; }
+@keyframes jump-flash {
+  0%, 40% { background: var(--heat-1); }
+  100% { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .problem-row.just-jumped { animation: none; outline: 2px solid var(--focus); }
 }
 .problem-row:hover { background: var(--row-hover); }
 .problem-row.done .q-text { text-decoration: line-through; color: var(--muted); }
@@ -259,13 +383,15 @@ a.q-text { color: var(--fg); }
   color: #fff;
   white-space: nowrap;
 }
-.badge.Easy { background: var(--easy); }
-.badge.Medium { background: var(--medium); }
-.badge.Hard { background: var(--hard); }
+.badge.Easy { background: var(--badge-easy); }
+.badge.Medium { background: var(--badge-medium); }
+.badge.Hard { background: var(--badge-hard); }
 
 .star-btn { background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--muted); padding: 0; }
 .star-btn.active { color: #e0a300; }
 .notes-btn { background: none; border: none; cursor: pointer; font-size: 0.85rem; color: var(--muted); padding: 0; }
+.notes-btn.has-notes { color: var(--fg); font-weight: 600; }
+.notes-btn.has-notes::after { content: " •"; }
 
 .detail-panel { font-size: 0.78rem; color: var(--muted); margin-top: 4px; display: none; }
 .detail-panel.open { display: block; }
@@ -280,6 +406,21 @@ a.q-text { color: var(--fg); }
   border-radius: 6px;
   background: var(--bg);
   color: var(--fg);
+}
+
+/* iOS Safari zooms the page when a focused field is under 16px and never zooms
+   back out — which made tapping into a notes box strand you at ~130%. */
+@media (max-width: 700px) {
+  #search, .filter-select, .detail-panel textarea { font-size: 16px; }
+}
+
+/* Star/notes sat at ~16px hit areas, under both the 44px iOS and 24px WCAG
+   minimums, right next to the problem link. */
+@media (pointer: coarse) {
+  .star-btn, .notes-btn { padding: 6px; min-width: 32px; min-height: 32px; }
+  .problem-row input[type="checkbox"] { width: 20px; height: 20px; }
+  .heatmap-day { width: 13px; height: 13px; }
+  .heatmap-week { grid-template-rows: repeat(7, 13px); }
 }
 
 footer {
