@@ -47,6 +47,18 @@
 </header>
 
 <main>
+  <details id="heatmapSection" class="analytics heatmap-section" open>
+    <summary>Activity Heatmap</summary>
+    <div class="heatmap-controls">
+      <div class="heatmap-year-nav">
+        <button id="heatmapPrevYear" class="year-nav-btn" title="Previous year">&#8249;</button>
+        <span id="heatmapYearLabel" class="heatmap-year-label">Current</span>
+        <button id="heatmapNextYear" class="year-nav-btn" title="Next year" disabled>&#8250;</button>
+      </div>
+    </div>
+    <div class="heatmap-scroll"><div id="heatmapGrid"></div></div>
+    <div id="heatmapSummary" class="heatmap-summary"></div>
+  </details>
   <details id="analytics" class="analytics" open>
     <summary>Analytics</summary>
     <div class="analytics-grid" id="analyticsGrid"></div>
