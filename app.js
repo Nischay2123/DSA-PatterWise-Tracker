@@ -1,5 +1,7 @@
 const STORE_KEY = "dsa-tracker-progress";
 const ALL_PROBLEMS = DATA.topics.flatMap((t) => t.patterns.flatMap((p) => p.problems));
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+let heatmapRangeMonths = 3;
 
 function loadStore() {
   try {
@@ -14,7 +16,18 @@ function saveStore(store) {
 }
 
 function getState(store, id) {
-  return store.problems[id] || { done: false, revise: false, notes: "" };
+  return store.problems[id] || { done: false, revise: false, notes: "", completedAt: null, revisedAt: null };
+}
+
+function toISODate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function todayISO() {
+  return toISODate(new Date());
 }
 
 function countDone(problems, store) {
@@ -103,6 +116,7 @@ function updateProgress(store) {
   document.getElementById("overallFill").style.width = pct + "%";
   document.getElementById("overallLabel").textContent = `${overallDone}/${overallTotal} (${pct}%)`;
   renderAnalytics(store);
+  renderHeatmap(store);
 }
 
 function breakdownBy(getKey, order, store) {
@@ -146,6 +160,101 @@ function renderAnalytics(store) {
     </div>`;
 }
 
+function buildHeatmapStats(store) {
+  const doneByDate = new Map();
+  const revisedByDate = new Map();
+  Object.values(store.problems).forEach((st) => {
+    if (st.completedAt) doneByDate.set(st.completedAt, (doneByDate.get(st.completedAt) || 0) + 1);
+    if (st.revisedAt) revisedByDate.set(st.revisedAt, (revisedByDate.get(st.revisedAt) || 0) + 1);
+  });
+  return { doneByDate, revisedByDate };
+}
+
+function heatmapLevel(count, max) {
+  if (!count) return 0;
+  if (max <= 1) return count >= 1 ? 4 : 0;
+  const ratio = count / max;
+  if (ratio >= 0.75) return 4;
+  if (ratio >= 0.5) return 3;
+  if (ratio >= 0.25) return 2;
+  return 1;
+}
+
+function formatDayLabel(date) {
+  return `${MONTH_NAMES[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+}
+
+function renderHeatmap(store) {
+  const { doneByDate, revisedByDate } = buildHeatmapStats(store);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const rangeStart = new Date(today);
+  rangeStart.setMonth(rangeStart.getMonth() - heatmapRangeMonths);
+  const gridStart = new Date(rangeStart);
+  gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+
+  const days = [];
+  for (let d = new Date(gridStart); d <= today; d.setDate(d.getDate() + 1)) {
+    const iso = toISODate(d);
+    days.push({
+      date: new Date(d),
+      iso,
+      done: doneByDate.get(iso) || 0,
+      revised: revisedByDate.get(iso) || 0,
+      inRange: d >= rangeStart,
+    });
+  }
+
+  const maxDone = days.reduce((m, day) => (day.inRange ? Math.max(m, day.done) : m), 0);
+
+  const weeks = [];
+  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+
+  const monthLabels = [];
+  let lastMonth = -1;
+  weeks.forEach((week, wi) => {
+    const firstDay = week[0].date;
+    if (firstDay.getMonth() !== lastMonth) {
+      lastMonth = firstDay.getMonth();
+      monthLabels.push({ weekIndex: wi, label: MONTH_NAMES[firstDay.getMonth()] });
+    }
+  });
+  const monthRowHtml = monthLabels.map((m, i) => {
+    const nextStart = i + 1 < monthLabels.length ? monthLabels[i + 1].weekIndex : weeks.length;
+    const span = Math.max(1, nextStart - m.weekIndex);
+    if (span < 2 && i > 0) return "";
+    return `<span class="heatmap-month" style="grid-column:${m.weekIndex + 1} / span ${span}">${m.label}</span>`;
+  }).join("");
+
+  const weeksHtml = weeks.map((week) => {
+    const cellsHtml = week.map((day) => {
+      if (!day.inRange) return `<div class="heatmap-day future"></div>`;
+      const level = heatmapLevel(day.done, maxDone);
+      const label = day.done || day.revised
+        ? `${formatDayLabel(day.date)} — ${day.done} solved · ${day.revised} revised`
+        : `${formatDayLabel(day.date)} — no activity`;
+      return `<div class="heatmap-day" data-level="${level}" title="${esc(label)}"></div>`;
+    }).join("");
+    return `<div class="heatmap-week">${cellsHtml}</div>`;
+  }).join("");
+
+  document.getElementById("heatmapGrid").innerHTML = `
+    <div class="heatmap-months" style="grid-template-columns:repeat(${weeks.length}, 14px)">${monthRowHtml}</div>
+    <div class="heatmap-weeks">${weeksHtml}</div>
+    <div class="heatmap-legend">
+      <span>Less</span>
+      ${[0, 1, 2, 3, 4].map((l) => `<div class="heatmap-day" data-level="${l}"></div>`).join("")}
+      <span>More</span>
+    </div>`;
+
+  const inRangeDays = days.filter((d) => d.inRange);
+  const totalDone = inRangeDays.reduce((s, d) => s + d.done, 0);
+  const totalRevised = inRangeDays.reduce((s, d) => s + d.revised, 0);
+  const activeDays = inRangeDays.filter((d) => d.done > 0).length;
+  document.getElementById("heatmapSummary").textContent =
+    `${totalDone} solved · ${totalRevised} revised on ${activeDays} active day${activeDays === 1 ? "" : "s"} in this range`;
+}
+
 function applyFilters() {
   const q = document.getElementById("search").value.trim().toLowerCase();
   const diff = document.querySelector(".diff-btn.active").dataset.diff;
@@ -186,8 +295,9 @@ function mutateProblem(id, patch) {
 document.getElementById("topics").addEventListener("change", (e) => {
   if (!e.target.classList.contains("done-cb")) return;
   const row = e.target.closest(".problem-row");
-  const store = mutateProblem(row.dataset.id, { done: e.target.checked });
-  row.classList.toggle("done", e.target.checked);
+  const done = e.target.checked;
+  const store = mutateProblem(row.dataset.id, { done, completedAt: done ? todayISO() : null });
+  row.classList.toggle("done", done);
   updateProgress(store);
   applyFilters();
 });
@@ -197,9 +307,10 @@ document.getElementById("topics").addEventListener("click", (e) => {
   if (starBtn) {
     const row = starBtn.closest(".problem-row");
     const revise = !getState(loadStore(), row.dataset.id).revise;
-    const store = mutateProblem(row.dataset.id, { revise });
+    const store = mutateProblem(row.dataset.id, { revise, revisedAt: revise ? todayISO() : null });
     starBtn.classList.toggle("active", revise);
     renderAnalytics(store);
+    renderHeatmap(store);
     return;
   }
   const notesBtn = e.target.closest(".notes-btn");
@@ -212,6 +323,15 @@ document.getElementById("topics").addEventListener("focusout", (e) => {
   if (e.target.tagName !== "TEXTAREA") return;
   const row = e.target.closest(".problem-row");
   mutateProblem(row.dataset.id, { notes: e.target.value });
+});
+
+document.querySelectorAll(".range-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".range-btn").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    heatmapRangeMonths = Number(btn.dataset.months);
+    renderHeatmap(loadStore());
+  });
 });
 
 document.querySelectorAll(".diff-btn").forEach((btn) => {

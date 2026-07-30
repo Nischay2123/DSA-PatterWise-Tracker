@@ -8,6 +8,11 @@
   --fg: #1a1a1a;
   --muted: #6b6b6f;
   --row-hover: #f4f4f7;
+  --heat-0: #ebedf0;
+  --heat-1: #c6e6cd;
+  --heat-2: #8fd19e;
+  --heat-3: #4cb264;
+  --heat-4: #2fa84f;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -16,6 +21,11 @@
     --fg: #e8e8ea;
     --muted: #9a9aa0;
     --row-hover: #202024;
+    --heat-0: #202024;
+    --heat-1: #1c4229;
+    --heat-2: #216b39;
+    --heat-3: #2a9147;
+    --heat-4: #39c261;
   }
 }
 
@@ -157,6 +167,49 @@ details.pattern[open] > summary { margin-bottom: 2px; }
 .analytics-label { width: 70px; flex-shrink: 0; color: var(--muted); }
 .analytics-count { width: 48px; flex-shrink: 0; text-align: right; color: var(--muted); }
 .progress-bar.mini { height: 6px; }
+
+.heatmap-controls { display: flex; padding: 4px 0 8px; }
+.heatmap-range-filter { display: flex; gap: 6px; }
+.range-btn {
+  font-size: 0.8rem;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+.range-btn.active { background: var(--fg); color: var(--bg); }
+.heatmap-scroll { overflow-x: auto; padding-bottom: 4px; }
+.heatmap-months {
+  display: grid;
+  grid-auto-flow: column;
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.heatmap-weeks { display: grid; grid-auto-flow: column; grid-auto-columns: 11px; gap: 3px; }
+.heatmap-week { display: grid; grid-template-rows: repeat(7, 11px); gap: 3px; }
+.heatmap-day {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--heat-0);
+}
+.heatmap-day[data-level="1"] { background: var(--heat-1); }
+.heatmap-day[data-level="2"] { background: var(--heat-2); }
+.heatmap-day[data-level="3"] { background: var(--heat-3); }
+.heatmap-day[data-level="4"] { background: var(--heat-4); }
+.heatmap-day.future { background: transparent; }
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.heatmap-summary { font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
 
 .problem-row {
   display: flex;

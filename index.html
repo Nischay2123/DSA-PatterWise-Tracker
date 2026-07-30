@@ -47,6 +47,19 @@
 </header>
 
 <main>
+  <details id="heatmapSection" class="analytics heatmap-section" open>
+    <summary>Activity Heatmap</summary>
+    <div class="heatmap-controls">
+      <div class="heatmap-range-filter">
+        <button data-months="1" class="range-btn">1M</button>
+        <button data-months="3" class="range-btn active">3M</button>
+        <button data-months="6" class="range-btn">6M</button>
+        <button data-months="12" class="range-btn">1Y</button>
+      </div>
+    </div>
+    <div class="heatmap-scroll"><div id="heatmapGrid"></div></div>
+    <div id="heatmapSummary" class="heatmap-summary"></div>
+  </details>
   <details id="analytics" class="analytics" open>
     <summary>Analytics</summary>
     <div class="analytics-grid" id="analyticsGrid"></div>
