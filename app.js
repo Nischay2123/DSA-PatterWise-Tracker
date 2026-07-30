@@ -596,6 +596,99 @@ document.getElementById("importInput").addEventListener("change", (e) => {
   e.target.value = "";
 });
 
+// ISO dates sort lexically, so the earliest is just the smaller string.
+function earlierDate(a, b) {
+  if (a && b) return a < b ? a : b;
+  return a || b || null;
+}
+
+function mergeNotes(a, b) {
+  const left = (a || "").trim();
+  const right = (b || "").trim();
+  if (!left) return right;
+  if (!right) return left;
+  if (left === right) return left;
+  return `${left}\n\n--- merged ---\n\n${right}`;
+}
+
+// Union merge: a problem is solved if either copy says so, so merging can only
+// ever add progress. Never un-solves anything and never drops a note.
+function mergeStores(local, incoming) {
+  const merged = { version: 1, problems: {} };
+  const ids = new Set([...Object.keys(local.problems), ...Object.keys(incoming.problems)]);
+  ids.forEach((id) => {
+    const a = local.problems[id] || {};
+    const b = incoming.problems[id] || {};
+    const done = !!(a.done || b.done);
+    const revise = !!(a.revise || b.revise);
+    merged.problems[id] = {
+      done,
+      revise,
+      notes: mergeNotes(a.notes, b.notes),
+      // Keep the invariant the rest of the app relies on: no date without the flag.
+      completedAt: done ? earlierDate(a.completedAt, b.completedAt) : null,
+      revisedAt: revise ? earlierDate(a.revisedAt, b.revisedAt) : null,
+    };
+  });
+  return merged;
+}
+
+function summarizeMerge(local, merged) {
+  let newlySolved = 0, newlyRevised = 0, notesCombined = 0;
+  Object.keys(merged.problems).forEach((id) => {
+    const before = local.problems[id] || {};
+    const after = merged.problems[id];
+    if (after.done && !before.done) newlySolved++;
+    if (after.revise && !before.revise) newlyRevised++;
+    if (after.notes && after.notes !== (before.notes || "")) notesCombined++;
+  });
+  return { newlySolved, newlyRevised, notesCombined };
+}
+
+document.getElementById("mergeBtn").addEventListener("click", () => {
+  document.getElementById("mergeInput").click();
+});
+
+document.getElementById("mergeInput").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(reader.result);
+    } catch (err) {
+      alert("That file isn't valid JSON, so nothing was changed.");
+      return;
+    }
+    if (!isValidStore(parsed)) {
+      alert("That doesn't look like a DSA Tracker backup — it has no \"problems\" data. Nothing was changed.");
+      return;
+    }
+    const current = loadStore();
+    const merged = mergeStores(current, parsed);
+    const { newlySolved, newlyRevised, notesCombined } = summarizeMerge(current, merged);
+    if (!newlySolved && !newlyRevised && !notesCombined) {
+      alert("That file adds nothing new — everything in it is already tracked here.");
+      return;
+    }
+    const ok = confirm(
+      "Merge this backup into your progress?\n\n" +
+      `Newly solved:   ${newlySolved}\n` +
+      `Newly starred:  ${newlyRevised}\n` +
+      `Notes combined: ${notesCombined}\n\n` +
+      `Solved after merge: ${countDoneInStore(merged)} (currently ${countDoneInStore(current)})\n\n` +
+      "Nothing already solved will be un-solved. You can still Undo import afterwards."
+    );
+    if (!ok) return;
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(current));
+    saveStore(merged);
+    render();
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+});
+
 document.getElementById("undoImportBtn").addEventListener("click", () => {
   const raw = localStorage.getItem(BACKUP_KEY);
   if (!raw) return;

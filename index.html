@@ -84,7 +84,19 @@
 </main>
 
 <footer>
-  Progress is saved in this browser only (localStorage) — no account, no sync. Use Export regularly as a backup.
+  <p>Progress is saved in this browser only (localStorage) — no account, no sync. Use Export regularly as a backup.</p>
+  <details class="advanced">
+    <summary>Advanced</summary>
+    <div class="advanced-body">
+      <p class="advanced-note">
+        <strong>Merge a backup</strong> combines another device's file with what's already here instead of
+        replacing it. A problem stays solved if it's solved in either copy, the earliest completion date wins,
+        and differing notes are kept side by side. Nothing already solved is ever un-solved.
+      </p>
+      <button id="mergeBtn" class="advanced-btn">Choose a file to merge&hellip;</button>
+      <input type="file" id="mergeInput" accept="application/json" class="visually-hidden" tabindex="-1" aria-hidden="true">
+    </div>
+  </details>
 </footer>
 
 <script src="data.js"></script>

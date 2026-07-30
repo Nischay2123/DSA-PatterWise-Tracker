@@ -429,3 +429,27 @@ footer {
   color: var(--muted);
   padding: 20px;
 }
+footer p { margin: 0; }
+/* Merge lives down here on purpose: findable when looked for, but nowhere near
+   the header's Import button, where a mis-click would be destructive. */
+.advanced { margin-top: 14px; }
+.advanced > summary { display: inline-block; color: var(--muted); }
+.advanced-body {
+  max-width: 460px;
+  margin: 10px auto 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: left;
+}
+.advanced-note { margin: 0 0 10px; line-height: 1.5; }
+.advanced-btn {
+  font-size: 0.75rem;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+.advanced-btn:hover { background: var(--row-hover); }
