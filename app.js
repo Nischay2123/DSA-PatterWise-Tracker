@@ -201,68 +201,55 @@ function getHeatmapRange(offset) {
 function renderHeatmap(store) {
   const { doneByDate, revisedByDate } = buildHeatmapStats(store);
   const { start: rangeStart, end: rangeEnd, label } = getHeatmapRange(heatmapYearOffset);
-  const gridStart = new Date(rangeStart);
-  gridStart.setDate(gridStart.getDate() - gridStart.getDay());
-
-  const days = [];
-  for (let d = new Date(gridStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
-    const iso = toISODate(d);
-    days.push({
-      date: new Date(d),
-      iso,
-      done: doneByDate.get(iso) || 0,
-      revised: revisedByDate.get(iso) || 0,
-      inRange: d >= rangeStart && d <= rangeEnd,
-    });
+  // Each month owns only its own days: a week straddling a month boundary is
+  // split, so no day ever renders under a neighbouring month's label.
+  const months = [];
+  const cursor = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
+  const lastMonthStart = new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), 1);
+  while (cursor <= lastMonthStart) {
+    const monthStart = new Date(cursor);
+    const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+    const from = monthStart < rangeStart ? new Date(rangeStart) : monthStart;
+    const to = monthEnd > rangeEnd ? new Date(rangeEnd) : monthEnd;
+    const days = [];
+    for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+      const iso = toISODate(d);
+      days.push({
+        date: new Date(d),
+        done: doneByDate.get(iso) || 0,
+        revised: revisedByDate.get(iso) || 0,
+      });
+    }
+    if (days.length) months.push({ label: MONTH_NAMES[monthStart.getMonth()], pad: from.getDay(), days });
+    cursor.setMonth(cursor.getMonth() + 1);
   }
 
-  const maxDone = days.reduce((m, day) => (day.inRange ? Math.max(m, day.done) : m), 0);
+  const allDays = months.flatMap((m) => m.days);
+  const maxDone = allDays.reduce((m, day) => Math.max(m, day.done), 0);
 
-  const weeks = [];
-  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
-
-  const monthGroups = [];
-  let lastMonth = -1;
-  weeks.forEach((week, wi) => {
-    const firstDay = week[0].date;
-    if (firstDay.getMonth() !== lastMonth) {
-      lastMonth = firstDay.getMonth();
-      monthGroups.push({ weekIndex: wi, label: MONTH_NAMES[firstDay.getMonth()], weeks: [] });
+  const blocksHtml = months.map((month) => {
+    const cells = [];
+    for (let i = 0; i < month.pad; i++) cells.push(`<div class="heatmap-day empty"></div>`);
+    month.days.forEach((day) => {
+      const level = heatmapLevel(day.done, maxDone);
+      const revisedPart = day.revised ? ` · ${day.revised} revised` : "";
+      const tip = `${day.done} solved${revisedPart} on ${formatDayLabel(day.date)}`;
+      cells.push(`<div class="heatmap-day" data-level="${level}" title="${esc(tip)}"></div>`);
+    });
+    while (cells.length % 7) cells.push(`<div class="heatmap-day empty"></div>`);
+    const weeksHtml = [];
+    for (let i = 0; i < cells.length; i += 7) {
+      weeksHtml.push(`<div class="heatmap-week">${cells.slice(i, i + 7).join("")}</div>`);
     }
-    monthGroups[monthGroups.length - 1].weeks.push(week);
-  });
-
-  const colWidths = [];
-  monthGroups.forEach((group, i) => {
-    if (i > 0) colWidths.push("8px");
-    group.weeks.forEach(() => colWidths.push("12px"));
-  });
-  const colTemplate = colWidths.join(" ");
-
-  const monthRowHtml = monthGroups.map((group, i) => {
-    const gapHtml = i > 0 ? `<span class="heatmap-month-gap"></span>` : "";
-    return `${gapHtml}<span class="heatmap-month" style="grid-column:span ${group.weeks.length}">${group.label}</span>`;
-  }).join("");
-
-  const weeksHtml = monthGroups.map((group, i) => {
-    const gapHtml = i > 0 ? `<div class="heatmap-week-gap"></div>` : "";
-    const groupHtml = group.weeks.map((week) => {
-      const cellsHtml = week.map((day) => {
-        if (!day.inRange) return `<div class="heatmap-day future"></div>`;
-        const level = heatmapLevel(day.done, maxDone);
-        const label = day.done || day.revised
-          ? `${formatDayLabel(day.date)} — ${day.done} solved · ${day.revised} revised`
-          : `${formatDayLabel(day.date)} — no activity`;
-        return `<div class="heatmap-day" data-level="${level}" title="${esc(label)}"></div>`;
-      }).join("");
-      return `<div class="heatmap-week">${cellsHtml}</div>`;
-    }).join("");
-    return gapHtml + groupHtml;
+    return `
+      <div class="heatmap-month-block">
+        <div class="heatmap-month-weeks">${weeksHtml.join("")}</div>
+        <div class="heatmap-month-label">${month.label}</div>
+      </div>`;
   }).join("");
 
   document.getElementById("heatmapGrid").innerHTML = `
-    <div class="heatmap-months" style="grid-template-columns:${colTemplate}">${monthRowHtml}</div>
-    <div class="heatmap-weeks" style="grid-template-columns:${colTemplate}">${weeksHtml}</div>
+    <div class="heatmap-body">${blocksHtml}</div>
     <div class="heatmap-legend">
       <span>Less</span>
       ${[0, 1, 2, 3, 4].map((l) => `<div class="heatmap-day" data-level="${l}"></div>`).join("")}
@@ -272,10 +259,9 @@ function renderHeatmap(store) {
   document.getElementById("heatmapYearLabel").textContent = label;
   document.getElementById("heatmapNextYear").disabled = heatmapYearOffset === 0;
 
-  const inRangeDays = days.filter((d) => d.inRange);
-  const totalDone = inRangeDays.reduce((s, d) => s + d.done, 0);
-  const totalRevised = inRangeDays.reduce((s, d) => s + d.revised, 0);
-  const activeDays = inRangeDays.filter((d) => d.done > 0).length;
+  const totalDone = allDays.reduce((s, d) => s + d.done, 0);
+  const totalRevised = allDays.reduce((s, d) => s + d.revised, 0);
+  const activeDays = allDays.filter((d) => d.done > 0).length;
   document.getElementById("heatmapSummary").textContent =
     `${totalDone} solved · ${totalRevised} revised on ${activeDays} active day${activeDays === 1 ? "" : "s"} in this range`;
 }
