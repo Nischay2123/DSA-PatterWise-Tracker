@@ -1,7 +1,7 @@
 const STORE_KEY = "dsa-tracker-progress";
 const ALL_PROBLEMS = DATA.topics.flatMap((t) => t.patterns.flatMap((p) => p.problems));
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-let heatmapRangeMonths = 3;
+let heatmapYearOffset = 0;
 
 function loadStore() {
   try {
@@ -184,24 +184,35 @@ function formatDayLabel(date) {
   return `${MONTH_NAMES[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
 }
 
-function renderHeatmap(store) {
-  const { doneByDate, revisedByDate } = buildHeatmapStats(store);
+function getHeatmapRange(offset) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const rangeStart = new Date(today);
-  rangeStart.setMonth(rangeStart.getMonth() - heatmapRangeMonths);
+  if (offset === 0) {
+    const end = today;
+    const start = new Date(end);
+    start.setFullYear(start.getFullYear() - 1);
+    start.setDate(start.getDate() + 1);
+    return { start, end, label: "Current" };
+  }
+  const year = today.getFullYear() - offset;
+  return { start: new Date(year, 0, 1), end: new Date(year, 11, 31), label: String(year) };
+}
+
+function renderHeatmap(store) {
+  const { doneByDate, revisedByDate } = buildHeatmapStats(store);
+  const { start: rangeStart, end: rangeEnd, label } = getHeatmapRange(heatmapYearOffset);
   const gridStart = new Date(rangeStart);
   gridStart.setDate(gridStart.getDate() - gridStart.getDay());
 
   const days = [];
-  for (let d = new Date(gridStart); d <= today; d.setDate(d.getDate() + 1)) {
+  for (let d = new Date(gridStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
     const iso = toISODate(d);
     days.push({
       date: new Date(d),
       iso,
       done: doneByDate.get(iso) || 0,
       revised: revisedByDate.get(iso) || 0,
-      inRange: d >= rangeStart,
+      inRange: d >= rangeStart && d <= rangeEnd,
     });
   }
 
@@ -239,13 +250,16 @@ function renderHeatmap(store) {
   }).join("");
 
   document.getElementById("heatmapGrid").innerHTML = `
-    <div class="heatmap-months" style="grid-template-columns:repeat(${weeks.length}, 14px)">${monthRowHtml}</div>
+    <div class="heatmap-months" style="grid-template-columns:repeat(${weeks.length}, 16px)">${monthRowHtml}</div>
     <div class="heatmap-weeks">${weeksHtml}</div>
     <div class="heatmap-legend">
       <span>Less</span>
       ${[0, 1, 2, 3, 4].map((l) => `<div class="heatmap-day" data-level="${l}"></div>`).join("")}
       <span>More</span>
     </div>`;
+
+  document.getElementById("heatmapYearLabel").textContent = label;
+  document.getElementById("heatmapNextYear").disabled = heatmapYearOffset === 0;
 
   const inRangeDays = days.filter((d) => d.inRange);
   const totalDone = inRangeDays.reduce((s, d) => s + d.done, 0);
@@ -325,13 +339,15 @@ document.getElementById("topics").addEventListener("focusout", (e) => {
   mutateProblem(row.dataset.id, { notes: e.target.value });
 });
 
-document.querySelectorAll(".range-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".range-btn").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    heatmapRangeMonths = Number(btn.dataset.months);
-    renderHeatmap(loadStore());
-  });
+document.getElementById("heatmapPrevYear").addEventListener("click", () => {
+  heatmapYearOffset++;
+  renderHeatmap(loadStore());
+});
+
+document.getElementById("heatmapNextYear").addEventListener("click", () => {
+  if (heatmapYearOffset === 0) return;
+  heatmapYearOffset--;
+  renderHeatmap(loadStore());
 });
 
 document.querySelectorAll(".diff-btn").forEach((btn) => {
