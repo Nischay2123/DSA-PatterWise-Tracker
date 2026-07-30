@@ -221,37 +221,48 @@ function renderHeatmap(store) {
   const weeks = [];
   for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
 
-  const monthLabels = [];
+  const monthGroups = [];
   let lastMonth = -1;
   weeks.forEach((week, wi) => {
     const firstDay = week[0].date;
     if (firstDay.getMonth() !== lastMonth) {
       lastMonth = firstDay.getMonth();
-      monthLabels.push({ weekIndex: wi, label: MONTH_NAMES[firstDay.getMonth()] });
+      monthGroups.push({ weekIndex: wi, label: MONTH_NAMES[firstDay.getMonth()], weeks: [] });
     }
+    monthGroups[monthGroups.length - 1].weeks.push(week);
   });
-  const monthRowHtml = monthLabels.map((m, i) => {
-    const nextStart = i + 1 < monthLabels.length ? monthLabels[i + 1].weekIndex : weeks.length;
-    const span = Math.max(1, nextStart - m.weekIndex);
-    if (span < 2 && i > 0) return "";
-    return `<span class="heatmap-month" style="grid-column:${m.weekIndex + 1} / span ${span}">${m.label}</span>`;
+
+  const colWidths = [];
+  monthGroups.forEach((group, i) => {
+    if (i > 0) colWidths.push("8px");
+    group.weeks.forEach(() => colWidths.push("12px"));
+  });
+  const colTemplate = colWidths.join(" ");
+
+  const monthRowHtml = monthGroups.map((group, i) => {
+    const gapHtml = i > 0 ? `<span class="heatmap-month-gap"></span>` : "";
+    return `${gapHtml}<span class="heatmap-month" style="grid-column:span ${group.weeks.length}">${group.label}</span>`;
   }).join("");
 
-  const weeksHtml = weeks.map((week) => {
-    const cellsHtml = week.map((day) => {
-      if (!day.inRange) return `<div class="heatmap-day future"></div>`;
-      const level = heatmapLevel(day.done, maxDone);
-      const label = day.done || day.revised
-        ? `${formatDayLabel(day.date)} — ${day.done} solved · ${day.revised} revised`
-        : `${formatDayLabel(day.date)} — no activity`;
-      return `<div class="heatmap-day" data-level="${level}" title="${esc(label)}"></div>`;
+  const weeksHtml = monthGroups.map((group, i) => {
+    const gapHtml = i > 0 ? `<div class="heatmap-week-gap"></div>` : "";
+    const groupHtml = group.weeks.map((week) => {
+      const cellsHtml = week.map((day) => {
+        if (!day.inRange) return `<div class="heatmap-day future"></div>`;
+        const level = heatmapLevel(day.done, maxDone);
+        const label = day.done || day.revised
+          ? `${formatDayLabel(day.date)} — ${day.done} solved · ${day.revised} revised`
+          : `${formatDayLabel(day.date)} — no activity`;
+        return `<div class="heatmap-day" data-level="${level}" title="${esc(label)}"></div>`;
+      }).join("");
+      return `<div class="heatmap-week">${cellsHtml}</div>`;
     }).join("");
-    return `<div class="heatmap-week">${cellsHtml}</div>`;
+    return gapHtml + groupHtml;
   }).join("");
 
   document.getElementById("heatmapGrid").innerHTML = `
-    <div class="heatmap-months" style="grid-template-columns:repeat(${weeks.length}, 16px)">${monthRowHtml}</div>
-    <div class="heatmap-weeks">${weeksHtml}</div>
+    <div class="heatmap-months" style="grid-template-columns:${colTemplate}">${monthRowHtml}</div>
+    <div class="heatmap-weeks" style="grid-template-columns:${colTemplate}">${weeksHtml}</div>
     <div class="heatmap-legend">
       <span>Less</span>
       ${[0, 1, 2, 3, 4].map((l) => `<div class="heatmap-day" data-level="${l}"></div>`).join("")}
