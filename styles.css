@@ -142,20 +142,40 @@ details.pattern > summary {
 details.pattern[open] > summary { margin-bottom: 2px; }
 .pattern-body { padding-left: 12px; }
 
-.analytics {
-  max-width: 900px;
-  margin: 0 auto 14px;
-  padding: 4px 20px;
+.dashboard {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
 }
-.analytics > summary {
+.dash-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.dash-title { font-size: 0.95rem; font-weight: 600; margin: 0; }
+.dash-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.dash-analytics { border-top: 1px solid var(--border); margin-top: 12px; }
+.dash-analytics > summary {
+  font-size: 0.85rem;
   font-weight: 600;
-  padding: 8px 0;
+  padding: 10px 0 0;
 }
 .analytics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 12px;
-  padding: 4px 0 12px;
+  padding: 10px 0 2px;
 }
 .analytics-card {
   border: 1px solid var(--border);
@@ -168,7 +188,6 @@ details.pattern[open] > summary { margin-bottom: 2px; }
 .analytics-count { width: 48px; flex-shrink: 0; text-align: right; color: var(--muted); }
 .progress-bar.mini { height: 6px; }
 
-.heatmap-controls { display: flex; padding: 4px 0 8px; }
 .heatmap-year-nav { display: flex; align-items: center; gap: 10px; }
 .year-nav-btn {
   font-size: 0.95rem;
@@ -183,20 +202,20 @@ details.pattern[open] > summary { margin-bottom: 2px; }
 .year-nav-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .heatmap-year-label { font-size: 0.85rem; font-weight: 600; min-width: 60px; text-align: center; }
 .heatmap-scroll { overflow-x: auto; padding-bottom: 4px; }
-.heatmap-body { display: flex; gap: 10px; width: max-content; }
+.heatmap-body { display: flex; gap: 6px; width: max-content; }
 .heatmap-month-block { display: flex; flex-direction: column; gap: 6px; }
-.heatmap-month-weeks { display: flex; gap: 4px; }
+.heatmap-month-weeks { display: flex; gap: 2px; }
 .heatmap-month-label {
   font-size: 0.7rem;
   color: var(--muted);
   text-align: center;
   white-space: nowrap;
 }
-.heatmap-week { display: grid; grid-template-rows: repeat(7, 12px); gap: 4px; }
+.heatmap-week { display: grid; grid-template-rows: repeat(7, 10px); gap: 2px; }
 .heatmap-day {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
   background: var(--heat-0);
 }
 .heatmap-day.empty { background: transparent; }
@@ -208,11 +227,10 @@ details.pattern[open] > summary { margin-bottom: 2px; }
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 8px;
   font-size: 0.7rem;
   color: var(--muted);
 }
-.heatmap-summary { font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
+.heatmap-summary { font-size: 0.8rem; color: var(--muted); }
 
 .problem-row {
   display: flex;

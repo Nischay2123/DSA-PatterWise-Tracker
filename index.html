@@ -47,9 +47,9 @@
 </header>
 
 <main>
-  <details id="heatmapSection" class="analytics heatmap-section" open>
-    <summary>Activity Heatmap</summary>
-    <div class="heatmap-controls">
+  <section id="dashboard" class="dashboard">
+    <div class="dash-head">
+      <h2 class="dash-title">Activity</h2>
       <div class="heatmap-year-nav">
         <button id="heatmapPrevYear" class="year-nav-btn" title="Previous year">&#8249;</button>
         <span id="heatmapYearLabel" class="heatmap-year-label">Current</span>
@@ -57,12 +57,15 @@
       </div>
     </div>
     <div class="heatmap-scroll"><div id="heatmapGrid"></div></div>
-    <div id="heatmapSummary" class="heatmap-summary"></div>
-  </details>
-  <details id="analytics" class="analytics" open>
-    <summary>Analytics</summary>
-    <div class="analytics-grid" id="analyticsGrid"></div>
-  </details>
+    <div class="dash-foot">
+      <span id="heatmapSummary" class="heatmap-summary"></span>
+      <div id="heatmapLegend" class="heatmap-legend"></div>
+    </div>
+    <details id="analytics" class="dash-analytics">
+      <summary>Analytics</summary>
+      <div class="analytics-grid" id="analyticsGrid"></div>
+    </details>
+  </section>
   <div id="topics"></div>
 </main>
 

@@ -248,13 +248,12 @@ function renderHeatmap(store) {
       </div>`;
   }).join("");
 
-  document.getElementById("heatmapGrid").innerHTML = `
-    <div class="heatmap-body">${blocksHtml}</div>
-    <div class="heatmap-legend">
-      <span>Less</span>
-      ${[0, 1, 2, 3, 4].map((l) => `<div class="heatmap-day" data-level="${l}"></div>`).join("")}
-      <span>More</span>
-    </div>`;
+  document.getElementById("heatmapGrid").innerHTML = `<div class="heatmap-body">${blocksHtml}</div>`;
+
+  document.getElementById("heatmapLegend").innerHTML = `
+    <span>Less</span>
+    ${[0, 1, 2, 3, 4].map((l) => `<div class="heatmap-day" data-level="${l}"></div>`).join("")}
+    <span>More</span>`;
 
   document.getElementById("heatmapYearLabel").textContent = label;
   document.getElementById("heatmapNextYear").disabled = heatmapYearOffset === 0;
