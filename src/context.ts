@@ -1,7 +1,9 @@
 import type { Dispatch, SetStateAction } from "react";
-import { createContext, useCallback, useContext, useEffect, useReducer, useState } from "react";
-import { getState, loadStore, saveStore, todayISO } from "./store";
-import type { FilterState, ProblemState, ProgressStore } from "./types";
+import { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState } from "react";
+import { loadAppStore, saveAppStore } from "./persistence/db";
+import { emptyAppStoreV2 } from "./persistence/migrate";
+import { getState, patchV2FromV1, todayISO, v2ProgressToV1Store } from "./store";
+import type { AppStoreV2, FilterState, ProblemState, ProgressStore } from "./types";
 
 export type Action =
   | { type: "TOGGLE_DONE"; id: string; done: boolean }
@@ -28,12 +30,43 @@ function storeReducer(store: ProgressStore, action: Action): ProgressStore {
   }
 }
 
+export type BootStatus = "loading" | "ready" | "error";
+
+const EMPTY_STORE: ProgressStore = { version: 1, problems: {}, idsMigrated: true };
+
 export function useProgressStore() {
-  const [store, dispatch] = useReducer(storeReducer, undefined, () => loadStore());
+  const [store, dispatch] = useReducer(storeReducer, EMPTY_STORE);
   const [importNonce, setImportNonce] = useState(0);
+  const [status, setStatus] = useState<BootStatus>("loading");
+  const [bootError, setBootError] = useState<string | null>(null);
+  const v2Ref = useRef<AppStoreV2>(emptyAppStoreV2());
+  const bootedRef = useRef(false);
 
   useEffect(() => {
-    saveStore(store);
+    let cancelled = false;
+    loadAppStore()
+      .then((v2) => {
+        if (cancelled) return;
+        v2Ref.current = v2;
+        dispatch({ type: "IMPORT", store: v2ProgressToV1Store(v2) });
+        bootedRef.current = true;
+        setStatus("ready");
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setBootError(err instanceof Error ? err.message : String(err));
+        setStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    // Skip the placeholder pre-boot state and never persist while booted-with-error.
+    if (!bootedRef.current) return;
+    v2Ref.current = patchV2FromV1(v2Ref.current, store);
+    saveAppStore(v2Ref.current);
   }, [store]);
 
   const wrappedDispatch = useCallback((action: Action) => {
@@ -41,7 +74,7 @@ export function useProgressStore() {
     dispatch(action);
   }, []);
 
-  return { store, dispatch: wrappedDispatch, importNonce };
+  return { store, dispatch: wrappedDispatch, importNonce, status, bootError };
 }
 
 interface StoreContextValue {

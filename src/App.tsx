@@ -7,6 +7,7 @@ import { MergeImport } from "./components/MergeImport";
 import { ProgressBar } from "./components/ProgressBar";
 import { TopicList } from "./components/TopicList";
 import { FiltersContext, StoreContext, useProgressStore } from "./context";
+import { downloadBackupFile } from "./persistence/backup";
 import { countDone, getState, hasBackup, isProblemVisible } from "./store";
 import { useFilterAccordions } from "./useFilterAccordions";
 import type { FilterState, QuestionData } from "./types";
@@ -44,8 +45,38 @@ function jumpToProblem(id: string) {
   row.classList.add("just-jumped");
 }
 
+function LoadingScreen() {
+  return (
+    <div className="flex items-center justify-center h-screen text-muted text-[0.9rem]">Loading your progress…</div>
+  );
+}
+
+function ErrorScreen({ error }: { error: string | null }) {
+  const exportRaw = () => {
+    const raw = localStorage.getItem("dsa-tracker-progress");
+    if (raw) downloadBackupFile(raw);
+  };
+  return (
+    <div className="max-w-[500px] mx-auto mt-20 px-5 text-center">
+      <h1 className="text-[1.1rem] font-semibold mb-2">Couldn't load your progress</h1>
+      <p className="text-[0.85rem] text-muted mb-1">
+        Something went wrong migrating your saved data, so nothing was overwritten. Your original progress is still
+        safe in this browser.
+      </p>
+      {error && <p className="text-[0.75rem] text-muted mb-4 font-mono break-words">{error}</p>}
+      <button
+        type="button"
+        onClick={exportRaw}
+        className="border border-border rounded-md px-3 py-1.5 text-[0.85rem] cursor-pointer bg-transparent text-fg"
+      >
+        Export raw progress as JSON
+      </button>
+    </div>
+  );
+}
+
 export function App() {
-  const { store, dispatch, importNonce } = useProgressStore();
+  const { store, dispatch, importNonce, status, bootError } = useProgressStore();
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [backupExists, setBackupExists] = useState(() => hasBackup());
 
@@ -60,6 +91,9 @@ export function App() {
   const refreshBackup = () => setBackupExists(hasBackup());
 
   useFilterAccordions(filters);
+
+  if (status === "loading") return <LoadingScreen />;
+  if (status === "error") return <ErrorScreen error={bootError} />;
 
   return (
     <StoreContext.Provider value={{ store, dispatch }}>
@@ -93,8 +127,7 @@ export function App() {
         </main>
         <footer className="text-center text-[0.75rem] text-muted p-5">
           <p className="m-0">
-            Progress is saved in this browser only (localStorage) — no account, no sync. Use Export regularly as a
-            backup.
+            Progress is saved in this browser only — no account, no sync. Use Export regularly as a backup.
           </p>
           <MergeImport onBackupChange={refreshBackup} />
         </footer>

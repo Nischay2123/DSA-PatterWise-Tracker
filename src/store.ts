@@ -1,5 +1,15 @@
 import idMapRaw from "../data/idMap.json";
-import type { FilterState, HeatmapDay, HeatmapMonth, Problem, ProblemState, ProgressStore } from "./types";
+import { liftV1Entry } from "./persistence/migrate";
+import type {
+  AppStoreV2,
+  FilterState,
+  HeatmapDay,
+  HeatmapMonth,
+  Problem,
+  ProblemState,
+  ProgressStore,
+  QuestionProgressV2,
+} from "./types";
 
 const STORE_KEY = "dsa-tracker-progress";
 const BACKUP_KEY = "dsa-tracker-progress-backup";
@@ -307,6 +317,45 @@ export function mergeStores(local: ProgressStore, incoming: ProgressStore): Prog
     };
   });
   return merged;
+}
+
+// --- v2 (IndexedDB) adapter -------------------------------------------------
+// Phase 2 moves persistence to IndexedDB without touching the UI layer yet
+// (that's Phase 3). These two functions are the seam: the reducer and every
+// component still see the familiar v1 ProgressStore shape, while what's
+// actually saved to disk is v2. Round-tripping through here on every change
+// must never clobber v2-only fields (approach/pseudocode/mistakes/etc.) that
+// a later phase writes -- so patch existing entries, don't replace them.
+
+export function v2ProgressToV1Store(v2: AppStoreV2): ProgressStore {
+  const problems: Record<string, ProblemState> = {};
+  for (const [id, p] of Object.entries(v2.progress)) {
+    problems[id] = {
+      done: p.completed,
+      revise: p.starred,
+      notes: p.notes.legacy,
+      completedAt: p.lastCompletedAt,
+      revisedAt: p.starredAt,
+    };
+  }
+  return { version: 1, problems, idsMigrated: true };
+}
+
+export function patchV2FromV1(v2: AppStoreV2, v1: ProgressStore): AppStoreV2 {
+  const progress: Record<string, QuestionProgressV2> = { ...v2.progress };
+  for (const [id, state] of Object.entries(v1.problems)) {
+    const base = progress[id] ?? liftV1Entry(state);
+    progress[id] = {
+      ...base,
+      completed: state.done,
+      starred: state.revise,
+      starredAt: state.revisedAt,
+      firstCompletedAt: state.completedAt,
+      lastCompletedAt: state.completedAt,
+      notes: { ...base.notes, legacy: state.notes },
+    };
+  }
+  return { ...v2, progress };
 }
 
 export interface MergeSummary {
