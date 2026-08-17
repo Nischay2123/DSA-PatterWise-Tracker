@@ -8,7 +8,7 @@ import { ProgressBar } from "./components/ProgressBar";
 import { TopicList } from "./components/TopicList";
 import { FiltersContext, StoreContext, useProgressStore } from "./context";
 import { downloadBackupFile } from "./persistence/backup";
-import { countDone, getState, hasBackup, isProblemVisible } from "./store";
+import { countDone, getState, hasBackupV2, isProblemVisible } from "./store";
 import { useFilterAccordions } from "./useFilterAccordions";
 import type { FilterState, QuestionData } from "./types";
 
@@ -78,7 +78,7 @@ function ErrorScreen({ error }: { error: string | null }) {
 export function App() {
   const { store, dispatch, importNonce, status, bootError, v2Store, dispatchV2 } = useProgressStore();
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
-  const [backupExists, setBackupExists] = useState(() => hasBackup());
+  const [backupExists, setBackupExists] = useState(() => hasBackupV2());
 
   const overallDone = countDone(ALL_PROBLEMS, store);
   const overallTotal = ALL_PROBLEMS.length;
@@ -88,7 +88,7 @@ export function App() {
     isProblemVisible(problem, getState(store, problem.id), filters, { topicName, patternName })
   ).length;
 
-  const refreshBackup = () => setBackupExists(hasBackup());
+  const refreshBackup = () => setBackupExists(hasBackupV2());
 
   useFilterAccordions(filters);
 

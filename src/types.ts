@@ -163,4 +163,7 @@ export type V2Action =
   | { type: "SET_CODE"; id: string; code: string }
   | { type: "SET_STRUCTURED_NOTE"; id: string; field: StructuredNoteField; value: string }
   | { type: "ADD_MISTAKE"; id: string; mistake: { at: string; what: string; remember: string } }
-  | { type: "REMOVE_MISTAKE"; id: string; at: string };
+  | { type: "REMOVE_MISTAKE"; id: string; at: string }
+  // Wholesale replace, for importing/restoring a complete v2 export or backup --
+  // mirrors the v1 reducer's own "IMPORT" case.
+  | { type: "REPLACE_STORE"; store: AppStoreV2 };

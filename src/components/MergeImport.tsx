@@ -1,9 +1,9 @@
 import type { ChangeEvent } from "react";
 import { useStore } from "../context";
-import { countDoneInStore, isValidStore, mergeStores, saveBackup, summarizeMerge } from "../store";
+import { countDoneInStore, isValidStore, mergeStores, saveBackupV2, summarizeMerge } from "../store";
 
 export function MergeImport({ onBackupChange }: { onBackupChange: () => void }) {
-  const { store, dispatch } = useStore();
+  const { store, dispatch, v2Store } = useStore();
 
   const handleMerge = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -36,7 +36,11 @@ export function MergeImport({ onBackupChange }: { onBackupChange: () => void }) 
           "Nothing already solved is un-solved. You can still Undo import afterwards."
       );
       if (!ok) return;
-      saveBackup(store);
+      // Backs up the complete pre-merge v2 store (Phase 3 remediation) --
+      // the merge itself still only unions the five legacy v1 fields
+      // (Phase 8's job to extend), but Undo must restore everything that
+      // existed before the merge, not just what the merge touched.
+      saveBackupV2(v2Store);
       onBackupChange();
       dispatch({ type: "IMPORT", store: merged });
     };

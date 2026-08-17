@@ -5,6 +5,7 @@ import {
   canCompleteFreely,
   computeStreak,
   countDone,
+  countDoneInStoreV2,
   CURRENT_COMPLETION_GATE_VERSION,
   earlierDate,
   earliestYearOffset,
@@ -21,9 +22,11 @@ import {
   patchV2FromV1,
   remapIds,
   summarizeMerge,
+  toExportableV2,
+  v2ProgressToV1Store,
   v2Reducer,
 } from "./store";
-import { DEFAULT_SETTINGS, emptyAppStoreV2, migrateV1ToV2 } from "./persistence/migrate";
+import { DEFAULT_SETTINGS, emptyAppStoreV2, isValidAppStoreV2, migrateV1ToV2 } from "./persistence/migrate";
 import type { AppSettings, AppStoreV2, FilterState, Problem, ProblemState, ProgressStore } from "./types";
 
 function settings(patch: Partial<AppSettings> = {}): AppSettings {
@@ -532,5 +535,108 @@ describe("Phase 3 acceptance: legacy notes survive an edit to another field, byt
     v2 = v2Reducer(v2, { type: "SET_CODE", id: "a", code: "..." });
     v2 = v2Reducer(v2, { type: "SET_APPROACH", id: "a", approach: "..." });
     expect(v2.progress.a.notes.legacy).toBe("original legacy note, verbatim");
+  });
+});
+
+// --- Phase 3 remediation: export/backup must carry the full v2 store -------
+
+function richV2(): AppStoreV2 {
+  let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_APPROACH", id: "a", approach: "two pointers" });
+  v2 = v2Reducer(v2, { type: "SET_PSEUDOCODE", id: "a", pseudocode: "for i in range(n): ..." });
+  v2 = v2Reducer(v2, { type: "SET_CODE", id: "a", code: "def solve(): pass" });
+  v2 = v2Reducer(v2, { type: "SET_STRUCTURED_NOTE", id: "a", field: "keyInsight", value: "hash map lookup" });
+  v2 = v2Reducer(v2, { type: "ADD_MISTAKE", id: "a", mistake: { at: "2026-01-01T00:00:00.000Z", what: "off by one", remember: "check bounds" } });
+  v2 = patchV2FromV1(v2, v1StoreOf("a", { done: true, revise: true, notes: "legacy note", completedAt: "2026-01-01", revisedAt: "2026-01-02" }));
+  return v2;
+}
+
+describe("toExportableV2", () => {
+  it("strips the API key but preserves everything else", () => {
+    const v2 = { ...richV2(), settings: { ...emptyAppStoreV2().settings, apiKey: "secret-key-value" } };
+    const exportable = toExportableV2(v2);
+    expect(exportable.settings.apiKey).toBe("");
+    expect(exportable.progress).toEqual(v2.progress);
+    expect(exportable.schemaVersion).toBe(2);
+  });
+
+  it("preserves approach/pseudocode/code/structured notes/mistakes/dates/star/gate version", () => {
+    const v2 = richV2();
+    const exportable = toExportableV2(v2);
+    const a = exportable.progress.a;
+    expect(a.approach).toBe("two pointers");
+    expect(a.pseudocode).toBe("for i in range(n): ...");
+    expect(a.code).toBe("def solve(): pass");
+    expect(a.notes.keyInsight).toBe("hash map lookup");
+    expect(a.notes.legacy).toBe("legacy note");
+    expect(a.mistakes).toEqual([{ at: "2026-01-01T00:00:00.000Z", what: "off by one", remember: "check bounds" }]);
+    expect(a.starred).toBe(true);
+    expect(a.starredAt).toBe("2026-01-02");
+    expect(a.firstCompletedAt).toBe("2026-01-01");
+    expect(a.completed).toBe(true);
+  });
+
+  it("preserves revisionStats and orphanedProgress even though nothing writes to them yet", () => {
+    const v2 = richV2();
+    v2.progress.a.revisionStats = { count: 2, lastRevisedAt: "2026-02-01", lastScore: 80, lastConfidence: "strong" };
+    v2.orphanedProgress.orphan1 = getV2Progress(emptyAppStoreV2(), "orphan1");
+    const exportable = toExportableV2(v2);
+    expect(exportable.progress.a.revisionStats).toEqual({ count: 2, lastRevisedAt: "2026-02-01", lastScore: 80, lastConfidence: "strong" });
+    expect(exportable.orphanedProgress.orphan1).toBeDefined();
+  });
+});
+
+describe("countDoneInStoreV2", () => {
+  it("counts completed entries", () => {
+    let v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf("a", { done: true }));
+    v2 = patchV2FromV1(v2, v1StoreOf("b", { done: false }));
+    expect(countDoneInStoreV2(v2)).toBe(1);
+  });
+
+  it("is zero for an empty store", () => {
+    expect(countDoneInStoreV2(emptyAppStoreV2())).toBe(0);
+  });
+});
+
+describe("v2Reducer -- REPLACE_STORE", () => {
+  it("replaces the entire store wholesale", () => {
+    const incoming = richV2();
+    const result = v2Reducer(emptyAppStoreV2(), { type: "REPLACE_STORE", store: incoming });
+    expect(result).toBe(incoming);
+  });
+});
+
+describe("v1/v2 shape detection is mutually exclusive (import auto-detection)", () => {
+  it("a v1 ProgressStore is never mistaken for a v2 AppStoreV2", () => {
+    const v1: ProgressStore = { version: 1, idsMigrated: true, problems: { a: state({ done: true }) } };
+    expect(isValidAppStoreV2(v1)).toBe(false);
+    expect(isValidStore(v1)).toBe(true);
+  });
+
+  it("a v2 AppStoreV2 is never mistaken for a v1 ProgressStore", () => {
+    const v2 = richV2();
+    expect(isValidStore(v2)).toBe(false);
+    expect(isValidAppStoreV2(v2)).toBe(true);
+  });
+});
+
+describe("Phase 3 remediation: importing a full v2 export round-trips losslessly", () => {
+  it("REPLACE_STORE followed by the matching v1 sync (patchV2FromV1) never disturbs any v2-only field", () => {
+    // Mirrors exactly what ImportExport.tsx's handleImport does for a v2 file:
+    // dispatchV2(REPLACE_STORE) followed by dispatch(IMPORT, v2ProgressToV1Store(...)),
+    // which is what fires the existing [store]-driven sync effect in a real app.
+    const imported = richV2();
+    const afterReplace = v2Reducer(emptyAppStoreV2(), { type: "REPLACE_STORE", store: imported });
+    const v1View = v2ProgressToV1Store(afterReplace);
+    const afterSync = patchV2FromV1(afterReplace, v1View);
+
+    expect(afterSync).toEqual(imported);
+  });
+
+  it("also round-trips correctly for an entry that was never completed", () => {
+    let imported = v2Reducer(emptyAppStoreV2(), { type: "SET_PSEUDOCODE", id: "b", pseudocode: "draft only" });
+    const afterReplace = v2Reducer(emptyAppStoreV2(), { type: "REPLACE_STORE", store: imported });
+    const v1View = v2ProgressToV1Store(afterReplace);
+    const afterSync = patchV2FromV1(afterReplace, v1View);
+    expect(afterSync).toEqual(imported);
   });
 });

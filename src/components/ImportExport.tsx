@@ -1,13 +1,17 @@
 import type { ChangeEvent } from "react";
 import { useStore } from "../context";
+import { isValidAppStoreV2 } from "../persistence/migrate";
 import {
-  clearBackup,
+  clearBackupV2,
   countDoneInStore,
+  countDoneInStoreV2,
   isValidStore,
-  loadBackup,
+  loadBackupV2,
   migrateIdsIfNeeded,
-  saveBackup,
+  saveBackupV2,
+  toExportableV2,
   todayISO,
+  v2ProgressToV1Store,
 } from "../store";
 
 const BUTTON_CLASS = "text-[0.85rem] px-3 py-1.5 border border-border rounded-md bg-transparent text-fg cursor-pointer";
@@ -19,10 +23,13 @@ export function ImportExport({
   backupExists: boolean;
   onBackupChange: () => void;
 }) {
-  const { store, dispatch } = useStore();
+  const { store, dispatch, v2Store, dispatchV2 } = useStore();
 
   const handleExport = () => {
-    const blob = new Blob([JSON.stringify(store, null, 2)], { type: "application/json" });
+    // The full v2 store -- approach/pseudocode/code/notes/mistakes included,
+    // API key excluded (never leaves the browser in a file).
+    const exportable = toExportableV2(v2Store);
+    const blob = new Blob([JSON.stringify(exportable, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     // Date-stamped so a folder of backups is tellable apart when it matters most.
@@ -43,36 +50,63 @@ export function ImportExport({
         alert("That file isn't valid JSON, so nothing was changed.");
         return;
       }
-      if (!isValidStore(parsed)) {
-        alert('That doesn\'t look like a DSA Tracker backup — it has no "problems" data. Nothing was changed.');
+
+      // A full v2 export (current app) carries approach/pseudocode/code/notes/
+      // mistakes; an older v1 export (pre-Phase-3) carries only the five
+      // legacy fields. Both remain importable -- checked in that order since
+      // the shapes never overlap (`.progress` vs. `.problems`).
+      if (isValidAppStoreV2(parsed)) {
+        const currentDone = countDoneInStoreV2(v2Store);
+        const incomingDone = countDoneInStoreV2(parsed);
+        if (currentDone > 0) {
+          const ok = confirm(
+            "Replace your current progress?\n\n" +
+              `Now:  ${currentDone} solved\n` +
+              `File: ${incomingDone} solved\n\n` +
+              "This restores your full saved progress, including code, notes, and mistakes. " +
+              "Your current progress will be kept as a one-time backup you can recover with Undo import."
+          );
+          if (!ok) return;
+          saveBackupV2(v2Store);
+          onBackupChange();
+        }
+        dispatchV2({ type: "REPLACE_STORE", store: parsed });
+        dispatch({ type: "IMPORT", store: v2ProgressToV1Store(parsed) });
         return;
       }
-      const currentDone = countDoneInStore(store);
-      const incomingDone = countDoneInStore(parsed);
-      if (currentDone > 0) {
-        const ok = confirm(
-          "Replace your current progress?\n\n" +
-            `Now:  ${currentDone} solved\n` +
-            `File: ${incomingDone} solved\n\n` +
-            "Your current progress will be kept as a one-time backup you can recover with Undo import."
-        );
-        if (!ok) return;
-        saveBackup(store);
-        onBackupChange();
+
+      if (isValidStore(parsed)) {
+        const currentDone = countDoneInStore(store);
+        const incomingDone = countDoneInStore(parsed);
+        if (currentDone > 0) {
+          const ok = confirm(
+            "Replace your current progress?\n\n" +
+              `Now:  ${currentDone} solved\n` +
+              `File: ${incomingDone} solved\n\n` +
+              "Your current progress will be kept as a one-time backup you can recover with Undo import."
+          );
+          if (!ok) return;
+          saveBackupV2(v2Store);
+          onBackupChange();
+        }
+        const { store: migratedStore } = migrateIdsIfNeeded(parsed);
+        dispatch({ type: "IMPORT", store: migratedStore });
+        return;
       }
-      const { store: migratedStore } = migrateIdsIfNeeded(parsed);
-      dispatch({ type: "IMPORT", store: migratedStore });
+
+      alert('That doesn\'t look like a DSA Tracker backup — it has no "problems" or "progress" data. Nothing was changed.');
     };
     reader.readAsText(file);
     e.target.value = "";
   };
 
   const handleUndoImport = () => {
-    const backup = loadBackup();
+    const backup = loadBackupV2();
     if (!backup) return;
-    if (!confirm(`Restore your progress from before the last import (${countDoneInStore(backup)} solved)?`)) return;
-    dispatch({ type: "IMPORT", store: backup });
-    clearBackup();
+    if (!confirm(`Restore your progress from before the last import (${countDoneInStoreV2(backup)} solved)?`)) return;
+    dispatchV2({ type: "REPLACE_STORE", store: backup });
+    dispatch({ type: "IMPORT", store: v2ProgressToV1Store(backup) });
+    clearBackupV2();
     onBackupChange();
   };
 

@@ -1,5 +1,5 @@
 import idMapRaw from "../data/idMap.json";
-import { liftV1Entry } from "./persistence/migrate";
+import { isValidAppStoreV2, liftV1Entry } from "./persistence/migrate";
 import type {
   AppSettings,
   AppStoreV2,
@@ -14,7 +14,11 @@ import type {
 } from "./types";
 
 const STORE_KEY = "dsa-tracker-progress";
-const BACKUP_KEY = "dsa-tracker-progress-backup";
+// One-shot undo-before-import/merge snapshot, holding the full v2 store (Phase
+// 3 remediation). The old "dsa-tracker-progress-backup" key held only a lossy
+// v1 projection and is no longer written or read -- any pre-existing undo
+// snapshot there is orphaned, exactly like the other frozen legacy keys.
+const V2_BACKUP_KEY = "dsa-tracker-progress-backup-v2";
 const ID_MAP: Record<string, string> = idMapRaw;
 
 export const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -79,27 +83,30 @@ export function loadStore(): ProgressStore {
   return { version: 1, problems: {}, idsMigrated: true };
 }
 
-export function saveBackup(store: ProgressStore): void {
-  localStorage.setItem(BACKUP_KEY, JSON.stringify(store));
+// One-shot undo-before-import/merge snapshot. Stores the *complete* v2 store
+// (Phase 3 remediation) so Undo restores pseudocode/code/notes/mistakes too,
+// not just the five v1 fields.
+export function saveBackupV2(v2: AppStoreV2): void {
+  localStorage.setItem(V2_BACKUP_KEY, JSON.stringify(v2));
 }
 
-export function loadBackup(): ProgressStore | null {
-  const raw = localStorage.getItem(BACKUP_KEY);
+export function loadBackupV2(): AppStoreV2 | null {
+  const raw = localStorage.getItem(V2_BACKUP_KEY);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    return isValidStore(parsed) ? parsed : null;
+    return isValidAppStoreV2(parsed) ? parsed : null;
   } catch {
     return null;
   }
 }
 
-export function clearBackup(): void {
-  localStorage.removeItem(BACKUP_KEY);
+export function clearBackupV2(): void {
+  localStorage.removeItem(V2_BACKUP_KEY);
 }
 
-export function hasBackup(): boolean {
-  return !!localStorage.getItem(BACKUP_KEY);
+export function hasBackupV2(): boolean {
+  return !!localStorage.getItem(V2_BACKUP_KEY);
 }
 
 export function isValidStore(parsed: unknown): parsed is ProgressStore {
@@ -110,6 +117,19 @@ export function isValidStore(parsed: unknown): parsed is ProgressStore {
 
 export function countDoneInStore(store: ProgressStore): number {
   return Object.values(store.problems).filter((st) => st && st.done).length;
+}
+
+export function countDoneInStoreV2(v2: AppStoreV2): number {
+  return Object.values(v2.progress).filter((p) => p.completed).length;
+}
+
+// The exported/downloaded copy of the store. Identical to the live v2 store
+// except the API key is never written to a file that leaves the browser --
+// "Including settings.apiKey in an export payload... " is a hard rule from
+// the plan, and this is the one seam all exports funnel through, so it holds
+// regardless of whether Phase 7 has populated a real key yet.
+export function toExportableV2(v2: AppStoreV2): AppStoreV2 {
+  return { ...v2, settings: { ...v2.settings, apiKey: "" } };
 }
 
 export interface BreakdownRow {
@@ -434,6 +454,8 @@ export function v2Reducer(v2: AppStoreV2, action: V2Action): AppStoreV2 {
       const existing = getV2Progress(v2, action.id);
       return patchV2Progress(v2, action.id, { mistakes: existing.mistakes.filter((m) => m.at !== action.at) });
     }
+    case "REPLACE_STORE":
+      return action.store;
   }
 }
 
