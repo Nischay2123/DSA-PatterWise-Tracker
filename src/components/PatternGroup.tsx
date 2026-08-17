@@ -4,7 +4,15 @@ import { cx } from "../cx";
 import type { Pattern } from "../types";
 import { QuestionRow } from "./QuestionRow";
 
-export function PatternGroup({ pattern, topicName }: { pattern: Pattern; topicName: string }) {
+export function PatternGroup({
+  pattern,
+  topicName,
+  gated,
+}: {
+  pattern: Pattern;
+  topicName: string;
+  gated: boolean;
+}) {
   const { store } = useStore();
   const { filters } = useFilters();
 
@@ -26,7 +34,7 @@ export function PatternGroup({ pattern, topicName }: { pattern: Pattern; topicNa
       </summary>
       <div className="pl-3">
         {pattern.problems.map((p) => (
-          <QuestionRow key={p.id} problem={p} topicName={topicName} patternName={pattern.name} />
+          <QuestionRow key={p.id} problem={p} topicName={topicName} patternName={pattern.name} gated={gated} />
         ))}
       </div>
     </details>

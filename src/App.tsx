@@ -5,11 +5,13 @@ import { Filters } from "./components/Filters";
 import { ImportExport } from "./components/ImportExport";
 import { MergeImport } from "./components/MergeImport";
 import { ProgressBar } from "./components/ProgressBar";
+import { SessionShell } from "./components/revision/SessionShell";
 import { TopicList } from "./components/TopicList";
 import { FiltersContext, StoreContext, useProgressStore } from "./context";
 import { downloadBackupFile } from "./persistence/backup";
 import { countDone, getState, hasBackupV2, isProblemVisible } from "./store";
 import { useFilterAccordions } from "./useFilterAccordions";
+import { useHash } from "./useHash";
 import type { FilterState, QuestionData } from "./types";
 
 const DATA = questionsData as QuestionData;
@@ -79,6 +81,7 @@ export function App() {
   const { store, dispatch, importNonce, status, bootError, v2Store, dispatchV2 } = useProgressStore();
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [backupExists, setBackupExists] = useState(() => hasBackupV2());
+  const [hash, navigate] = useHash();
 
   const overallDone = countDone(ALL_PROBLEMS, store);
   const overallTotal = ALL_PROBLEMS.length;
@@ -94,6 +97,17 @@ export function App() {
 
   if (status === "loading") return <LoadingScreen />;
   if (status === "error") return <ErrorScreen error={bootError} />;
+
+  const sessionMatch = /^#\/revision\/(.+)$/.exec(hash);
+  const sessionTopic = sessionMatch ? DATA.topics.find((t) => t.id === decodeURIComponent(sessionMatch[1])) : null;
+
+  if (sessionTopic) {
+    return (
+      <StoreContext.Provider value={{ store, dispatch, v2Store, dispatchV2 }}>
+        <SessionShell topic={sessionTopic} onExit={() => navigate("#/tracker")} />
+      </StoreContext.Provider>
+    );
+  }
 
   return (
     <StoreContext.Provider value={{ store, dispatch, v2Store, dispatchV2 }}>

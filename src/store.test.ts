@@ -9,7 +9,9 @@ import {
   CURRENT_COMPLETION_GATE_VERSION,
   earlierDate,
   earliestYearOffset,
+  ensureTopicsScheduled,
   getHeatmapRange,
+  getTopicRevision,
   getV2Progress,
   hasCompletionEvidence,
   hasNotes,
@@ -27,7 +29,7 @@ import {
   v2Reducer,
 } from "./store";
 import { DEFAULT_SETTINGS, emptyAppStoreV2, isValidAppStoreV2, migrateV1ToV2 } from "./persistence/migrate";
-import type { AppSettings, AppStoreV2, FilterState, Problem, ProblemState, ProgressStore } from "./types";
+import type { AppSettings, AppStoreV2, FilterState, Problem, ProblemState, ProgressStore, RevisionAttempt, Topic } from "./types";
 
 function settings(patch: Partial<AppSettings> = {}): AppSettings {
   return { ...DEFAULT_SETTINGS, ...patch };
@@ -638,5 +640,204 @@ describe("Phase 3 remediation: importing a full v2 export round-trips losslessly
     const v1View = v2ProgressToV1Store(afterReplace);
     const afterSync = patchV2FromV1(afterReplace, v1View);
     expect(afterSync).toEqual(imported);
+  });
+});
+
+// --- Phase 6: revision session lifecycle ------------------------------------
+
+function topicFixture(id: string, problemIds: string[]): Topic {
+  return { id, name: id, patterns: [{ id: `${id}__p1`, name: "P1", problems: problemIds.map((pid) => problem({ id: pid })) }] };
+}
+
+function completeIn(v2: AppStoreV2, ids: string[]): AppStoreV2 {
+  let next = v2;
+  for (const id of ids) next = patchV2FromV1(next, v1StoreOf(id, { done: true }));
+  return next;
+}
+
+function attemptFixture(patch: Partial<RevisionAttempt> = {}): RevisionAttempt {
+  return {
+    id: "att1",
+    topicId: "arrays",
+    startedAt: "2026-01-01T00:00:00.000Z",
+    submittedAt: null,
+    fundamentals: [{ conceptId: "c1", answer: "" }],
+    questions: [{ questionId: "q1", approach: "", pseudocode: "", complexity: "", edgeCases: "", confidence: null }],
+    evaluationStatus: "DRAFT",
+    evaluation: null,
+    error: null,
+    ...patch,
+  };
+}
+
+describe("getTopicRevision", () => {
+  it("returns a sensible default when a topic has never been scheduled", () => {
+    const tr = getTopicRevision(emptyAppStoreV2(), "arrays");
+    expect(tr).toEqual({
+      topicId: "arrays",
+      cycle: 0,
+      nextDueAt: null,
+      lastPassedAt: null,
+      lastFailedAt: null,
+      activeSessionId: null,
+      history: [],
+      weakConcepts: {},
+    });
+  });
+
+  it("returns the real entry once one exists", () => {
+    const v2 = ensureTopicsScheduled(completeIn(emptyAppStoreV2(), ["a", "b", "c", "d"]), [topicFixture("arrays", ["a", "b", "c", "d"])]);
+    expect(getTopicRevision(v2, "arrays").nextDueAt).not.toBeNull();
+  });
+});
+
+describe("ensureTopicsScheduled", () => {
+  const now = new Date("2026-01-01T00:00:00.000Z");
+
+  it("schedules a topic the moment completion crosses the threshold", () => {
+    const topic = topicFixture("arrays", ["a", "b", "c", "d"]); // 3/4 = 75%
+    const v2 = ensureTopicsScheduled(completeIn(emptyAppStoreV2(), ["a", "b", "c"]), [topic], now);
+    const tr = v2.revision.arrays;
+    expect(tr).toBeDefined();
+    expect(tr.cycle).toBe(0);
+    expect(tr.nextDueAt).not.toBeNull();
+    expect(tr.nextDueAt! > "2026-01-01").toBe(true); // a real grace period, not immediately due
+  });
+
+  it("does not schedule a topic below the threshold", () => {
+    const topic = topicFixture("arrays", ["a", "b", "c", "d"]); // 1/4 = 25%
+    const v2 = ensureTopicsScheduled(completeIn(emptyAppStoreV2(), ["a"]), [topic], now);
+    expect(v2.revision.arrays).toBeUndefined();
+  });
+
+  it("never schedules an exempt topic even at 100%", () => {
+    const topic = topicFixture("fundamentals", ["a", "b"]);
+    const v2 = ensureTopicsScheduled(completeIn(emptyAppStoreV2(), ["a", "b"]), [topic], now);
+    expect(v2.revision.fundamentals).toBeUndefined();
+  });
+
+  it("never overwrites an existing entry, even one that would look eligible again", () => {
+    const topic = topicFixture("arrays", ["a", "b", "c", "d"]);
+    const seeded: AppStoreV2 = {
+      ...completeIn(emptyAppStoreV2(), ["a", "b", "c", "d"]),
+      revision: { arrays: { topicId: "arrays", cycle: 2, nextDueAt: "2020-01-01", lastPassedAt: "2020-01-01", lastFailedAt: null, activeSessionId: null, history: [], weakConcepts: { x: 1 } } },
+    };
+    const v2 = ensureTopicsScheduled(seeded, [topic], now);
+    expect(v2.revision.arrays).toEqual(seeded.revision.arrays); // untouched, not re-scheduled
+  });
+
+  it("is a no-op (same reference) when nothing needs scheduling", () => {
+    const v2 = emptyAppStoreV2();
+    expect(ensureTopicsScheduled(v2, [topicFixture("arrays", ["a"])], now)).toBe(v2);
+  });
+});
+
+describe("v2Reducer -- revision session lifecycle", () => {
+  it("START_REVISION_SESSION stores the attempt and marks the topic active", () => {
+    const attempt = attemptFixture();
+    const v2 = v2Reducer(emptyAppStoreV2(), { type: "START_REVISION_SESSION", topicId: "arrays", attempt });
+    expect(v2.attempts.att1).toEqual(attempt);
+    expect(v2.revision.arrays.activeSessionId).toBe("att1");
+  });
+
+  it("START_REVISION_SESSION preserves an existing topic revision's history/cycle", () => {
+    const seeded: AppStoreV2 = {
+      ...emptyAppStoreV2(),
+      revision: { arrays: { topicId: "arrays", cycle: 2, nextDueAt: "2026-06-01", lastPassedAt: "2026-01-01", lastFailedAt: null, activeSessionId: null, history: [{ at: "2026-01-01", score: 90, passed: true, attemptId: "old" }], weakConcepts: {} } },
+    };
+    const v2 = v2Reducer(seeded, { type: "START_REVISION_SESSION", topicId: "arrays", attempt: attemptFixture() });
+    expect(v2.revision.arrays.cycle).toBe(2);
+    expect(v2.revision.arrays.history).toHaveLength(1);
+    expect(v2.revision.arrays.activeSessionId).toBe("att1");
+  });
+
+  it("SAVE_FUNDAMENTAL_ANSWER updates only the matching concept", () => {
+    const attempt = attemptFixture({ fundamentals: [{ conceptId: "c1", answer: "" }, { conceptId: "c2", answer: "" }] });
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "START_REVISION_SESSION", topicId: "arrays", attempt });
+    v2 = v2Reducer(v2, { type: "SAVE_FUNDAMENTAL_ANSWER", attemptId: "att1", conceptId: "c2", answer: "because X" });
+    expect(v2.attempts.att1.fundamentals).toEqual([
+      { conceptId: "c1", answer: "" },
+      { conceptId: "c2", answer: "because X" },
+    ]);
+  });
+
+  it("SAVE_FUNDAMENTAL_ANSWER is a no-op for an unknown attempt id", () => {
+    const v2 = emptyAppStoreV2();
+    expect(v2Reducer(v2, { type: "SAVE_FUNDAMENTAL_ANSWER", attemptId: "nope", conceptId: "c1", answer: "x" })).toBe(v2);
+  });
+
+  it("SAVE_QUESTION_RECALL updates only the targeted field on the targeted question", () => {
+    const attempt = attemptFixture({
+      questions: [
+        { questionId: "q1", approach: "", pseudocode: "", complexity: "", edgeCases: "", confidence: null },
+        { questionId: "q2", approach: "keep me", pseudocode: "", complexity: "", edgeCases: "", confidence: null },
+      ],
+    });
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "START_REVISION_SESSION", topicId: "arrays", attempt });
+    v2 = v2Reducer(v2, { type: "SAVE_QUESTION_RECALL", attemptId: "att1", questionId: "q1", field: "pseudocode", value: "loop it" });
+    expect(v2.attempts.att1.questions[0]).toEqual({ questionId: "q1", approach: "", pseudocode: "loop it", complexity: "", edgeCases: "", confidence: null });
+    expect(v2.attempts.att1.questions[1].approach).toBe("keep me"); // untouched
+  });
+
+  it("SAVE_QUESTION_CONFIDENCE sets confidence on the targeted question only", () => {
+    const attempt = attemptFixture({
+      questions: [
+        { questionId: "q1", approach: "", pseudocode: "", complexity: "", edgeCases: "", confidence: null },
+        { questionId: "q2", approach: "", pseudocode: "", complexity: "", edgeCases: "", confidence: null },
+      ],
+    });
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "START_REVISION_SESSION", topicId: "arrays", attempt });
+    v2 = v2Reducer(v2, { type: "SAVE_QUESTION_CONFIDENCE", attemptId: "att1", questionId: "q2", confidence: "forgot" });
+    expect(v2.attempts.att1.questions[0].confidence).toBeNull();
+    expect(v2.attempts.att1.questions[1].confidence).toBe("forgot");
+  });
+
+  describe("SUBMIT_REVISION_SESSION", () => {
+    it("marks the attempt submitted/PENDING and clears activeSessionId, without touching cycle/history", () => {
+      const attempt = attemptFixture({ questions: [{ questionId: "q1", approach: "a", pseudocode: "p", complexity: "c", edgeCases: "", confidence: "strong" }] });
+      let v2 = v2Reducer(emptyAppStoreV2(), { type: "START_REVISION_SESSION", topicId: "arrays", attempt });
+      v2 = v2Reducer(v2, { type: "SUBMIT_REVISION_SESSION", attemptId: "att1" });
+
+      expect(v2.attempts.att1.submittedAt).not.toBeNull();
+      expect(v2.attempts.att1.evaluationStatus).toBe("PENDING");
+      expect(v2.attempts.att1.evaluation).toBeNull();
+      expect(v2.revision.arrays.activeSessionId).toBeNull();
+      expect(v2.revision.arrays.cycle).toBe(0); // no LLM yet -- no pass/fail, no interval advance
+      expect(v2.revision.arrays.history).toEqual([]);
+    });
+
+    it("records revisionStats (count/lastRevisedAt/lastConfidence) for every rated question", () => {
+      const attempt = attemptFixture({ questions: [{ questionId: "q1", approach: "a", pseudocode: "p", complexity: "c", edgeCases: "", confidence: "partial" }] });
+      let v2 = v2Reducer(emptyAppStoreV2(), { type: "START_REVISION_SESSION", topicId: "arrays", attempt });
+      v2 = v2Reducer(v2, { type: "SUBMIT_REVISION_SESSION", attemptId: "att1" });
+
+      const stats = v2.progress.q1.revisionStats;
+      expect(stats.count).toBe(1);
+      expect(stats.lastRevisedAt).not.toBeNull();
+      expect(stats.lastConfidence).toBe("partial");
+      expect(stats.lastScore).toBeNull(); // never fabricated -- only a real LLM evaluation sets this (Phase 7)
+    });
+
+    it("increments an existing revisionStats.count rather than resetting it", () => {
+      let v2 = emptyAppStoreV2();
+      v2 = { ...v2, progress: { ...v2.progress, q1: { ...getV2Progress(v2, "q1"), revisionStats: { count: 3, lastRevisedAt: "2025-01-01", lastScore: 60, lastConfidence: "forgot" } } } };
+      const attempt = attemptFixture({ questions: [{ questionId: "q1", approach: "a", pseudocode: "p", complexity: "c", edgeCases: "", confidence: "strong" }] });
+      v2 = v2Reducer(v2, { type: "START_REVISION_SESSION", topicId: "arrays", attempt });
+      v2 = v2Reducer(v2, { type: "SUBMIT_REVISION_SESSION", attemptId: "att1" });
+      expect(v2.progress.q1.revisionStats.count).toBe(4);
+      expect(v2.progress.q1.revisionStats.lastScore).toBe(60); // untouched -- no new score exists to replace it with
+    });
+
+    it("skips a question left with no confidence rating rather than crashing", () => {
+      const attempt = attemptFixture({ questions: [{ questionId: "q1", approach: "", pseudocode: "", complexity: "", edgeCases: "", confidence: null }] });
+      let v2 = v2Reducer(emptyAppStoreV2(), { type: "START_REVISION_SESSION", topicId: "arrays", attempt });
+      v2 = v2Reducer(v2, { type: "SUBMIT_REVISION_SESSION", attemptId: "att1" });
+      expect(v2.progress.q1).toBeUndefined();
+    });
+
+    it("is a no-op for an unknown attempt id", () => {
+      const v2 = emptyAppStoreV2();
+      expect(v2Reducer(v2, { type: "SUBMIT_REVISION_SESSION", attemptId: "nope" })).toBe(v2);
+    });
   });
 });

@@ -18,10 +18,12 @@ export function QuestionRow({
   problem,
   topicName,
   patternName,
+  gated,
 }: {
   problem: Problem;
   topicName: string;
   patternName: string;
+  gated: boolean;
 }) {
   const { store, dispatch, v2Store } = useStore();
   const { filters } = useFilters();
@@ -31,6 +33,9 @@ export function QuestionRow({
   const progress = getV2Progress(v2Store, problem.id);
   const visible = isProblemVisible(problem, state, filters, { topicName, patternName });
   const notesIndicator = hasNotes(progress);
+  // Gating blocks only a NEW completion (plan §6) -- un-completing, and
+  // everything else on an already-done question, stays free.
+  const checkboxBlocked = gated && !state.done;
 
   const meta = [
     problem.platform && problem.platform !== "-" ? problem.platform : null,
@@ -65,8 +70,10 @@ export function QuestionRow({
     >
       <input
         type="checkbox"
-        className="mt-[3px] [@media(pointer:coarse)]:w-5 [@media(pointer:coarse)]:h-5"
+        className="mt-[3px] [@media(pointer:coarse)]:w-5 [@media(pointer:coarse)]:h-5 disabled:cursor-not-allowed"
         checked={state.done}
+        disabled={checkboxBlocked}
+        title={checkboxBlocked ? "Revision due for this topic — complete a revision session to unlock new completions" : undefined}
         aria-label={`Mark "${problem.question}" as done`}
         aria-expanded={completionPanelOpen}
         onChange={(e) => handleCheckboxChange(e.target.checked)}

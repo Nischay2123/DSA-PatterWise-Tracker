@@ -1,5 +1,7 @@
 import idMapRaw from "../data/idMap.json";
+import { REVISION_CONFIG } from "./config";
 import { isValidAppStoreV2, liftV1Entry } from "./persistence/migrate";
+import { scheduleInitial } from "./revision/scheduler";
 import type {
   AppSettings,
   AppStoreV2,
@@ -10,6 +12,8 @@ import type {
   ProblemState,
   ProgressStore,
   QuestionProgressV2,
+  Topic,
+  TopicRevision,
   V2Action,
 } from "./types";
 
@@ -429,6 +433,56 @@ export function getV2Progress(v2: AppStoreV2, id: string): QuestionProgressV2 {
   return v2.progress[id] ?? liftV1Entry({ done: false, revise: false, notes: "", completedAt: null, revisedAt: null });
 }
 
+// A topic with no revision history yet (never crossed the threshold) has no
+// entry in v2.revision at all -- this is its derived default, mirroring
+// getV2Progress's same never-completed fallback below.
+export function getTopicRevision(v2: AppStoreV2, topicId: string): TopicRevision {
+  return (
+    v2.revision[topicId] ?? {
+      topicId,
+      cycle: 0,
+      nextDueAt: null,
+      lastPassedAt: null,
+      lastFailedAt: null,
+      activeSessionId: null,
+      history: [],
+      weakConcepts: {},
+    }
+  );
+}
+
+// Plan §5's "schedule created" step, applied automatically the moment a
+// topic's completion first crosses the threshold (fired from the same v1->v2
+// sync effect that already runs on every store change). Only ever writes a
+// topic that has NO existing revision entry -- once one exists (however it
+// got there), it is never overwritten here, so this can't clobber real
+// history/cycle/weakConcepts on a later re-check, and un-completing a
+// question back below threshold never un-schedules it either.
+export function ensureTopicsScheduled(v2: AppStoreV2, topics: Topic[], now: Date = new Date()): AppStoreV2 {
+  let revision = v2.revision;
+  for (const topic of topics) {
+    if (revision[topic.id] || (REVISION_CONFIG.exemptTopics as readonly string[]).includes(topic.id)) continue;
+    const problems = topic.patterns.flatMap((p) => p.problems);
+    const done = problems.filter((p) => v2.progress[p.id]?.completed).length;
+    const pct = problems.length ? done / problems.length : 0;
+    if (pct < REVISION_CONFIG.completionThreshold) continue;
+    revision = {
+      ...revision,
+      [topic.id]: {
+        topicId: topic.id,
+        cycle: 0,
+        nextDueAt: scheduleInitial(now),
+        lastPassedAt: null,
+        lastFailedAt: null,
+        activeSessionId: null,
+        history: [],
+        weakConcepts: {},
+      },
+    };
+  }
+  return revision === v2.revision ? v2 : { ...v2, revision };
+}
+
 function patchV2Progress(v2: AppStoreV2, id: string, patch: Partial<QuestionProgressV2>): AppStoreV2 {
   const existing = getV2Progress(v2, id);
   return { ...v2, progress: { ...v2.progress, [id]: { ...existing, ...patch } } };
@@ -456,6 +510,101 @@ export function v2Reducer(v2: AppStoreV2, action: V2Action): AppStoreV2 {
     }
     case "REPLACE_STORE":
       return action.store;
+
+    // --- Phase 6: revision session lifecycle ---------------------------
+    case "START_REVISION_SESSION": {
+      const tr = getTopicRevision(v2, action.topicId);
+      return {
+        ...v2,
+        attempts: { ...v2.attempts, [action.attempt.id]: action.attempt },
+        revision: { ...v2.revision, [action.topicId]: { ...tr, activeSessionId: action.attempt.id } },
+      };
+    }
+    case "SAVE_FUNDAMENTAL_ANSWER": {
+      const attempt = v2.attempts[action.attemptId];
+      if (!attempt) return v2;
+      return {
+        ...v2,
+        attempts: {
+          ...v2.attempts,
+          [action.attemptId]: {
+            ...attempt,
+            fundamentals: attempt.fundamentals.map((f) =>
+              f.conceptId === action.conceptId ? { ...f, answer: action.answer } : f
+            ),
+          },
+        },
+      };
+    }
+    case "SAVE_QUESTION_RECALL": {
+      const attempt = v2.attempts[action.attemptId];
+      if (!attempt) return v2;
+      return {
+        ...v2,
+        attempts: {
+          ...v2.attempts,
+          [action.attemptId]: {
+            ...attempt,
+            questions: attempt.questions.map((q) =>
+              q.questionId === action.questionId ? { ...q, [action.field]: action.value } : q
+            ),
+          },
+        },
+      };
+    }
+    case "SAVE_QUESTION_CONFIDENCE": {
+      const attempt = v2.attempts[action.attemptId];
+      if (!attempt) return v2;
+      return {
+        ...v2,
+        attempts: {
+          ...v2.attempts,
+          [action.attemptId]: {
+            ...attempt,
+            questions: attempt.questions.map((q) =>
+              q.questionId === action.questionId ? { ...q, confidence: action.confidence } : q
+            ),
+          },
+        },
+      };
+    }
+    case "SUBMIT_REVISION_SESSION": {
+      const attempt = v2.attempts[action.attemptId];
+      if (!attempt) return v2;
+      const nowIso = todayISO();
+      // Confidence is learning data, never a score (plan §8) -- submitting
+      // records that a real revision happened (count/lastRevisedAt/
+      // lastConfidence) but never touches lastScore or TopicRevision's
+      // cycle/history, since neither can exist without a real evaluation
+      // (Phase 7). The topic stays exactly as gated as it was.
+      let progress = v2.progress;
+      for (const q of attempt.questions) {
+        if (!q.confidence) continue;
+        const existing = getV2Progress(v2, q.questionId);
+        progress = {
+          ...progress,
+          [q.questionId]: {
+            ...existing,
+            revisionStats: {
+              ...existing.revisionStats,
+              count: existing.revisionStats.count + 1,
+              lastRevisedAt: nowIso,
+              lastConfidence: q.confidence,
+            },
+          },
+        };
+      }
+      const tr = getTopicRevision(v2, attempt.topicId);
+      return {
+        ...v2,
+        progress,
+        attempts: {
+          ...v2.attempts,
+          [action.attemptId]: { ...attempt, submittedAt: new Date().toISOString(), evaluationStatus: "PENDING" },
+        },
+        revision: { ...v2.revision, [attempt.topicId]: { ...tr, activeSessionId: null } },
+      };
+    }
   }
 }
 

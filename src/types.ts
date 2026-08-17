@@ -118,7 +118,9 @@ export interface RevisionAttempt {
     pseudocode: string;
     complexity: string;
     edgeCases: string;
-    confidence: "strong" | "partial" | "forgot";
+    // null = not yet rated (draft, mirrors SelectionCandidate.lastConfidence's
+    // existing null-means-unset idiom) -- distinct from a real self-rating.
+    confidence: "strong" | "partial" | "forgot" | null;
   }[];
   evaluationStatus: "DRAFT" | "PENDING" | "OK" | "FAILED_PERMANENT";
   evaluation: Record<string, unknown> | null;
@@ -166,4 +168,25 @@ export type V2Action =
   | { type: "REMOVE_MISTAKE"; id: string; at: string }
   // Wholesale replace, for importing/restoring a complete v2 export or backup --
   // mirrors the v1 reducer's own "IMPORT" case.
-  | { type: "REPLACE_STORE"; store: AppStoreV2 };
+  | { type: "REPLACE_STORE"; store: AppStoreV2 }
+  // --- Phase 6: revision session lifecycle -----------------------------
+  // Attempt is built once (fundamentals/questions already selected) by
+  // revision/session.ts's createRevisionAttempt and handed in whole --
+  // selection must not re-run on every render/refresh, or a resumed
+  // session would show different questions than the one the user started.
+  | { type: "START_REVISION_SESSION"; topicId: string; attempt: RevisionAttempt }
+  | { type: "SAVE_FUNDAMENTAL_ANSWER"; attemptId: string; conceptId: string; answer: string }
+  | {
+      type: "SAVE_QUESTION_RECALL";
+      attemptId: string;
+      questionId: string;
+      field: "approach" | "pseudocode" | "complexity" | "edgeCases";
+      value: string;
+    }
+  | {
+      type: "SAVE_QUESTION_CONFIDENCE";
+      attemptId: string;
+      questionId: string;
+      confidence: "strong" | "partial" | "forgot";
+    }
+  | { type: "SUBMIT_REVISION_SESSION"; attemptId: string };

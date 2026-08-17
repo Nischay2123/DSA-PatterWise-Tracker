@@ -1,9 +1,12 @@
 import type { Dispatch, SetStateAction } from "react";
 import { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState } from "react";
+import questionsData from "../data/questions.json";
 import { loadAppStore, saveAppStore } from "./persistence/db";
 import { emptyAppStoreV2 } from "./persistence/migrate";
-import { getState, patchV2FromV1, todayISO, v2ProgressToV1Store, v2Reducer } from "./store";
-import type { AppStoreV2, FilterState, ProblemState, ProgressStore, V2Action } from "./types";
+import { ensureTopicsScheduled, getState, patchV2FromV1, todayISO, v2ProgressToV1Store, v2Reducer } from "./store";
+import type { AppStoreV2, FilterState, ProblemState, ProgressStore, QuestionData, V2Action } from "./types";
+
+const ALL_TOPICS = (questionsData as QuestionData).topics;
 
 export type Action =
   | { type: "TOGGLE_DONE"; id: string; done: boolean }
@@ -66,7 +69,12 @@ export function useProgressStore() {
     // Skip the placeholder pre-boot state and never persist while booted-with-error.
     if (!bootedRef.current) return;
     setV2Store((prev) => {
-      const next = patchV2FromV1(prev, store);
+      // Plan §5's "schedule created" step: the moment a topic's completion
+      // crosses the threshold, it gets a real nextDueAt (a grace period)
+      // instead of jumping straight to REVISION_DUE the instant this ships
+      // for anyone already above threshold. Runs on every store change but
+      // is a no-op for every topic that already has a revision entry.
+      const next = ensureTopicsScheduled(patchV2FromV1(prev, store), ALL_TOPICS);
       saveAppStore(next);
       return next;
     });

@@ -1,12 +1,31 @@
+import { REVISION_CONFIG } from "../config";
 import { useFilters, useStore } from "../context";
-import { countDone, getState, isProblemVisible } from "../store";
+import { deriveState, isTopicGated } from "../revision/stateMachine";
+import { countDone, getState, getTopicRevision, isProblemVisible } from "../store";
 import { cx } from "../cx";
 import type { Topic } from "../types";
 import { PatternGroup } from "./PatternGroup";
 import { ProgressBar } from "./ProgressBar";
 
+function RevisionBanner({ topic }: { topic: Topic }) {
+  return (
+    <div className="mx-3.5 mb-2.5 flex items-center justify-between gap-2 border border-border rounded-md bg-row-hover px-3 py-2 text-[0.8rem]">
+      <span>Revision due for {topic.name}.</span>
+      <button
+        type="button"
+        onClick={() => {
+          window.location.hash = `#/revision/${encodeURIComponent(topic.id)}`;
+        }}
+        className="text-[0.8rem] px-2.5 py-1 border border-border rounded-md bg-transparent text-fg cursor-pointer whitespace-nowrap"
+      >
+        Start revision
+      </button>
+    </div>
+  );
+}
+
 function TopicItem({ topic }: { topic: Topic }) {
-  const { store } = useStore();
+  const { store, v2Store } = useStore();
   const { filters } = useFilters();
 
   const allProblems = topic.patterns.flatMap((p) => p.problems);
@@ -15,6 +34,10 @@ function TopicItem({ topic }: { topic: Topic }) {
   );
   const done = countDone(allProblems, store);
   const total = allProblems.length;
+
+  const isExempt = (REVISION_CONFIG.exemptTopics as readonly string[]).includes(topic.id);
+  const revisionState = deriveState(getTopicRevision(v2Store, topic.id), total ? done / total : 0, isExempt);
+  const gated = isTopicGated(revisionState);
 
   return (
     <details
@@ -33,8 +56,9 @@ function TopicItem({ topic }: { topic: Topic }) {
           {`${done}/${total}`}
         </span>
       </summary>
+      {gated && <RevisionBanner topic={topic} />}
       {topic.patterns.map((p) => (
-        <PatternGroup key={p.id} pattern={p} topicName={topic.name} />
+        <PatternGroup key={p.id} pattern={p} topicName={topic.name} gated={gated} />
       ))}
     </details>
   );
