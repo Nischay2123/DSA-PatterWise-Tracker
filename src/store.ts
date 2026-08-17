@@ -1,6 +1,7 @@
 import idMapRaw from "../data/idMap.json";
 import { liftV1Entry } from "./persistence/migrate";
 import type {
+  AppSettings,
   AppStoreV2,
   FilterState,
   HeatmapDay,
@@ -342,6 +343,29 @@ export function v2ProgressToV1Store(v2: AppStoreV2): ProgressStore {
   return { version: 1, problems, idsMigrated: true };
 }
 
+// --- Completion gate (Phase 3) -----------------------------------------
+// completionGateVersion stays `null` (grandfathered/ungated) for every
+// migrated, pre-existing, requireEvidence-bypassed, or re-checked
+// completion. It's stamped with this version only when a genuinely new
+// completion actually satisfied the evidence rule below.
+export const CURRENT_COMPLETION_GATE_VERSION = 1;
+
+export function hasNotes(progress: QuestionProgressV2): boolean {
+  return Object.values(progress.notes).some((v) => v.trim().length > 0);
+}
+
+export function hasCompletionEvidence(progress: QuestionProgressV2): boolean {
+  return !!progress.pseudocode.trim() || !!progress.code.trim();
+}
+
+// A completion is free of the evidence gate if: the question has ever been
+// completed before (grandfathered -- "editable but not re-gated", never
+// retroactively invalidated), or the setting is off (the friction release
+// valve), or evidence already exists.
+export function canCompleteFreely(progress: QuestionProgressV2, settings: AppSettings): boolean {
+  return progress.firstCompletedAt !== null || !settings.requireEvidence || hasCompletionEvidence(progress);
+}
+
 export function patchV2FromV1(v2: AppStoreV2, v1: ProgressStore): AppStoreV2 {
   const progress: Record<string, QuestionProgressV2> = { ...v2.progress };
   for (const [id, state] of Object.entries(v1.problems)) {
@@ -350,6 +374,11 @@ export function patchV2FromV1(v2: AppStoreV2, v1: ProgressStore): AppStoreV2 {
     // unrelated dispatch re-patching this id (already done, or still not
     // done) must never disturb what's already recorded for it.
     const justCompleted = state.done && !base.completed;
+    // A gate-verified completion is one that's genuinely new (never
+    // completed before -- grandfathered/re-checks are exempt) AND has real
+    // evidence recorded at the moment of completion. Everything else --
+    // grandfathered, requireEvidence off, re-checks -- stays ungated (0).
+    const gateSatisfied = justCompleted && base.firstCompletedAt === null && hasCompletionEvidence(base);
     progress[id] = {
       ...base,
       completed: state.done,
@@ -362,10 +391,7 @@ export function patchV2FromV1(v2: AppStoreV2, v1: ProgressStore): AppStoreV2 {
       // The most recent completion date. Updates only on a new completion;
       // un-checking leaves it as-is (the plan doesn't ask it to be cleared).
       lastCompletedAt: justCompleted ? state.completedAt : base.lastCompletedAt,
-      // Every completion made through this legacy v1 path is ungated (no
-      // evidence gate exists yet) -- re-stamp null on each new completion so
-      // a stale gate version can never survive a legacy re-completion.
-      completionGateVersion: justCompleted ? null : base.completionGateVersion,
+      completionGateVersion: justCompleted ? (gateSatisfied ? CURRENT_COMPLETION_GATE_VERSION : null) : base.completionGateVersion,
       notes: { ...base.notes, legacy: state.notes },
     };
   }

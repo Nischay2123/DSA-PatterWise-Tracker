@@ -76,7 +76,7 @@ function ErrorScreen({ error }: { error: string | null }) {
 }
 
 export function App() {
-  const { store, dispatch, importNonce, status, bootError } = useProgressStore();
+  const { store, dispatch, importNonce, status, bootError, v2Store, dispatchV2 } = useProgressStore();
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [backupExists, setBackupExists] = useState(() => hasBackup());
 
@@ -96,7 +96,7 @@ export function App() {
   if (status === "error") return <ErrorScreen error={bootError} />;
 
   return (
-    <StoreContext.Provider value={{ store, dispatch }}>
+    <StoreContext.Provider value={{ store, dispatch, v2Store, dispatchV2 }}>
       <FiltersContext.Provider value={{ filters, setFilters }}>
         <header className="sticky top-0 z-10 bg-bg border-b border-border px-5 py-3">
           <div className="flex items-center justify-between gap-3">

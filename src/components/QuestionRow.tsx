@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { useFilters, useStore } from "../context";
-import { getState, isProblemVisible } from "../store";
+import { canCompleteFreely, getState, getV2Progress, hasNotes, isProblemVisible } from "../store";
 import { cx } from "../cx";
+import { CompletionPanel } from "./CompletionPanel";
+import { MistakeList } from "./MistakeList";
+import { NotesEditor } from "./NotesEditor";
+import { SolutionEditor } from "./SolutionEditor";
 import type { Problem } from "../types";
 
 const BADGE_COLOR = {
@@ -19,12 +23,14 @@ export function QuestionRow({
   topicName: string;
   patternName: string;
 }) {
-  const { store, dispatch } = useStore();
+  const { store, dispatch, v2Store } = useStore();
   const { filters } = useFilters();
-  const [notesOpen, setNotesOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [completionPanelOpen, setCompletionPanelOpen] = useState(false);
   const state = getState(store, problem.id);
+  const progress = getV2Progress(v2Store, problem.id);
   const visible = isProblemVisible(problem, state, filters, { topicName, patternName });
-  const hasNotes = !!state.notes.trim();
+  const notesIndicator = hasNotes(progress);
 
   const meta = [
     problem.platform && problem.platform !== "-" ? problem.platform : null,
@@ -35,6 +41,19 @@ export function QuestionRow({
   ]
     .filter(Boolean)
     .join(" · ");
+
+  const handleCheckboxChange = (checked: boolean) => {
+    if (!checked) {
+      // Un-checking is always free -- no gate, no panel.
+      dispatch({ type: "TOGGLE_DONE", id: problem.id, done: false });
+      return;
+    }
+    if (canCompleteFreely(progress, v2Store.settings)) {
+      dispatch({ type: "TOGGLE_DONE", id: problem.id, done: true });
+    } else {
+      setCompletionPanelOpen(true);
+    }
+  };
 
   return (
     <div
@@ -49,7 +68,8 @@ export function QuestionRow({
         className="mt-[3px] [@media(pointer:coarse)]:w-5 [@media(pointer:coarse)]:h-5"
         checked={state.done}
         aria-label={`Mark "${problem.question}" as done`}
-        onChange={(e) => dispatch({ type: "TOGGLE_DONE", id: problem.id, done: e.target.checked })}
+        aria-expanded={completionPanelOpen}
+        onChange={(e) => handleCheckboxChange(e.target.checked)}
       />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
@@ -93,22 +113,25 @@ export function QuestionRow({
           <button
             className={cx(
               "bg-transparent border-0 cursor-pointer text-[0.85rem] p-0 [@media(pointer:coarse)]:p-1.5 [@media(pointer:coarse)]:min-w-8 [@media(pointer:coarse)]:min-h-8",
-              hasNotes ? "text-fg font-semibold after:content-['_•']" : "text-muted"
+              notesIndicator ? "text-fg font-semibold after:content-['_•']" : "text-muted"
             )}
-            onClick={() => setNotesOpen((o) => !o)}
+            onClick={() => setDetailsOpen((o) => !o)}
           >
-            notes
+            details
           </button>
         </div>
-        <div className={cx("text-[0.78rem] text-muted mt-1", notesOpen ? "block" : "hidden")}>
-          <div>{meta}</div>
-          <textarea
-            key={problem.id}
-            defaultValue={state.notes}
-            placeholder="Notes..."
-            className="w-full min-h-[40px] mt-1 font-[inherit] text-[0.85rem] p-1.5 border border-border rounded-md bg-bg text-fg max-[700px]:text-base"
-            onBlur={(e) => dispatch({ type: "SET_NOTES", id: problem.id, notes: e.target.value })}
+        {completionPanelOpen && (
+          <CompletionPanel
+            problemId={problem.id}
+            onCancel={() => setCompletionPanelOpen(false)}
+            onCompleted={() => setCompletionPanelOpen(false)}
           />
+        )}
+        <div className={cx("text-[0.78rem] text-muted mt-1", detailsOpen ? "block" : "hidden")}>
+          <div className="mb-2">{meta}</div>
+          <SolutionEditor problemId={problem.id} />
+          <NotesEditor problemId={problem.id} />
+          <MistakeList problemId={problem.id} />
         </div>
       </div>
     </div>

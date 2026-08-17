@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   areFiltersActive,
   buildHeatmapMonths,
+  canCompleteFreely,
   computeStreak,
   countDone,
+  CURRENT_COMPLETION_GATE_VERSION,
   earlierDate,
   earliestYearOffset,
   getHeatmapRange,
   getV2Progress,
+  hasCompletionEvidence,
+  hasNotes,
   heatmapLevel,
   isProblemVisible,
   isValidStore,
@@ -19,8 +23,12 @@ import {
   summarizeMerge,
   v2Reducer,
 } from "./store";
-import { emptyAppStoreV2, migrateV1ToV2 } from "./persistence/migrate";
-import type { AppStoreV2, FilterState, Problem, ProblemState, ProgressStore } from "./types";
+import { DEFAULT_SETTINGS, emptyAppStoreV2, migrateV1ToV2 } from "./persistence/migrate";
+import type { AppSettings, AppStoreV2, FilterState, Problem, ProblemState, ProgressStore } from "./types";
+
+function settings(patch: Partial<AppSettings> = {}): AppSettings {
+  return { ...DEFAULT_SETTINGS, ...patch };
+}
 
 function state(patch: Partial<ProblemState> = {}): ProblemState {
   return { done: false, revise: false, notes: "", completedAt: null, revisedAt: null, ...patch };
@@ -411,5 +419,118 @@ describe("v2Reducer -- v2-only fields are never clobbered by legacy v1 actions",
     expect(v2.progress.a.starred).toBe(true);
     expect(v2.progress.a.starredAt).toBe("2026-01-01");
     expect(v2.progress.a.approach).toBe("two pointers");
+  });
+});
+
+describe("hasNotes", () => {
+  it("is false when every note field, including legacy, is empty", () => {
+    expect(hasNotes(getV2Progress(emptyAppStoreV2(), "a"))).toBe(false);
+  });
+
+  it("is true when only the legacy blob is non-empty (migrated notes keep their marker)", () => {
+    const v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf("a", { notes: "old note" }));
+    expect(hasNotes(v2.progress.a)).toBe(true);
+  });
+
+  it("is true when only a structured field is non-empty", () => {
+    const v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_STRUCTURED_NOTE", id: "a", field: "keyInsight", value: "x" });
+    expect(hasNotes(v2.progress.a)).toBe(true);
+  });
+
+  it("whitespace-only fields do not count as having notes", () => {
+    const v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf("a", { notes: "   " }));
+    expect(hasNotes(v2.progress.a)).toBe(false);
+  });
+});
+
+describe("hasCompletionEvidence", () => {
+  it("is false with empty pseudocode and code", () => {
+    expect(hasCompletionEvidence(getV2Progress(emptyAppStoreV2(), "a"))).toBe(false);
+  });
+
+  it("is true with non-empty pseudocode alone", () => {
+    const v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_PSEUDOCODE", id: "a", pseudocode: "for i in n: ..." });
+    expect(hasCompletionEvidence(v2.progress.a)).toBe(true);
+  });
+
+  it("is true with non-empty code alone", () => {
+    const v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_CODE", id: "a", code: "def f(): pass" });
+    expect(hasCompletionEvidence(v2.progress.a)).toBe(true);
+  });
+
+  it("whitespace-only evidence does not count", () => {
+    const v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_PSEUDOCODE", id: "a", pseudocode: "   " });
+    expect(hasCompletionEvidence(v2.progress.a)).toBe(false);
+  });
+});
+
+describe("canCompleteFreely -- the completion gate", () => {
+  it("blocks a never-completed question with requireEvidence on and no evidence", () => {
+    const progress = getV2Progress(emptyAppStoreV2(), "a");
+    expect(canCompleteFreely(progress, settings({ requireEvidence: true }))).toBe(false);
+  });
+
+  it("allows it once pseudocode or code is present", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_PSEUDOCODE", id: "a", pseudocode: "two pointers" });
+    expect(canCompleteFreely(v2.progress.a, settings({ requireEvidence: true }))).toBe(true);
+    v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_CODE", id: "a", code: "..." });
+    expect(canCompleteFreely(v2.progress.a, settings({ requireEvidence: true }))).toBe(true);
+  });
+
+  it("requireEvidence:false bypasses the gate entirely, evidence or not", () => {
+    const progress = getV2Progress(emptyAppStoreV2(), "a");
+    expect(canCompleteFreely(progress, settings({ requireEvidence: false }))).toBe(true);
+  });
+
+  it("a grandfathered/already-once-completed question is never re-gated, even with zero evidence", () => {
+    let v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf("a", { done: true, completedAt: "2020-01-01" }));
+    v2 = patchV2FromV1(v2, v1StoreOf("a", { done: false, completedAt: null })); // unchecked
+    expect(v2.progress.a.firstCompletedAt).toBe("2020-01-01"); // still on record
+    expect(hasCompletionEvidence(v2.progress.a)).toBe(false);
+    expect(canCompleteFreely(v2.progress.a, settings({ requireEvidence: true }))).toBe(true);
+  });
+});
+
+describe("completionGateVersion stamping on real completion", () => {
+  it("stamps CURRENT_COMPLETION_GATE_VERSION when a genuinely new completion has evidence", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_PSEUDOCODE", id: "a", pseudocode: "two pointers" });
+    v2 = patchV2FromV1(v2, v1StoreOf("a", { done: true, completedAt: "2026-01-01" }));
+    expect(v2.progress.a.completionGateVersion).toBe(CURRENT_COMPLETION_GATE_VERSION);
+  });
+
+  it("stays null when requireEvidence bypassed it (no evidence, new completion)", () => {
+    const v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf("a", { done: true, completedAt: "2026-01-01" }));
+    expect(v2.progress.a.completionGateVersion).toBeNull();
+  });
+
+  it("a migrated/grandfathered completion is version null, not the current gate version", () => {
+    const v2 = migrateV1ToV2({ version: 1, idsMigrated: true, problems: { a: state({ done: true, completedAt: "2020-01-01" }) } });
+    expect(v2.progress.a.completionGateVersion).toBeNull();
+  });
+
+  it("re-completing after an uncheck stays null even with evidence present -- re-checks are exempt, not re-verified", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_PSEUDOCODE", id: "a", pseudocode: "two pointers" });
+    v2 = patchV2FromV1(v2, v1StoreOf("a", { done: true, completedAt: "2026-01-01" })); // gated pass
+    expect(v2.progress.a.completionGateVersion).toBe(CURRENT_COMPLETION_GATE_VERSION);
+    v2 = patchV2FromV1(v2, v1StoreOf("a", { done: false, completedAt: null })); // uncheck
+    v2 = patchV2FromV1(v2, v1StoreOf("a", { done: true, completedAt: "2026-02-01" })); // re-check
+    expect(v2.progress.a.completionGateVersion).toBeNull();
+  });
+});
+
+describe("Phase 3 acceptance: legacy notes survive an edit to another field, byte-identical", () => {
+  it("editing a structured note field does not alter the legacy blob", () => {
+    let v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf("a", { notes: "original legacy note, verbatim" }));
+    v2 = v2Reducer(v2, { type: "SET_STRUCTURED_NOTE", id: "a", field: "commonMistake", value: "off by one" });
+    expect(v2.progress.a.notes.legacy).toBe("original legacy note, verbatim");
+    expect(v2.progress.a.notes.commonMistake).toBe("off by one");
+  });
+
+  it("editing pseudocode/code/approach does not alter the legacy blob", () => {
+    let v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf("a", { notes: "original legacy note, verbatim" }));
+    v2 = v2Reducer(v2, { type: "SET_PSEUDOCODE", id: "a", pseudocode: "..." });
+    v2 = v2Reducer(v2, { type: "SET_CODE", id: "a", code: "..." });
+    v2 = v2Reducer(v2, { type: "SET_APPROACH", id: "a", approach: "..." });
+    expect(v2.progress.a.notes.legacy).toBe("original legacy note, verbatim");
   });
 });

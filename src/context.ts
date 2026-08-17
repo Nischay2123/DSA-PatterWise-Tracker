@@ -94,6 +94,8 @@ export function useProgressStore() {
 interface StoreContextValue {
   store: ProgressStore;
   dispatch: (action: Action) => void;
+  v2Store: AppStoreV2;
+  dispatchV2: (action: V2Action) => void;
 }
 
 export const StoreContext = createContext<StoreContextValue | null>(null);
