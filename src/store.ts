@@ -1,0 +1,330 @@
+import idMapRaw from "../data/idMap.json";
+import type { FilterState, HeatmapDay, HeatmapMonth, Problem, ProblemState, ProgressStore } from "./types";
+
+const STORE_KEY = "dsa-tracker-progress";
+const BACKUP_KEY = "dsa-tracker-progress-backup";
+const ID_MAP: Record<string, string> = idMapRaw;
+
+export const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export function getState(store: ProgressStore, id: string): ProblemState {
+  return store.problems[id] || { done: false, revise: false, notes: "", completedAt: null, revisedAt: null };
+}
+
+export function countDone(problems: { id: string }[], store: ProgressStore): number {
+  return problems.reduce((n, p) => n + (getState(store, p.id).done ? 1 : 0), 0);
+}
+
+export function remapIds(problems: Record<string, ProblemState>, idMap: Record<string, string>) {
+  const migrated: Record<string, ProblemState> = {};
+  const orphaned: string[] = [];
+  for (const [oldId, state] of Object.entries(problems)) {
+    const newId = idMap[oldId];
+    migrated[newId || oldId] = state;
+    if (!newId) orphaned.push(oldId);
+  }
+  return { migrated, orphaned };
+}
+
+export function migrateIdsIfNeeded(store: ProgressStore): { store: ProgressStore; migrated: boolean } {
+  if (store.idsMigrated) return { store, migrated: false };
+  const { migrated: problems, orphaned } = remapIds(store.problems, ID_MAP);
+  const next: ProgressStore = { ...store, problems, idsMigrated: true };
+  if (orphaned.length) {
+    console.warn(`ID migration: ${orphaned.length} unmapped id(s) preserved as-is (not dropped):`, orphaned);
+  }
+  return { store: next, migrated: true };
+}
+
+let warnedAboutSaveFailure = false;
+
+export function saveStore(store: ProgressStore): void {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  } catch {
+    // Private-mode Safari and full-quota browsers throw here. Silently failing
+    // would leave ticked boxes that vanish on reload, so say so once.
+    if (!warnedAboutSaveFailure) {
+      warnedAboutSaveFailure = true;
+      alert(
+        "Your progress could not be saved — the browser is blocking local storage (private browsing or storage is full). Changes will be lost when you reload."
+      );
+    }
+  }
+}
+
+export function loadStore(): ProgressStore {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORE_KEY) ?? "null");
+    if (parsed && parsed.problems) {
+      const { store, migrated } = migrateIdsIfNeeded(parsed);
+      if (migrated) saveStore(store);
+      return store;
+    }
+  } catch {
+    // corrupt localStorage -- fall through to a fresh store
+  }
+  return { version: 1, problems: {}, idsMigrated: true };
+}
+
+export function saveBackup(store: ProgressStore): void {
+  localStorage.setItem(BACKUP_KEY, JSON.stringify(store));
+}
+
+export function loadBackup(): ProgressStore | null {
+  const raw = localStorage.getItem(BACKUP_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return isValidStore(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearBackup(): void {
+  localStorage.removeItem(BACKUP_KEY);
+}
+
+export function hasBackup(): boolean {
+  return !!localStorage.getItem(BACKUP_KEY);
+}
+
+export function isValidStore(parsed: unknown): parsed is ProgressStore {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
+  const p = parsed as Record<string, unknown>;
+  return !!p.problems && typeof p.problems === "object" && !Array.isArray(p.problems);
+}
+
+export function countDoneInStore(store: ProgressStore): number {
+  return Object.values(store.problems).filter((st) => st && st.done).length;
+}
+
+export interface BreakdownRow {
+  label: string;
+  done: number;
+  total: number;
+}
+
+export function breakdownBy(
+  problems: Problem[],
+  getKey: (p: Problem) => string,
+  order: string[],
+  store: ProgressStore
+): BreakdownRow[] {
+  const stats: Record<string, { done: number; total: number }> = {};
+  order.forEach((k) => (stats[k] = { done: 0, total: 0 }));
+  problems.forEach((p) => {
+    const k = getKey(p);
+    if (!stats[k]) return;
+    stats[k].total++;
+    if (getState(store, p.id).done) stats[k].done++;
+  });
+  return order.filter((k) => stats[k].total > 0).map((k) => ({ label: k, ...stats[k] }));
+}
+
+export interface VisibilityContext {
+  topicName: string;
+  patternName: string;
+}
+
+export function isProblemVisible(
+  problem: Problem,
+  state: ProblemState,
+  filters: FilterState,
+  context: VisibilityContext
+): boolean {
+  const q = filters.search.trim().toLowerCase();
+  const haystack = [problem.question, context.topicName, context.patternName, problem.subpattern, problem.platform]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const matchesText = !q || haystack.includes(q);
+  const matchesDiff = filters.difficulty === "All" || problem.difficulty === filters.difficulty;
+  const matchesImportance = filters.importance === "All" || problem.importance === filters.importance;
+  const matchesFreq = filters.freq === "All" || problem.interviewFreq === filters.freq;
+  const matchesCompleted = !filters.hideCompleted || !state.done;
+  const matchesRevise = !filters.reviseOnly || state.revise;
+  return matchesText && matchesDiff && matchesImportance && matchesFreq && matchesCompleted && matchesRevise;
+}
+
+export function areFiltersActive(filters: FilterState): boolean {
+  return (
+    !!filters.search.trim() ||
+    filters.difficulty !== "All" ||
+    filters.importance !== "All" ||
+    filters.freq !== "All" ||
+    filters.reviseOnly
+  );
+}
+
+// --- Dates -----------------------------------------------------------------
+
+export function toISODate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export function todayISO(): string {
+  return toISODate(new Date());
+}
+
+// --- Heatmap / streak / dashboard (pure logic) ------------------------------
+
+export function buildHeatmapStats(store: ProgressStore) {
+  const doneByDate = new Map<string, number>();
+  const revisedByDate = new Map<string, number>();
+  Object.values(store.problems).forEach((st) => {
+    if (st.completedAt) doneByDate.set(st.completedAt, (doneByDate.get(st.completedAt) || 0) + 1);
+    if (st.revisedAt) revisedByDate.set(st.revisedAt, (revisedByDate.get(st.revisedAt) || 0) + 1);
+  });
+  return { doneByDate, revisedByDate };
+}
+
+// Fixed thresholds rather than rebasing on the range max: a single solved problem
+// shouldn't render as the darkest green, and two years should be comparable.
+// A streak stays alive through today even before you've solved anything today —
+// it only breaks once a full day passes with nothing solved.
+export function computeStreak(doneByDate: Map<string, number>, now: Date = new Date()): number {
+  const cursor = new Date(now);
+  cursor.setHours(0, 0, 0, 0);
+  if (!doneByDate.get(toISODate(cursor))) cursor.setDate(cursor.getDate() - 1);
+  let streak = 0;
+  while (doneByDate.get(toISODate(cursor))) {
+    streak++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+// How many years back the record actually goes -- paging past it shows nothing.
+export function earliestYearOffset(store: ProgressStore, now: Date = new Date()): number {
+  const earliest = Object.values(store.problems)
+    .map((st) => st.completedAt || st.revisedAt)
+    .filter(Boolean)
+    .sort()[0];
+  return earliest ? now.getFullYear() - Number(earliest.slice(0, 4)) : 0;
+}
+
+export function findNextUnsolved<T extends { id: string }>(problems: T[], store: ProgressStore): T | null {
+  return problems.find((p) => !getState(store, p.id).done) || null;
+}
+
+export function heatmapLevel(count: number): 0 | 1 | 2 | 3 | 4 {
+  if (!count) return 0;
+  if (count >= 10) return 4;
+  if (count >= 6) return 3;
+  if (count >= 3) return 2;
+  return 1;
+}
+
+export function formatDayLabel(date: Date): string {
+  return `${MONTH_NAMES[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+}
+
+export interface HeatmapRange {
+  start: Date;
+  end: Date;
+  label: string;
+}
+
+export function getHeatmapRange(offset: number, now: Date = new Date()): HeatmapRange {
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  if (offset === 0) {
+    const end = today;
+    const start = new Date(end);
+    start.setFullYear(start.getFullYear() - 1);
+    start.setDate(start.getDate() + 1);
+    return { start, end, label: "Current" };
+  }
+  const year = today.getFullYear() - offset;
+  return { start: new Date(year, 0, 1), end: new Date(year, 11, 31), label: String(year) };
+}
+
+// Each month owns only its own days: a week straddling a month boundary is
+// split, so no day ever renders under a neighbouring month's label.
+export function buildHeatmapMonths(
+  doneByDate: Map<string, number>,
+  revisedByDate: Map<string, number>,
+  range: HeatmapRange
+): HeatmapMonth[] {
+  const months: HeatmapMonth[] = [];
+  const cursor = new Date(range.start.getFullYear(), range.start.getMonth(), 1);
+  const lastMonthStart = new Date(range.end.getFullYear(), range.end.getMonth(), 1);
+  while (cursor <= lastMonthStart) {
+    const monthStart = new Date(cursor);
+    const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+    const from = monthStart < range.start ? new Date(range.start) : monthStart;
+    const to = monthEnd > range.end ? new Date(range.end) : monthEnd;
+    const days: HeatmapDay[] = [];
+    for (const d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+      const iso = toISODate(d);
+      days.push({ date: new Date(d), done: doneByDate.get(iso) || 0, revised: revisedByDate.get(iso) || 0 });
+    }
+    if (days.length) months.push({ label: MONTH_NAMES[monthStart.getMonth()], pad: from.getDay(), days });
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return months;
+}
+
+// --- Merge --------------------------------------------------------------
+
+// ISO dates sort lexically, so the earliest is just the smaller string.
+export function earlierDate(a: string | null, b: string | null): string | null {
+  if (a && b) return a < b ? a : b;
+  return a || b || null;
+}
+
+export function mergeNotes(a: string, b: string): string {
+  const left = (a || "").trim();
+  const right = (b || "").trim();
+  if (!left) return right;
+  if (!right) return left;
+  if (left === right) return left;
+  return `${left}\n\n--- merged ---\n\n${right}`;
+}
+
+// Union merge: a problem is solved if either copy says so, so merging can only
+// ever add progress. Never un-solves anything and never drops a note.
+export function mergeStores(local: ProgressStore, incoming: ProgressStore): ProgressStore {
+  const merged: ProgressStore = { version: 1, problems: {}, idsMigrated: true };
+  const ids = new Set([...Object.keys(local.problems), ...Object.keys(incoming.problems)]);
+  ids.forEach((id) => {
+    const a = local.problems[id] || ({} as Partial<ProblemState>);
+    const b = incoming.problems[id] || ({} as Partial<ProblemState>);
+    const done = !!(a.done || b.done);
+    const revise = !!(a.revise || b.revise);
+    merged.problems[id] = {
+      done,
+      revise,
+      notes: mergeNotes(a.notes ?? "", b.notes ?? ""),
+      // Keep the invariant the rest of the app relies on: no date without the flag.
+      completedAt: done ? earlierDate(a.completedAt ?? null, b.completedAt ?? null) : null,
+      revisedAt: revise ? earlierDate(a.revisedAt ?? null, b.revisedAt ?? null) : null,
+    };
+  });
+  return merged;
+}
+
+export interface MergeSummary {
+  newlySolved: number;
+  newlyRevised: number;
+  notesCombined: number;
+}
+
+export function summarizeMerge(local: ProgressStore, merged: ProgressStore): MergeSummary {
+  let newlySolved = 0;
+  let newlyRevised = 0;
+  let notesCombined = 0;
+  Object.keys(merged.problems).forEach((id) => {
+    const before = local.problems[id] || ({} as Partial<ProblemState>);
+    const after = merged.problems[id];
+    if (after.done && !before.done) newlySolved++;
+    if (after.revise && !before.revise) newlyRevised++;
+    if (after.notes && after.notes !== (before.notes || "")) notesCombined++;
+  });
+  return { newlySolved, newlyRevised, notesCombined };
+}

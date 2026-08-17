@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@theme {
+  --color-easy: #2fa84f;
+  --color-medium: #d99a1b;
+  --color-hard: #d9463f;
+  --color-border: #d0d0d5;
+  --color-bg: #ffffff;
+  --color-fg: #1a1a1a;
+  --color-muted: #6b6b6f;
+  --color-row-hover: #f4f4f7;
+  --color-heat-0: #ebedf0;
+  --color-heat-1: #c6e6cd;
+  --color-heat-2: #8fd19e;
+  --color-heat-3: #4cb264;
+  --color-heat-4: #2fa84f;
+  --color-tip-bg: #24242a;
+  --color-tip-fg: #f4f4f6;
+  --color-focus: #1a6dd4;
+  /* Badges carry white text, so they need their own darker shades to clear
+     WCAG AA 4.5:1 -- the lighter --color-easy/medium/hard stay for fills. */
+  --color-badge-easy: #26863f;
+  --color-badge-medium: #9a6d13;
+  --color-badge-hard: #d2443d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-border: #3a3a40;
+    --color-bg: #16161a;
+    --color-fg: #e8e8ea;
+    --color-muted: #9a9aa0;
+    --color-row-hover: #202024;
+    --color-heat-0: #202024;
+    --color-heat-1: #1c4229;
+    --color-heat-2: #216b39;
+    --color-heat-3: #2a9147;
+    --color-heat-4: #39c261;
+    --color-tip-bg: #3a3a42;
+    --color-tip-fg: #f4f4f6;
+    --color-focus: #6ea8f0;
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+  body {
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  /* Keyboard navigation had no visible indicator anywhere before this. */
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  /* Jump-to-problem highlight -- toggled imperatively via classList, not a
+     Tailwind utility, since it fires outside React's render cycle. */
+  @keyframes jump-flash {
+    0%,
+    40% {
+      background: var(--color-heat-1);
+    }
+    100% {
+      background: transparent;
+    }
+  }
+  .just-jumped {
+    animation: jump-flash 1.6s ease-out;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .just-jumped {
+      animation: none;
+      outline: 2px solid var(--color-focus);
+    }
+  }
+}
