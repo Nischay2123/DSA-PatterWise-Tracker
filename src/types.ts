@@ -70,6 +70,10 @@ export interface QuestionProgressV2 {
   starredAt: string | null; // v1 `revisedAt` -- a bookmark date, NOT a revision date
   firstCompletedAt: string | null;
   lastCompletedAt: string | null;
+  // null = grandfathered / no completion-evidence gate applied (migrated from v1,
+  // or completed before Phase 3's gate exists). Once Phase 3 ships a real gate,
+  // a positive integer records which gate version's evidence rule was satisfied.
+  completionGateVersion: number | null;
   approach: string;
   pseudocode: string;
   code: string;
@@ -139,3 +143,24 @@ export interface AppStoreV2 {
   // Unknown ids from v1 that couldn't be mapped through idMap.json -- never dropped.
   orphanedProgress: Record<string, QuestionProgressV2>;
 }
+
+// --- v2-native writes (Phase 2 remediation) ---------------------------------
+// The v1 reducer/adapter in context.ts + store.ts can only carry fields that
+// exist on the v1 ProblemState shape. These fields have no v1 equivalent, so
+// they need their own write path that the v1 adapter never touches.
+
+export type StructuredNoteField =
+  | "approach"
+  | "keyInsight"
+  | "commonMistake"
+  | "complexity"
+  | "edgeCases"
+  | "reminder";
+
+export type V2Action =
+  | { type: "SET_APPROACH"; id: string; approach: string }
+  | { type: "SET_PSEUDOCODE"; id: string; pseudocode: string }
+  | { type: "SET_CODE"; id: string; code: string }
+  | { type: "SET_STRUCTURED_NOTE"; id: string; field: StructuredNoteField; value: string }
+  | { type: "ADD_MISTAKE"; id: string; mistake: { at: string; what: string; remember: string } }
+  | { type: "REMOVE_MISTAKE"; id: string; at: string };

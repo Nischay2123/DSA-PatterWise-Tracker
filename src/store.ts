@@ -9,6 +9,7 @@ import type {
   ProblemState,
   ProgressStore,
   QuestionProgressV2,
+  V2Action,
 } from "./types";
 
 const STORE_KEY = "dsa-tracker-progress";
@@ -345,17 +346,69 @@ export function patchV2FromV1(v2: AppStoreV2, v1: ProgressStore): AppStoreV2 {
   const progress: Record<string, QuestionProgressV2> = { ...v2.progress };
   for (const [id, state] of Object.entries(v1.problems)) {
     const base = progress[id] ?? liftV1Entry(state);
+    // Only a genuine false -> true transition is "a new completion". An
+    // unrelated dispatch re-patching this id (already done, or still not
+    // done) must never disturb what's already recorded for it.
+    const justCompleted = state.done && !base.completed;
     progress[id] = {
       ...base,
       completed: state.done,
       starred: state.revise,
       starredAt: state.revisedAt,
-      firstCompletedAt: state.completedAt,
-      lastCompletedAt: state.completedAt,
+      // Immutable once set: the historical fact of the FIRST completion,
+      // never replaced by a later re-completion. Un-checking does not clear
+      // it either -- only ever set from null, never reset back to null.
+      firstCompletedAt: base.firstCompletedAt ?? (state.done ? state.completedAt : null),
+      // The most recent completion date. Updates only on a new completion;
+      // un-checking leaves it as-is (the plan doesn't ask it to be cleared).
+      lastCompletedAt: justCompleted ? state.completedAt : base.lastCompletedAt,
+      // Every completion made through this legacy v1 path is ungated (no
+      // evidence gate exists yet) -- re-stamp null on each new completion so
+      // a stale gate version can never survive a legacy re-completion.
+      completionGateVersion: justCompleted ? null : base.completionGateVersion,
       notes: { ...base.notes, legacy: state.notes },
     };
   }
   return { ...v2, progress };
+}
+
+// --- v2-native writes (Phase 2 remediation) ---------------------------------
+// Fields with no v1 equivalent (approach/pseudocode/code/structured notes/
+// mistakes) can't be represented as a v1 Action, so they get their own
+// reducer that patches v2 directly. patchV2FromV1 above never touches these
+// fields (it always spreads `base` first), so a legacy v1 action can never
+// clobber anything written here -- verified by tests in store.test.ts.
+
+export function getV2Progress(v2: AppStoreV2, id: string): QuestionProgressV2 {
+  return v2.progress[id] ?? liftV1Entry({ done: false, revise: false, notes: "", completedAt: null, revisedAt: null });
+}
+
+function patchV2Progress(v2: AppStoreV2, id: string, patch: Partial<QuestionProgressV2>): AppStoreV2 {
+  const existing = getV2Progress(v2, id);
+  return { ...v2, progress: { ...v2.progress, [id]: { ...existing, ...patch } } };
+}
+
+export function v2Reducer(v2: AppStoreV2, action: V2Action): AppStoreV2 {
+  switch (action.type) {
+    case "SET_APPROACH":
+      return patchV2Progress(v2, action.id, { approach: action.approach });
+    case "SET_PSEUDOCODE":
+      return patchV2Progress(v2, action.id, { pseudocode: action.pseudocode });
+    case "SET_CODE":
+      return patchV2Progress(v2, action.id, { code: action.code });
+    case "SET_STRUCTURED_NOTE": {
+      const existing = getV2Progress(v2, action.id);
+      return patchV2Progress(v2, action.id, { notes: { ...existing.notes, [action.field]: action.value } });
+    }
+    case "ADD_MISTAKE": {
+      const existing = getV2Progress(v2, action.id);
+      return patchV2Progress(v2, action.id, { mistakes: [...existing.mistakes, action.mistake] });
+    }
+    case "REMOVE_MISTAKE": {
+      const existing = getV2Progress(v2, action.id);
+      return patchV2Progress(v2, action.id, { mistakes: existing.mistakes.filter((m) => m.at !== action.at) });
+    }
+  }
 }
 
 export interface MergeSummary {

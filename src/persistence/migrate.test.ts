@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { emptyAppStoreV2, liftV1Entry, migrateV1ToV2 } from "./migrate";
-import type { ProblemState, ProgressStore } from "../types";
+import { emptyAppStoreV2, isValidAppStoreV2, liftV1Entry, migrateV1ToV2 } from "./migrate";
+import type { AppStoreV2, ProblemState, ProgressStore } from "../types";
 
 function state(patch: Partial<ProblemState> = {}): ProblemState {
   return { done: false, revise: false, notes: "", completedAt: null, revisedAt: null, ...patch };
@@ -43,6 +43,7 @@ describe("migrateV1ToV2", () => {
       starredAt: "2026-01-15",
       firstCompletedAt: "2026-01-10",
       lastCompletedAt: "2026-01-10",
+      completionGateVersion: null,
       approach: "",
       pseudocode: "",
       code: "",
@@ -129,5 +130,46 @@ describe("migrateV1ToV2", () => {
   it("running migration twice on the same input is idempotent (pure function, no shared state)", () => {
     const store: ProgressStore = { version: 1, idsMigrated: true, problems: { a: state({ done: true }) } };
     expect(migrateV1ToV2(store)).toEqual(migrateV1ToV2(store));
+  });
+
+  describe("completionGateVersion grandfathering", () => {
+    it("a migrated completed question is grandfathered (null gate version)", () => {
+      const store: ProgressStore = { version: 1, idsMigrated: true, problems: { a: state({ done: true, completedAt: "2026-01-01" }) } };
+      expect(migrateV1ToV2(store).progress.a.completionGateVersion).toBeNull();
+    });
+
+    it("a migrated incomplete question is also null (moot until it's ever completed)", () => {
+      const store: ProgressStore = { version: 1, idsMigrated: true, problems: { a: state({ done: false }) } };
+      expect(migrateV1ToV2(store).progress.a.completionGateVersion).toBeNull();
+    });
+
+    it("migration is idempotent with respect to completionGateVersion too", () => {
+      const store: ProgressStore = { version: 1, idsMigrated: true, problems: { a: state({ done: true, completedAt: "2026-01-01" }) } };
+      const first = migrateV1ToV2(store);
+      const second = migrateV1ToV2(store);
+      expect(first.progress.a.completionGateVersion).toBe(second.progress.a.completionGateVersion);
+    });
+  });
+});
+
+describe("isValidAppStoreV2", () => {
+  it("accepts a well-formed v2 store", () => {
+    expect(isValidAppStoreV2(emptyAppStoreV2())).toBe(true);
+  });
+
+  it("rejects null, arrays, and wrong schemaVersion", () => {
+    expect(isValidAppStoreV2(null)).toBe(false);
+    expect(isValidAppStoreV2([])).toBe(false);
+    expect(isValidAppStoreV2({ ...emptyAppStoreV2(), schemaVersion: 1 })).toBe(false);
+  });
+
+  it("rejects a record missing required namespaces even with the right schemaVersion", () => {
+    expect(isValidAppStoreV2({ schemaVersion: 2 })).toBe(false);
+    expect(isValidAppStoreV2({ schemaVersion: 2, progress: {} })).toBe(false); // missing revision/attempts/etc.
+  });
+
+  it("rejects a record whose namespaces are arrays instead of objects", () => {
+    const malformed = { ...emptyAppStoreV2(), progress: [] } as unknown as AppStoreV2;
+    expect(isValidAppStoreV2(malformed)).toBe(false);
   });
 });

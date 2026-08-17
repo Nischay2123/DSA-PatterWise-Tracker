@@ -7,16 +7,20 @@ import {
   earlierDate,
   earliestYearOffset,
   getHeatmapRange,
+  getV2Progress,
   heatmapLevel,
   isProblemVisible,
   isValidStore,
   mergeNotes,
   mergeStores,
   migrateIdsIfNeeded,
+  patchV2FromV1,
   remapIds,
   summarizeMerge,
+  v2Reducer,
 } from "./store";
-import type { FilterState, Problem, ProblemState, ProgressStore } from "./types";
+import { emptyAppStoreV2, migrateV1ToV2 } from "./persistence/migrate";
+import type { AppStoreV2, FilterState, Problem, ProblemState, ProgressStore } from "./types";
 
 function state(patch: Partial<ProblemState> = {}): ProblemState {
   return { done: false, revise: false, notes: "", completedAt: null, revisedAt: null, ...patch };
@@ -285,5 +289,127 @@ describe("buildHeatmapMonths", () => {
     const day2 = months[0].days.find((d) => d.date.getDate() === 2)!;
     expect(day2.done).toBe(4);
     expect(day2.revised).toBe(1);
+  });
+});
+
+function v1StoreOf(id: string, entry: Partial<ProblemState>): ProgressStore {
+  return { version: 1, idsMigrated: true, problems: { [id]: state(entry) } };
+}
+
+describe("patchV2FromV1 -- completion date semantics", () => {
+  it("first completion sets both firstCompletedAt and lastCompletedAt", () => {
+    const v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf("a", { done: true, completedAt: "2026-01-01" }));
+    expect(v2.progress.a.firstCompletedAt).toBe("2026-01-01");
+    expect(v2.progress.a.lastCompletedAt).toBe("2026-01-01");
+  });
+
+  it("unchecking does not erase firstCompletedAt or lastCompletedAt", () => {
+    let v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf("a", { done: true, completedAt: "2026-01-01" }));
+    v2 = patchV2FromV1(v2, v1StoreOf("a", { done: false, completedAt: null }));
+    expect(v2.progress.a.completed).toBe(false);
+    expect(v2.progress.a.firstCompletedAt).toBe("2026-01-01");
+    expect(v2.progress.a.lastCompletedAt).toBe("2026-01-01");
+  });
+
+  it("re-completing after an uncheck updates lastCompletedAt but never replaces firstCompletedAt", () => {
+    let v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf("a", { done: true, completedAt: "2026-01-01" }));
+    v2 = patchV2FromV1(v2, v1StoreOf("a", { done: false, completedAt: null }));
+    v2 = patchV2FromV1(v2, v1StoreOf("a", { done: true, completedAt: "2026-02-15" }));
+    expect(v2.progress.a.firstCompletedAt).toBe("2026-01-01");
+    expect(v2.progress.a.lastCompletedAt).toBe("2026-02-15");
+  });
+
+  it("survives multiple completion/uncompletion cycles without ever losing the original first date", () => {
+    let v2 = emptyAppStoreV2();
+    const cycles = [
+      { done: true, completedAt: "2026-01-01" },
+      { done: false, completedAt: null },
+      { done: true, completedAt: "2026-02-01" },
+      { done: false, completedAt: null },
+      { done: true, completedAt: "2026-03-01" },
+    ];
+    for (const c of cycles) v2 = patchV2FromV1(v2, v1StoreOf("a", c));
+    expect(v2.progress.a.firstCompletedAt).toBe("2026-01-01");
+    expect(v2.progress.a.lastCompletedAt).toBe("2026-03-01");
+    expect(v2.progress.a.completed).toBe(true);
+  });
+
+  it("a redundant re-patch of unchanged state does not disturb dates already recorded", () => {
+    const v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf("a", { done: true, completedAt: "2026-01-01" }));
+    const before = v2.progress.a;
+    const after = patchV2FromV1(v2, v1StoreOf("a", { done: true, completedAt: "2026-01-01" }));
+    expect(after.progress.a).toEqual(before);
+  });
+
+  it("a migrated entry's original completion date survives later legacy uncheck/re-complete dispatches", () => {
+    const migrated = migrateV1ToV2({ version: 1, idsMigrated: true, problems: { a: state({ done: true, completedAt: "2024-06-01" }) } });
+    let v2 = patchV2FromV1(migrated, v1StoreOf("a", { done: false, completedAt: null }));
+    v2 = patchV2FromV1(v2, v1StoreOf("a", { done: true, completedAt: "2026-05-01" }));
+    expect(v2.progress.a.firstCompletedAt).toBe("2024-06-01");
+    expect(v2.progress.a.lastCompletedAt).toBe("2026-05-01");
+  });
+});
+
+describe("v2Reducer -- v2-only fields are never clobbered by legacy v1 actions", () => {
+  it("editing pseudocode survives a normal v1 action (toggling done)", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_PSEUDOCODE", id: "a", pseudocode: "for i in range(n): ..." });
+    v2 = patchV2FromV1(v2, v1StoreOf("a", { done: true, completedAt: "2026-01-01" }));
+    expect(v2.progress.a.pseudocode).toBe("for i in range(n): ...");
+    expect(v2.progress.a.completed).toBe(true);
+  });
+
+  it("editing code survives a normal v1 action", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_CODE", id: "a", code: "def solve(): pass" });
+    v2 = patchV2FromV1(v2, v1StoreOf("a", { revise: true, revisedAt: "2026-01-01" }));
+    expect(v2.progress.a.code).toBe("def solve(): pass");
+    expect(v2.progress.a.starred).toBe(true);
+  });
+
+  it("structured notes survive a normal v1 action, alongside the legacy note it carries", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), {
+      type: "SET_STRUCTURED_NOTE",
+      id: "a",
+      field: "keyInsight",
+      value: "two pointers",
+    });
+    v2 = patchV2FromV1(v2, v1StoreOf("a", { notes: "legacy note" }));
+    expect(v2.progress.a.notes.keyInsight).toBe("two pointers");
+    expect(v2.progress.a.notes.legacy).toBe("legacy note");
+  });
+
+  it("mistakes survive a normal v1 action", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), {
+      type: "ADD_MISTAKE",
+      id: "a",
+      mistake: { at: "2026-01-01", what: "off by one", remember: "check bounds" },
+    });
+    v2 = patchV2FromV1(v2, v1StoreOf("a", { done: true, completedAt: "2026-01-02" }));
+    expect(v2.progress.a.mistakes).toEqual([{ at: "2026-01-01", what: "off by one", remember: "check bounds" }]);
+  });
+
+  it("REMOVE_MISTAKE removes only the targeted entry", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "ADD_MISTAKE", id: "a", mistake: { at: "t1", what: "x", remember: "y" } });
+    v2 = v2Reducer(v2, { type: "ADD_MISTAKE", id: "a", mistake: { at: "t2", what: "z", remember: "w" } });
+    v2 = v2Reducer(v2, { type: "REMOVE_MISTAKE", id: "a", at: "t1" });
+    expect(v2.progress.a.mistakes).toEqual([{ at: "t2", what: "z", remember: "w" }]);
+  });
+
+  it("existing v2 revisionStats survive legacy v1 actions", () => {
+    const seeded: AppStoreV2 = {
+      ...emptyAppStoreV2(),
+      progress: {
+        a: { ...getV2Progress(emptyAppStoreV2(), "a"), revisionStats: { count: 3, lastRevisedAt: "2026-01-01", lastScore: 90, lastConfidence: "strong" } },
+      },
+    };
+    const v2 = patchV2FromV1(seeded, v1StoreOf("a", { done: true, completedAt: "2026-02-01" }));
+    expect(v2.progress.a.revisionStats).toEqual({ count: 3, lastRevisedAt: "2026-01-01", lastScore: 90, lastConfidence: "strong" });
+  });
+
+  it("existing starred/starredAt behavior is unchanged by v2-native writes", () => {
+    let v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf("a", { revise: true, revisedAt: "2026-01-01" }));
+    v2 = v2Reducer(v2, { type: "SET_APPROACH", id: "a", approach: "two pointers" });
+    expect(v2.progress.a.starred).toBe(true);
+    expect(v2.progress.a.starredAt).toBe("2026-01-01");
+    expect(v2.progress.a.approach).toBe("two pointers");
   });
 });

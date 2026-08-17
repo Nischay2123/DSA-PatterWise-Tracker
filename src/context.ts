@@ -2,8 +2,8 @@ import type { Dispatch, SetStateAction } from "react";
 import { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState } from "react";
 import { loadAppStore, saveAppStore } from "./persistence/db";
 import { emptyAppStoreV2 } from "./persistence/migrate";
-import { getState, patchV2FromV1, todayISO, v2ProgressToV1Store } from "./store";
-import type { AppStoreV2, FilterState, ProblemState, ProgressStore } from "./types";
+import { getState, patchV2FromV1, todayISO, v2ProgressToV1Store, v2Reducer } from "./store";
+import type { AppStoreV2, FilterState, ProblemState, ProgressStore, V2Action } from "./types";
 
 export type Action =
   | { type: "TOGGLE_DONE"; id: string; done: boolean }
@@ -36,10 +36,10 @@ const EMPTY_STORE: ProgressStore = { version: 1, problems: {}, idsMigrated: true
 
 export function useProgressStore() {
   const [store, dispatch] = useReducer(storeReducer, EMPTY_STORE);
+  const [v2Store, setV2Store] = useState<AppStoreV2>(() => emptyAppStoreV2());
   const [importNonce, setImportNonce] = useState(0);
   const [status, setStatus] = useState<BootStatus>("loading");
   const [bootError, setBootError] = useState<string | null>(null);
-  const v2Ref = useRef<AppStoreV2>(emptyAppStoreV2());
   const bootedRef = useRef(false);
 
   useEffect(() => {
@@ -47,7 +47,7 @@ export function useProgressStore() {
     loadAppStore()
       .then((v2) => {
         if (cancelled) return;
-        v2Ref.current = v2;
+        setV2Store(v2);
         dispatch({ type: "IMPORT", store: v2ProgressToV1Store(v2) });
         bootedRef.current = true;
         setStatus("ready");
@@ -65,8 +65,11 @@ export function useProgressStore() {
   useEffect(() => {
     // Skip the placeholder pre-boot state and never persist while booted-with-error.
     if (!bootedRef.current) return;
-    v2Ref.current = patchV2FromV1(v2Ref.current, store);
-    saveAppStore(v2Ref.current);
+    setV2Store((prev) => {
+      const next = patchV2FromV1(prev, store);
+      saveAppStore(next);
+      return next;
+    });
   }, [store]);
 
   const wrappedDispatch = useCallback((action: Action) => {
@@ -74,7 +77,18 @@ export function useProgressStore() {
     dispatch(action);
   }, []);
 
-  return { store, dispatch: wrappedDispatch, importNonce, status, bootError };
+  // Writes v2-only fields (approach/pseudocode/code/structured notes/mistakes)
+  // directly, bypassing the v1 reducer entirely -- there's no v1 shape that
+  // could carry them. Phase 3's UI is what will call this; nothing does yet.
+  const dispatchV2 = useCallback((action: V2Action) => {
+    setV2Store((prev) => {
+      const next = v2Reducer(prev, action);
+      saveAppStore(next);
+      return next;
+    });
+  }, []);
+
+  return { store, dispatch: wrappedDispatch, importNonce, status, bootError, v2Store, dispatchV2 };
 }
 
 interface StoreContextValue {

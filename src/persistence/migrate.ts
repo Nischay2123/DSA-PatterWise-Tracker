@@ -33,6 +33,9 @@ export function liftV1Entry(v1: ProblemState): QuestionProgressV2 {
     starredAt: v1.revisedAt ?? null,
     firstCompletedAt: v1.completedAt ?? null,
     lastCompletedAt: v1.completedAt ?? null,
+    // Every migrated entry predates Phase 3's completion-evidence gate by
+    // definition -- grandfathered, not subject to it.
+    completionGateVersion: null,
     approach: "",
     pseudocode: "",
     code: "",
@@ -48,6 +51,24 @@ export function liftV1Entry(v1: ProblemState): QuestionProgressV2 {
     mistakes: [],
     revisionStats: { count: 0, lastRevisedAt: null, lastScore: null, lastConfidence: null },
   };
+}
+
+// Structural validation for whatever idb-keyval hands back. Guards against a
+// corrupted or partially-written record that happens to carry schemaVersion 2
+// but isn't actually shaped like an AppStoreV2 -- db.ts treats "invalid" the
+// same as "missing" rather than trusting it blindly.
+export function isValidAppStoreV2(parsed: unknown): parsed is AppStoreV2 {
+  if (!parsed || typeof parsed !== "object") return false;
+  const p = parsed as Record<string, unknown>;
+  const isPlainRecord = (v: unknown) => !!v && typeof v === "object" && !Array.isArray(v);
+  return (
+    p.schemaVersion === 2 &&
+    isPlainRecord(p.progress) &&
+    isPlainRecord(p.revision) &&
+    isPlainRecord(p.attempts) &&
+    isPlainRecord(p.settings) &&
+    isPlainRecord(p.orphanedProgress)
+  );
 }
 
 // Pure v1 -> v2 mapping. Never touches localStorage/IDB -- callers own I/O and backups.
