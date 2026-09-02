@@ -211,14 +211,35 @@ export function todayISO(): string {
 
 // --- Heatmap / streak / dashboard (pure logic) ------------------------------
 
-export function buildHeatmapStats(store: ProgressStore) {
-  const doneByDate = new Map<string, number>();
+// Real revision events, per local calendar day (plan §5, Phase 8): now that
+// revision sessions exist, the "revised" series plots THEM rather than ★
+// bookmark dates. Counted per question recalled, not per session, so the
+// unit still matches the "solved" series and the old summary-line wording.
+//
+// Sourced from submitted attempts rather than revisionStats.lastRevisedAt,
+// because that field only remembers the most recent revision of a question --
+// walking attempts keeps the whole history on the chart. ★ is untouched and
+// still means "bookmark" everywhere else (locked decision #16).
+export function buildRevisedByDate(v2: AppStoreV2): Map<string, number> {
   const revisedByDate = new Map<string, number>();
+  for (const attempt of Object.values(v2.attempts)) {
+    if (!attempt.submittedAt) continue;
+    // submittedAt is a full UTC timestamp; the heatmap's grid is local
+    // calendar days (same convention as completedAt). Slicing the ISO string
+    // would file an evening session under tomorrow for anyone behind UTC.
+    const day = toISODate(new Date(attempt.submittedAt));
+    const count = attempt.questions.length;
+    if (count > 0) revisedByDate.set(day, (revisedByDate.get(day) ?? 0) + count);
+  }
+  return revisedByDate;
+}
+
+export function buildHeatmapStats(store: ProgressStore, v2: AppStoreV2) {
+  const doneByDate = new Map<string, number>();
   Object.values(store.problems).forEach((st) => {
     if (st.completedAt) doneByDate.set(st.completedAt, (doneByDate.get(st.completedAt) || 0) + 1);
-    if (st.revisedAt) revisedByDate.set(st.revisedAt, (revisedByDate.get(st.revisedAt) || 0) + 1);
   });
-  return { doneByDate, revisedByDate };
+  return { doneByDate, revisedByDate: buildRevisedByDate(v2) };
 }
 
 // Fixed thresholds rather than rebasing on the range max: a single solved problem
@@ -316,13 +337,25 @@ export function earlierDate(a: string | null, b: string | null): string | null {
   return a || b || null;
 }
 
+const NOTE_SEPARATOR = "\n\n--- merged ---\n\n";
+
+// Union of note segments, not blind concatenation. Treating an
+// already-merged note as the list of parts it's made of is what makes
+// re-merging the same backup a no-op -- otherwise every re-merge appends
+// another copy of the other side's text and notes grow without bound.
 export function mergeNotes(a: string, b: string): string {
   const left = (a || "").trim();
   const right = (b || "").trim();
   if (!left) return right;
   if (!right) return left;
   if (left === right) return left;
-  return `${left}\n\n--- merged ---\n\n${right}`;
+
+  const segments: string[] = [];
+  for (const part of [...left.split(NOTE_SEPARATOR), ...right.split(NOTE_SEPARATOR)]) {
+    const trimmed = part.trim();
+    if (trimmed && !segments.includes(trimmed)) segments.push(trimmed);
+  }
+  return segments.join(NOTE_SEPARATOR);
 }
 
 // Union merge: a problem is solved if either copy says so, so merging can only
@@ -345,6 +378,182 @@ export function mergeStores(local: ProgressStore, incoming: ProgressStore): Prog
     };
   });
   return merged;
+}
+
+// --- v2 merge (Phase 8) -----------------------------------------------------
+// Widens the v1 union merge above to the whole v2 shape. Same governing rule,
+// applied field by field: a merge may only ever ADD. Nothing is un-solved,
+// no note is dropped, no mistake or attempt disappears. Where two values
+// genuinely conflict and only one can survive, the tie-break is written out
+// explicitly below rather than left to object-spread order.
+
+function laterDate(a: string | null, b: string | null): string | null {
+  if (a && b) return a > b ? a : b;
+  return a || b || null;
+}
+
+function mergeMistakes(
+  a: QuestionProgressV2["mistakes"],
+  b: QuestionProgressV2["mistakes"]
+): QuestionProgressV2["mistakes"] {
+  const seen = new Set<string>();
+  const out: QuestionProgressV2["mistakes"] = [];
+  for (const m of [...a, ...b]) {
+    // Same moment + same text is the same mistake logged twice, not two.
+    const key = `${m.at}|${m.what}|${m.remember}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(m);
+  }
+  return out.sort((x, y) => x.at.localeCompare(y.at));
+}
+
+function mergeProgressEntry(a: QuestionProgressV2, b: QuestionProgressV2): QuestionProgressV2 {
+  const completed = a.completed || b.completed;
+  const starred = a.starred || b.starred;
+  // The side with more real revisions is the more advanced record, so its
+  // last-revision facts are the ones that survive as a set.
+  const richer = b.revisionStats.count > a.revisionStats.count ? b : a;
+  return {
+    completed,
+    starred,
+    starredAt: starred ? earlierDate(a.starredAt, b.starredAt) : null,
+    // Historical facts: the FIRST completion is the earliest either side
+    // knows about; the LAST is the most recent either side knows about.
+    firstCompletedAt: completed ? earlierDate(a.firstCompletedAt, b.firstCompletedAt) : null,
+    lastCompletedAt: completed ? laterDate(a.lastCompletedAt, b.lastCompletedAt) : null,
+    // A gate-verified completion stays verified; null means "ungated", so a
+    // non-null on either side is the more specific fact.
+    completionGateVersion: a.completionGateVersion ?? b.completionGateVersion,
+    approach: mergeNotes(a.approach, b.approach),
+    pseudocode: mergeNotes(a.pseudocode, b.pseudocode),
+    code: mergeNotes(a.code, b.code),
+    notes: {
+      legacy: mergeNotes(a.notes.legacy, b.notes.legacy),
+      approach: mergeNotes(a.notes.approach, b.notes.approach),
+      keyInsight: mergeNotes(a.notes.keyInsight, b.notes.keyInsight),
+      commonMistake: mergeNotes(a.notes.commonMistake, b.notes.commonMistake),
+      complexity: mergeNotes(a.notes.complexity, b.notes.complexity),
+      edgeCases: mergeNotes(a.notes.edgeCases, b.notes.edgeCases),
+      reminder: mergeNotes(a.notes.reminder, b.notes.reminder),
+    },
+    mistakes: mergeMistakes(a.mistakes, b.mistakes),
+    revisionStats: {
+      count: Math.max(a.revisionStats.count, b.revisionStats.count),
+      lastRevisedAt: laterDate(a.revisionStats.lastRevisedAt, b.revisionStats.lastRevisedAt),
+      lastScore: richer.revisionStats.lastScore,
+      lastConfidence: richer.revisionStats.lastConfidence,
+    },
+  };
+}
+
+function mergeTopicRevision(a: TopicRevision, b: TopicRevision): TopicRevision {
+  // history is the audit trail, so it unions and stays ordered. One attempt
+  // id can only appear once however many times the file is merged.
+  const byAttempt = new Map<string, TopicRevision["history"][number]>();
+  for (const h of [...a.history, ...b.history]) byAttempt.set(h.attemptId, h);
+  const history = [...byAttempt.values()].sort((x, y) => x.at.localeCompare(y.at));
+
+  const weakConcepts: Record<string, number> = { ...a.weakConcepts };
+  for (const [id, n] of Object.entries(b.weakConcepts)) {
+    // Max, not sum: merging the same file twice must not inflate a weight.
+    weakConcepts[id] = Math.max(weakConcepts[id] ?? 0, n);
+  }
+
+  // Scheduling is one coherent block -- cycle and nextDueAt have to agree, so
+  // they're taken together from whichever side has completed more passes.
+  // Equal cycles fall back to the later due date, which is the side that most
+  // recently satisfied a revision.
+  const ahead = b.cycle > a.cycle || (b.cycle === a.cycle && laterDate(a.nextDueAt, b.nextDueAt) === b.nextDueAt) ? b : a;
+
+  return {
+    topicId: a.topicId || b.topicId,
+    cycle: Math.max(a.cycle, b.cycle),
+    nextDueAt: ahead.nextDueAt,
+    lastPassedAt: laterDate(a.lastPassedAt, b.lastPassedAt),
+    lastFailedAt: laterDate(a.lastFailedAt, b.lastFailedAt),
+    // An in-progress session belongs to the device it was started on; never
+    // import one, or this device would resume a session it can't see.
+    activeSessionId: a.activeSessionId,
+    history,
+    weakConcepts,
+  };
+}
+
+export function mergeStoresV2(local: AppStoreV2, incoming: AppStoreV2): AppStoreV2 {
+  const progress: Record<string, QuestionProgressV2> = { ...local.progress };
+  for (const [id, entry] of Object.entries(incoming.progress)) {
+    const mine = local.progress[id];
+    progress[id] = mine ? mergeProgressEntry(mine, entry) : entry;
+  }
+
+  const orphanedProgress: Record<string, QuestionProgressV2> = { ...local.orphanedProgress };
+  for (const [id, entry] of Object.entries(incoming.orphanedProgress)) {
+    const mine = local.orphanedProgress[id];
+    orphanedProgress[id] = mine ? mergeProgressEntry(mine, entry) : entry;
+  }
+
+  const revision: Record<string, TopicRevision> = { ...local.revision };
+  for (const [topicId, entry] of Object.entries(incoming.revision)) {
+    const mine = local.revision[topicId];
+    revision[topicId] = mine ? mergeTopicRevision(mine, entry) : { ...entry, activeSessionId: null };
+  }
+
+  // Attempts are immutable records of something that happened. Union by id;
+  // a local one always wins a collision, since only this device could have
+  // been editing it.
+  const attempts = { ...incoming.attempts, ...local.attempts };
+
+  return {
+    schemaVersion: 2,
+    progress,
+    revision,
+    attempts,
+    // Never take another device's settings -- that would silently swap the
+    // provider/model, and an imported file's apiKey is blank by construction.
+    settings: local.settings,
+    orphanedProgress,
+  };
+}
+
+export interface MergeSummaryV2 {
+  newlySolved: number;
+  newlyStarred: number;
+  notesCombined: number;
+  mistakesAdded: number;
+  attemptsAdded: number;
+  revisionsRecorded: number;
+}
+
+// The dry run behind the confirm dialog: computed from the SAME merged store
+// that will be applied, so what the dialog promises and what lands can't
+// drift apart (plan §15 Phase 8: "dry-run diff matches applied result").
+export function summarizeMergeV2(local: AppStoreV2, merged: AppStoreV2): MergeSummaryV2 {
+  let newlySolved = 0;
+  let newlyStarred = 0;
+  let notesCombined = 0;
+  let mistakesAdded = 0;
+
+  for (const [id, after] of Object.entries(merged.progress)) {
+    const before = local.progress[id];
+    if (after.completed && !before?.completed) newlySolved++;
+    if (after.starred && !before?.starred) newlyStarred++;
+    const beforeText = before ? textOf(before) : "";
+    if (textOf(after) !== beforeText) notesCombined++;
+    mistakesAdded += after.mistakes.length - (before?.mistakes.length ?? 0);
+  }
+
+  const attemptsAdded = Object.keys(merged.attempts).length - Object.keys(local.attempts).length;
+  let revisionsRecorded = 0;
+  for (const [topicId, after] of Object.entries(merged.revision)) {
+    revisionsRecorded += after.history.length - (local.revision[topicId]?.history.length ?? 0);
+  }
+
+  return { newlySolved, newlyStarred, notesCombined, mistakesAdded, attemptsAdded, revisionsRecorded };
+}
+
+function textOf(p: QuestionProgressV2): string {
+  return [p.approach, p.pseudocode, p.code, ...Object.values(p.notes)].join(" ");
 }
 
 // --- v2 (IndexedDB) adapter -------------------------------------------------
@@ -645,7 +854,7 @@ export function applyEvaluation(v2: AppStoreV2, attemptId: string, evaluation: E
     };
   }
 
-  const { scoring, questionScores } = scored;
+  const { scoring, questionScores, weakQuestionIds } = scored;
 
   // Per-question score is real data now, so revisionStats.lastScore stops
   // being null and starts feeding selection.ts's weighting.
@@ -667,7 +876,9 @@ export function applyEvaluation(v2: AppStoreV2, attemptId: string, evaluation: E
       passed: scoring.passed,
       score: scoring.overallScore,
       attemptId,
-      weakConceptIds: scoring.weakConceptIds,
+      // Concepts AND questions: weakConcepts is keyed by either (plan §6),
+      // and selection.ts boosts a question by looking up its own id here.
+      weakConceptIds: [...scoring.weakConceptIds, ...weakQuestionIds],
     }),
   };
 

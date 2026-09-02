@@ -1,3 +1,4 @@
+import { REVISION_CONFIG } from "../config";
 import type { EvaluationResult, RevisionAttempt, Topic } from "../types";
 import type { PromptInput } from "../llm/prompt";
 import { scoreAttempt } from "./scoring";
@@ -47,6 +48,11 @@ export interface ScoredEvaluation {
   // computeOverallScore uses, so the two are on one comparable scale (which
   // is what selection.ts's `lastRevisionScore < passScore` check assumes).
   questionScores: Record<string, number>;
+  // Questions that didn't clear passScore. TopicRevision.weakConcepts is
+  // keyed by "conceptId | questionId" (plan §6), and selection.ts reads
+  // weakConcepts[problem.id] for its weakBoostFactor -- so without these
+  // ids the boost could never fire for a question, only for a concept.
+  weakQuestionIds: string[];
 }
 
 // Turns a validated model response into the real, client-side grade.
@@ -75,6 +81,7 @@ export function scoreEvaluation(attempt: RevisionAttempt, evaluation: Evaluation
 
   const questionScores: QuestionScore[] = [];
   const perQuestion100: Record<string, number> = {};
+  const weakQuestionIds: string[] = [];
   for (const q of attempt.questions) {
     const graded = questionById.get(q.questionId);
     if (!graded) return null;
@@ -86,11 +93,15 @@ export function scoreEvaluation(attempt: RevisionAttempt, evaluation: Evaluation
       complexity: graded.complexity,
     });
     const avg = (graded.correctness + graded.approach + graded.pseudocode + graded.complexity) / 4;
-    perQuestion100[q.questionId] = Math.round(avg * 20);
+    const score100 = Math.round(avg * 20);
+    perQuestion100[q.questionId] = score100;
+    // Same bar the whole system uses for "good enough", rather than a second
+    // threshold that could disagree with passScore.
+    if (score100 < REVISION_CONFIG.passScore) weakQuestionIds.push(q.questionId);
   }
 
   // scoreAttempt is Phase 4's, untouched: it owns passScore and the
   // critical-concept floor. The model's own `passed`/`score` are never
   // consulted here -- they are display data only (plan §9).
-  return { scoring: scoreAttempt(fundamentalScores, questionScores), questionScores: perQuestion100 };
+  return { scoring: scoreAttempt(fundamentalScores, questionScores), questionScores: perQuestion100, weakQuestionIds };
 }

@@ -29,7 +29,8 @@ import {
   v2Reducer,
 } from "./store";
 import { DEFAULT_SETTINGS, emptyAppStoreV2, isValidAppStoreV2, migrateV1ToV2 } from "./persistence/migrate";
-import { getFundamentalsForPattern } from "./revision/session";
+import questionsData from "../data/questions.json";
+import { buildSelectionCandidates, getFundamentalsForPattern } from "./revision/session";
 import type {
   AppSettings,
   AppStoreV2,
@@ -38,6 +39,7 @@ import type {
   Problem,
   ProblemState,
   ProgressStore,
+  QuestionData,
   RevisionAttempt,
   Topic,
 } from "./types";
@@ -983,5 +985,75 @@ describe("the API key never leaves the browser in an export", () => {
     const exported = toExportableV2(v2);
     expect(exported.settings.provider).toBe("grok");
     expect(exported.settings.model).toBe("grok-3");
+  });
+});
+
+// --- Phase 8: the weak-area feedback loop, end to end -----------------------
+
+describe("a failed evaluation feeds weak questions back into next session's selection", () => {
+  it("writes weak QUESTION ids into weakConcepts, which buildSelectionCandidates then reads", () => {
+    const conceptId = REAL_CONCEPT.id;
+    const questionId = "advanced-strings__pattern-matching__z-function";
+
+    let v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf(questionId, { done: true }));
+    const attempt = attemptFixture({
+      topicId: "advanced-strings",
+      submittedAt: "2026-01-01T00:30:00.000Z",
+      evaluationStatus: "PENDING",
+      fundamentals: [{ conceptId, answer: "weak recall" }],
+      questions: [{ questionId, approach: "a", pseudocode: "p", complexity: "c", edgeCases: "", confidence: "forgot" }],
+    });
+    v2 = v2Reducer(v2, { type: "START_REVISION_SESSION", topicId: "advanced-strings", attempt });
+
+    // A genuinely poor attempt: the question scores 40/100, under passScore.
+    const failing: EvaluationResult = {
+      passed: true, // model's opinion, ignored
+      score: 99,
+      perFundamental: [{ conceptId, score: 1, missing: [], note: "" }],
+      perQuestion: [{ questionId, correctness: 2, approach: 2, pseudocode: 2, complexity: 2, mistakes: [], note: "" }],
+      weakConcepts: [],
+      feedback: "",
+      recommendedFocus: [],
+    };
+    v2 = v2Reducer(v2, { type: "APPLY_EVALUATION", attemptId: "att1", evaluation: failing });
+
+    // The failure is recorded against BOTH the concept and the question.
+    const weak = v2.revision["advanced-strings"].weakConcepts;
+    expect(weak[conceptId]).toBe(1);
+    expect(weak[questionId]).toBe(1);
+    expect(v2.revision["advanced-strings"].history[0].passed).toBe(false);
+
+    // And the next session's candidate for that question is flagged weak,
+    // which is what selection.ts multiplies by weakBoostFactor.
+    const candidate = buildSelectionCandidates("advanced-strings", v2, questionsData as QuestionData).find(
+      (c) => c.id === questionId
+    )!;
+    expect(candidate.isWeak).toBe(true);
+    expect(candidate.lastRevisionScore).toBe(40);
+  });
+
+  it("does not flag a question that cleared passScore", () => {
+    const conceptId = REAL_CONCEPT.id;
+    const questionId = "advanced-strings__pattern-matching__z-function";
+    let v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf(questionId, { done: true }));
+    const attempt = attemptFixture({
+      topicId: "advanced-strings",
+      submittedAt: "2026-01-01T00:30:00.000Z",
+      fundamentals: [{ conceptId, answer: "good" }],
+      questions: [{ questionId, approach: "a", pseudocode: "p", complexity: "c", edgeCases: "", confidence: "strong" }],
+    });
+    v2 = v2Reducer(v2, { type: "START_REVISION_SESSION", topicId: "advanced-strings", attempt });
+    v2 = v2Reducer(v2, {
+      type: "APPLY_EVALUATION",
+      attemptId: "att1",
+      evaluation: {
+        passed: false, score: 0,
+        perFundamental: [{ conceptId, score: 5, missing: [], note: "" }],
+        perQuestion: [{ questionId, correctness: 5, approach: 4, pseudocode: 5, complexity: 4, mistakes: [], note: "" }],
+        weakConcepts: [], feedback: "", recommendedFocus: [],
+      },
+    });
+    expect(v2.revision["advanced-strings"].weakConcepts[questionId]).toBeUndefined();
+    expect(v2.revision["advanced-strings"].history[0].passed).toBe(true);
   });
 });

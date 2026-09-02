@@ -14,11 +14,11 @@ import { Analytics } from "./Analytics";
 import { Heatmap } from "./Heatmap";
 
 export function Dashboard({ allProblems, onContinue }: { allProblems: Problem[]; onContinue: (id: string) => void }) {
-  const { store } = useStore();
+  const { store, v2Store } = useStore();
   const [yearOffset, setYearOffset] = useState(0);
   const cardRef = useRef<HTMLElement>(null);
 
-  const { doneByDate, revisedByDate } = buildHeatmapStats(store);
+  const { doneByDate, revisedByDate } = buildHeatmapStats(store, v2Store);
   const range = getHeatmapRange(yearOffset);
   const months = buildHeatmapMonths(doneByDate, revisedByDate, range);
   const allDays = months.flatMap((m) => m.days);
@@ -76,7 +76,7 @@ export function Dashboard({ allProblems, onContinue }: { allProblems: Problem[];
 
       <div className="flex items-center justify-between gap-3 flex-wrap mt-2">
         <span className="text-[0.8rem] text-muted">
-          {`${totalDone} solved · ${totalRevised} revised on ${activeDays} active day${activeDays === 1 ? "" : "s"} in this range`}
+          {`${totalDone} solved · ${totalRevised} revised in sessions on ${activeDays} active day${activeDays === 1 ? "" : "s"} in this range`}
         </span>
         <div className="flex items-center gap-1 text-[0.7rem] text-muted">
           <span>Less</span>

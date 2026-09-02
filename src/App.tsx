@@ -6,6 +6,7 @@ import { ImportExport } from "./components/ImportExport";
 import { MergeImport } from "./components/MergeImport";
 import { ProgressBar } from "./components/ProgressBar";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { RevisionDashboard } from "./components/revision/Dashboard";
 import { SessionShell } from "./components/revision/SessionShell";
 import { TopicList } from "./components/TopicList";
 import { FiltersContext, StoreContext, useProgressStore } from "./context";
@@ -103,6 +104,18 @@ export function App() {
   const sessionMatch = /^#\/revision\/(.+)$/.exec(hash);
   const sessionTopic = sessionMatch ? DATA.topics.find((t) => t.id === decodeURIComponent(sessionMatch[1])) : null;
 
+  if (!sessionTopic && /^#\/revision\/?$/.test(hash)) {
+    return (
+      <StoreContext.Provider value={{ store, dispatch, v2Store, dispatchV2 }}>
+        <RevisionDashboard
+          topics={DATA.topics}
+          onExit={() => navigate("#/tracker")}
+          onStartRevision={(topicId) => navigate(`#/revision/${encodeURIComponent(topicId)}`)}
+        />
+      </StoreContext.Provider>
+    );
+  }
+
   if (sessionTopic) {
     return (
       <StoreContext.Provider value={{ store, dispatch, v2Store, dispatchV2 }}>
@@ -126,6 +139,14 @@ export function App() {
             <h1 className="text-[1.2rem] m-0">DSA Tracker</h1>
             <div className="flex items-center gap-2">
               <ImportExport backupExists={backupExists} onBackupChange={refreshBackup} />
+              <button
+                type="button"
+                onClick={() => navigate("#/revision")}
+                title="Revision dashboard"
+                className="text-[0.85rem] px-3 py-1.5 border border-border rounded-md bg-transparent text-fg cursor-pointer"
+              >
+                Revision
+              </button>
               <button
                 type="button"
                 onClick={() => setSettingsOpen((o) => !o)}

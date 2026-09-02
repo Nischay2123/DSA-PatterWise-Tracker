@@ -13,7 +13,9 @@ function buildWeeks(month: HeatmapMonth): Cell[][] {
   for (let i = 0; i < month.pad; i++) cells.push({ key: `pad-${i}` });
   month.days.forEach((day) => {
     const level = heatmapLevel(day.done);
-    const revisedPart = day.revised ? ` · ${day.revised} revised` : "";
+    // "revised" now counts real revision-session recalls, not ★ bookmarks
+    // (plan §5, Phase 8), so the wording says which.
+    const revisedPart = day.revised ? ` · ${day.revised} revised in a session` : "";
     const tip = `${day.done} solved${revisedPart} on ${formatDayLabel(day.date)}`;
     cells.push({ key: day.date.toISOString(), level, tip });
   });
