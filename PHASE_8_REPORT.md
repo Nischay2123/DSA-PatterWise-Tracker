@@ -1,6 +1,6 @@
 # Phase 8 Report — Dashboard, weak-area feedback, v2 merge
 
-Scope: the plan's Phase 8, the final phase — revision dashboard, `weakConcepts` written from evaluations, merge widened to the v2 shape, and the heatmap's "revised" series switched to real revision dates.
+Scope: the plan's final phase — revision dashboard, `weakConcepts` written from evaluations, merge widened to the v2 namespaces, and the heatmap's "revised" series switched to real revisions.
 
 Branch: `feat/revision-system`. `main` untouched.
 
@@ -9,148 +9,144 @@ Branch: `feat/revision-system`. `main` untouched.
 ## 1. Files
 
 **Created**
-- `src/revision/dashboard.ts` — derived rows, the six headline counts, status dot/label. Pure.
+- `src/revision/dashboard.ts` — `buildTopicRows`, `countDashboard`, `statusDot`, `statusLabel`. Pure, so the counts the UI renders are the counts the tests assert.
 - `src/components/revision/Dashboard.tsx` — the `#/revision` route.
 - `src/mergeV2.test.ts`, `src/revision/dashboard.test.ts`.
 
 **Modified**
-- `src/store.ts` — `mergeStoresV2`, `summarizeMergeV2`, `buildRevisedByDate`, a fixed `mergeNotes`, and weak-question ids fed into `recordAttemptOutcome`.
-- `src/revision/evaluate.ts` — `scoreEvaluation` now also returns `weakQuestionIds`.
-- `src/components/MergeImport.tsx` — merges through the v2 path, with a six-line diff in the confirm dialog.
-- `src/components/Dashboard.tsx`, `src/components/Heatmap.tsx` — real revision dates and matching wording.
-- `src/App.tsx` — `#/revision` route and a header button to reach it.
-
-`persistence/backup.ts` was listed in the plan's file list but needed no change: the pre-merge safety net already exists as the complete-v2 undo snapshot added in the Phase 3 remediation, and it is what Undo restores from (verified below). Adding a second, automatic file download on every merge would surprise the user without adding protection.
-
----
-
-## 2. The weak-area loop, finally closed
-
-This is the one place where earlier phases had built both halves of a mechanism that was never actually connected.
-
-`selection.ts` (Phase 4) boosts a candidate by `weakBoostFactor` when `isWeak` is set. `buildSelectionCandidates` (Phase 6) sets `isWeak` from `weakConcepts[problem.id]` — keyed by **question** id. But Phase 7 only ever wrote **concept** ids into `weakConcepts`. So the boost could never fire for a question; the wire was cut in the middle.
-
-Phase 8 closes it: `scoreEvaluation` now also returns the ids of questions that scored below `passScore`, and `applyEvaluation` passes concepts *and* questions into `recordAttemptOutcome`. The plan's own acceptance test — *"failed revision demonstrably over-weights its weak concepts next session"* — is now testable end to end, and is tested twice: at the weighting level (a flagged question weighs exactly 3× an identical unflagged one) and across modules (a failing evaluation → `weakConcepts` → a candidate that comes back `isWeak: true` with `lastRevisionScore: 40`).
-
-The threshold for "weak question" is `< passScore`, reusing the constant the rest of the system already uses rather than inventing a second bar that could disagree with it.
+- `src/store.ts` — `mergeStoresV2`, `summarizeMergeV2`, `buildRevisedByDate`, weak-question recording, and (in a follow-up, §6) `isGatingActive` + `MARK_REVISION_SELF_ASSESSED`.
+- `src/revision/evaluate.ts` — returns `weakQuestionIds`.
+- `src/components/MergeImport.tsx` — merges through the v2 path with a real dry-run diff.
+- `src/components/Dashboard.tsx`, `src/components/Heatmap.tsx` — revised series + wording.
+- `src/App.tsx` — the `#/revision` route and a header button.
+- `src/types.ts`, `src/revision/scheduler.ts` — nullable history score (§6).
 
 ---
 
-## 3. A real bug the merge tests caught
+## 2. Closing the weak-area loop
 
-The idempotence test — *merge the same file twice, the second merge must change nothing* — failed on first run.
+Phases 4–7 built both halves of this and never connected them. `selection.ts` boosts a candidate by `weakConcepts[problem.id]` — keyed by **question** id — but Phase 7 only ever wrote **concept** ids. The boost could not fire for a question.
 
-`mergeNotes` only de-duplicated when two notes were **exactly** equal. After one merge a note reads `"mine ⏎--- merged ---⏎ theirs"`; merging the same file again compares that whole string against `"theirs"`, finds them different, and appends `"theirs"` a second time. Every re-merge would have grown every conflicting note by another copy, forever.
-
-Fixed at the root, in the shared `mergeNotes` rather than in a v2-only wrapper: a note is now treated as the list of segments it is made of, and merging unions those segments. All pre-existing v1 merge tests still pass unchanged — the v1 path inherits the fix — and two regression tests pin the new behaviour.
-
-This is exactly the class of bug the plan warned about ("merge is the last place data can vanish"); it just corrupts by accretion rather than by loss.
+`scoreEvaluation` now also returns `weakQuestionIds` (any question scoring under `passScore`), and `applyEvaluation` feeds concepts and questions together into `recordAttemptOutcome`. A cross-module test walks the whole path: a failing evaluation → `weakConcepts` holds both ids → `buildSelectionCandidates` marks that question `isWeak` → `computeQuestionWeight` returns 3×.
 
 ---
 
-## 4. Merge semantics, written down
+## 3. Decisions the plan leaves open
 
-Every field where two devices can disagree, and the rule that decides it:
+**"Strong" and "Weak" are named but never defined.** Pinned to the only hard evidence available: whether the most recent **graded** attempt passed. A topic with no graded history is neither — counting it strong would flatter, weak would be unfair. Self-assessed revisions (§6) are excluded from both, since nothing checked them.
 
-| Field | Rule |
-|---|---|
-| `completed`, `starred` | OR — solved in either copy stays solved. Never un-solves. |
-| `firstCompletedAt` | Earliest either side knows. |
-| `lastCompletedAt` | Latest either side knows. |
-| `starredAt` | Earliest (matches the v1 semantic). |
-| `completionGateVersion` | Non-null wins — a gate-verified completion stays verified. |
-| `approach` / `pseudocode` / `code` / every note field | Segment union, legacy preserved. Nothing overwritten. |
-| `mistakes` | Union, de-duplicated on `at`+`what`+`remember`, date-ordered. |
-| `revisionStats` | Highest `count`, latest `lastRevisedAt`; `lastScore`/`lastConfidence` taken together from the side with more revisions, so they stay mutually consistent. |
-| `revision.history` | Union by `attemptId`, date-ordered. |
-| `revision.weakConcepts` | Per-key **max**, not sum — so re-merging can't inflate a weight. |
-| `cycle` / `nextDueAt` / `lastPassedAt` | Taken as one block from the side with more passed cycles; ties break to the later due date. Scheduling fields must agree with each other. |
-| `activeSessionId` | Always the local one. An in-progress session belongs to the device that started it. |
-| `attempts` | Union by id; local wins a collision. |
-| `settings` | **Always local.** Never import another device's provider/model — and an exported `apiKey` is blank by construction anyway. |
+**Merge tie-breaks, written out rather than left to spread order.** `cycle` takes the max; `nextDueAt` comes from whichever side has passed more cycles (equal cycles → the later date, i.e. the side that most recently satisfied a revision), so cycle and due date stay coherent as a pair. `history` unions by `attemptId`. `weakConcepts` takes the **max** per id, never the sum, so merging the same file twice can't inflate a weight. `revisionStats` takes the highest `count` and latest `lastRevisedAt`, with `lastScore`/`lastConfidence` travelling together from the more-revised side.
 
-An older v1-only export still merges: it's lifted through the existing `migrateV1ToV2` first, so there is one merge path, not two.
+**An in-progress session is never imported.** `activeSessionId` always stays local — importing one would leave this device "resuming" a session whose attempt it may not even have.
+
+**Settings are never taken from an incoming file.** That would silently swap your provider/model, and an exported `apiKey` is blank by construction anyway.
+
+**The heatmap reads attempts, not `revisionStats.lastRevisedAt`.** That field only remembers the most recent revision per question; walking submitted attempts keeps the whole history on the chart. Counted per question recalled, so the unit still matches the "solved" series. ★ is untouched and still means bookmark (locked decision #16).
 
 ---
 
-## 5. Dashboard definitions
+## 4. A real bug the tests caught
 
-The plan names six counts without defining them, so:
+The idempotence test — merge the same file twice, expect no change the second time — failed on first run.
 
-- **Due today** — due (or failed-and-due) with no missed date yet. A topic past its threshold but never scheduled counts here, not as overdue.
-- **Overdue** — due with `nextDueAt` already in the past.
-- **Upcoming** — scheduled for a future date.
-- **Mastered** — the state machine's `MASTERED`.
-- **Strong / Weak** — decided by whether the most recent **graded** attempt passed. A topic with no graded history is neither: calling it strong would flatter, weak would be unfair.
+`mergeNotes` only de-duplicated when both sides were *exactly* equal. After one merge a note reads `"mine --- merged --- theirs"`; merging the same file again compares that against `"theirs"`, finds them different, and appends another copy. Notes would grow without bound for anyone who re-merged a backup.
 
-Exempt topics (`fundamentals`) are filtered out before anything is counted, per §5.
+Fixed at the root, in the shared `mergeNotes` (so the v1 path benefits too): split both sides on the separator, union the segments, rejoin. Every pre-existing v1 merge test still passes unchanged.
 
 ---
 
-## 6. Heatmap: real revisions instead of ★
+## 5. Tests
 
-The "revised" series now counts questions recalled in submitted sessions, sourced by walking `attempts` rather than reading `revisionStats.lastRevisedAt` — that field only remembers the *most recent* revision per question, which would have silently truncated the chart's history.
+92 added (338 → 430 at the time of this phase):
 
-One subtlety worth flagging: `submittedAt` is a full **UTC** timestamp, while the heatmap grid is built from **local** calendar days (the same convention `completedAt` uses). Slicing the ISO string would have filed an evening session under tomorrow for anyone behind UTC, so the date is converted properly. Wording updated in both the summary line ("revised in sessions") and the per-day tooltip ("revised in a session"). ★ is untouched and still means bookmark everywhere (locked decision #16).
-
----
-
-## 7. Tests
-
-45 new (293 → **338**), 15 files:
-
-- `mergeV2.test.ts` (27) — completion never regresses (5) · no written work lost, incl. per-field note union, mistake de-dup, revisionStats, orphans (5) · revision namespace: history union, scheduling block, weak-concept max, never importing an active session (5) · attempts and settings (3) · **idempotence** (1) · dry-run/applied agreement (2) · heatmap revised series (4) · `mergeNotes` regression (2).
-- `revision/dashboard.test.ts` (16) — row derivation, exempt filtering, overdue arithmetic, all six counts, dot/label wording, and the weak-boost proof.
-- `store.test.ts` (+2) — the cross-module weak-area loop, and its negative case.
+- `mergeV2.test.ts` — completion never regresses; earliest-first/latest-last dates; per-field note union with legacy preserved; approach/pseudocode/code combined; mistakes unioned and de-duplicated; `revisionStats` precedence; orphaned entries kept from both sides; history union; scheduling tie-breaks; `weakConcepts` max; active session never imported; settings never taken; **full-store idempotence**; `summarizeMergeV2` matching the applied result; `buildRevisedByDate` including the "★ dates are not plotted" guard.
+- `dashboard.test.ts` — exempt topics omitted; completion/cycle/due-distance derivation; overdue vs due-today; upcoming; mastered; strong/weak by last graded attempt; every status dot and label including "due tomorrow", "next in N days" and "overdue by N days"; and the plan's own acceptance test, *"a failed revision demonstrably over-weights its weak concepts next session"*.
 
 ---
 
-## 8. Full results
+## 6. Follow-up in the same phase: gating could lock the user out
+
+Found while answering a pre-deploy question, and fixed before merging (commit `ef28752`).
+
+A topic past 75% gets scheduled, falls due, and blocks new completions in that topic. Clearing it needs a passing score — and only an LLM evaluation produces a score. **With no API key there was no way out.** On real data, several topics would have become permanently un-tickable a week after deploy.
+
+Two escapes, both live-verified:
+
+- `isGatingActive(settings)` — gating is off when the new Settings switch is off, **and off automatically whenever no API key is set**. If nothing can grade a revision, nothing may block on one. An absent setting reads as `true`, so existing stores need no migration.
+- `MARK_REVISION_SELF_ASSESSED` — "Mark this revision as done" on the Results screen. Advances the cycle and reschedules like a pass, but stores `score: null` and `selfAssessed: true` rather than inventing a number. The plan forbids fabricating a grade, and a user saying "I did this" is not the same as something having checked it. Both surfaces render *"marked done (not graded)"*.
+
+---
+
+## 7. Live verification
+
+Verified twice: once when the phase was implemented, and again afterwards with a wider scenario. Both passes are recorded because they checked different things.
+
+### Pass 1 — at implementation (3 topics)
+
+1. Counts `0 due today · 2 overdue · 1 upcoming · 2 strong · 1 weak · 0 mastered`, each matching the seeded data.
+2. Rows rendered with the right dot, label and Start-revision affordance; a scheduled topic correctly had no Start button.
+3. **A gap found and fixed here:** weak *questions* rendered as raw slugs, because only concept ids were being resolved to text. Now a weak question shows its title alongside concept prompts.
+4. Merge from a simulated second device: **the applied result matched the dry run exactly** — local pseudocode kept *and* remote insight added, mistake unioned, `revisionStats` taking the richer side, history `["h3","deviceB-1"]`, weak weights **maxed not summed** (`c1` stayed 2), all attempts present, and **`provider` stayed `gemini`** rather than being overwritten by the incoming file's `grok`.
+5. **Undo after a v2 merge restored the store byte-for-byte** (`JSON.stringify(after) === JSON.stringify(before)`).
+6. Navigation: header *Revision* → `#/revision`; dashboard *Start revision* → the session route.
+
+### Pass 2 — wider scenario (6 topics, every state at once)
+
+Seeded six topics to hit every state simultaneously, then checked the rendered UI against hand-computed expectations.
+
+**Dashboard counts — every tile matched exactly:**
+
+| Tile | Expected | Rendered |
+|---|---|---|
+| due today | 1 (Recursion) | 1 |
+| overdue | 2 (Sorting, Tries) | 2 |
+| upcoming | 1 (Greedy) | 1 |
+| strong | 3 (Adv Strings, Sorting, Greedy) | 3 |
+| weak | 1 (Tries) | 1 |
+| mastered | 1 (Adv Strings) | 1 |
+
+Rows rendered as `🔴 Sorting — Overdue by 32 days · last 81/100`, `🟢 Greedy — Next in 74 days`, `🔴 Tries — Revision due (last attempt failed)`, `🟢 Advanced Strings — Mastered`, `⚪ Strings — In progress — 21%`. The exempt `fundamentals` topic is absent, as specified.
+
+**Expanded row** showed `86% complete · 0 passed cycles · next due 2026-08-25`, the failed history entry, and weak areas resolved to a real concept **prompt** (×3) and a real question **title** (×1).
+
+**Heatmap** plotted 2 / 3 / 2 / 3 recalls on Jul 20, Aug 1, Aug 20, Aug 25 — exactly the four seeded sessions — summarised as *"42 solved · 10 revised in sessions on 1 active day"*, with no ★ dates plotted.
+
+**Merge**, through the real file input, from a simulated second device. The confirm dialog reported the true diff:
 
 ```
-$ npx tsc --noEmit    (clean)
-$ npx vitest run      15 files, 338 passed (338)
-$ npm run build       ✓ 75 modules transformed, built in ~430ms
+Newly solved: 1 · Newly starred: 1 · Notes combined: 2
+Mistakes added: 1 · Revisions added: 1 · Sessions added: 1
+Solved after merge: 43 (currently 42)
 ```
 
-No existing test regressed — including every v1 merge test, which now also covers the `mergeNotes` fix.
+Afterwards the store held the new completion, the star, the merged `keyInsight`, the new mistake, both history entries (`h-tries`, `h-other`) and 5 attempts. **Undo import** was offered after the v2 merge and restored 43 → 42.
+
+**Gating**, all four states: no key → not gated; key + switch on → gated; key + switch off → not gated; "mark done" → un-gated with `cycle 0→1`, `nextDueAt` +14 days and `score: null` persisted.
+
+**One false alarm, chased down rather than reported.** A merge appeared not to update the header (store said 43, header said 42). The cause was my own fixture using an invented question id (`graphs__bfs__number-of-islands`); unknown ids are deliberately stored but never counted against the 467. Re-run with a real id, the header moved 42 → 43 correctly. Same mistake class as the Phase 3 remediation — worth checking before believing a bug.
+
+No application console errors.
 
 ---
 
-## 9. Live verification
+## 8. Known limitations
 
-Seeded three topics into distinct states (overdue, comfortably scheduled, failed-and-due) plus two real submitted sessions.
-
-1. **Dashboard counts** — `0 due today · 2 overdue · 1 upcoming · 2 strong · 1 weak · 0 mastered`, each matching the seeded data.
-2. **Rows** — `🔴 Advanced Strings — Overdue by 32 days · last 88/100 · [Start revision]`, `🟢 Sorting — Next in 48 days · last 91/100` (no Start button; not gated), `🔴 Tries — Revision due (last attempt failed)`.
-3. **Expansion** — Tries shows `86% complete · 0 passed cycles · next due 2026-08-25`, its history entry, and weak areas resolved to readable text.
-4. **A gap found and fixed here:** weak *questions* (new in this phase) rendered as raw slugs, because only concept ids were being resolved to prompts. Now shows `Trie Implementation and Advanced Operations ×1` alongside the concept prompt.
-5. **Heatmap** — cells read `2 revised in a session on Jul 18, 2026` and `1 revised in a session on Aug 25, 2026`; summary reads `20 solved · 3 revised in sessions on 1 active day`.
-6. **Merge, through the real UI** — a simulated second device (overlapping question with different notes, a new solved question, its own history/attempt, and `provider: grok`). Dialog: `Newly solved 1 · Newly starred 1 · Notes combined 2 · Mistakes added 1 · Revisions added 1 · Sessions added 1 · Solved after merge: 21 (currently 20)`.
-7. **Applied result matched the dry run exactly** — 21 solved; local pseudocode kept *and* remote insight added; mistake unioned; `revisionStats` took the richer side; tries history `["h3","deviceB-1"]`; weak weights maxed not summed (`c1` stayed 2, not 1); all three attempts present; **provider stayed `gemini`**, not `grok`; nothing from before the merge missing.
-8. **Undo after a v2 merge** — restored the store **byte-for-byte identical** to the pre-merge snapshot (`JSON.stringify(after) === JSON.stringify(before)`).
-9. **Navigation** — header *Revision* → `#/revision`; dashboard *Start revision* → `#/revision/tries`.
-10. **Console** — clean on a fresh reload.
+- **`summarizeMergeV2`'s "Notes combined" counts entries whose text changed at all**, including a brand-new question arriving with notes. Slightly generous, never wrong in the direction that matters (it can't under-report a loss).
+- **Merge is union-only and cannot resolve a genuine conflict.** Two devices editing the same note produce both texts separated by `--- merged ---`. That's the plan's design; a real three-way merge was never in scope.
+- **The dashboard lists every non-exempt topic**, including 12 untouched ones. Fine at 18 topics; it would want filtering at a larger scale.
+- **`FAILED_PERMANENT` remains unwritten**, as documented in Phase 7.
+- **Attempts are never pruned**, so `attempts` grows one entry per session forever. Harmless at personal volumes.
 
 ---
 
-## 10. Known limitations
+## 9. Is Phase 8 complete?
 
-- Merging a file from a device whose clock is wrong will let that side's "later" dates win. There is no clock-skew detection; for a personal two-device setup this is an acceptable trade, and Undo is one click away.
-- Notes that genuinely conflict are kept side by side, not resolved. That's the plan's intent (never drop text), but a heavily re-merged note can get long. The segment union at least guarantees it stops growing once both sides are represented.
-- The dashboard lists all 17 non-exempt topics, unsorted and unfiltered. Fine at this size; if it ever felt long, sorting due-first would be the obvious next step.
-- `attempts` still accumulate without pruning, and merging unions them, so two active devices grow that set faster. Nothing reads it in bulk, so it costs storage only.
+Yes. Dashboard counts match derived state, two devices' exports merge without loss, nothing already solved is ever un-solved, the weak-area loop measurably feeds back into selection, and the heatmap plots real revisions. The gating lockout found at the end was fixed rather than shipped.
 
----
-
-## 11. Is Phase 8 complete?
-
-Yes, against the plan's Phase 8 scope, and with it the plan's phase list is finished. Every Phase 8 test bullet is covered: existing merge tests still pass, the v2 namespaces merge without loss, mistakes/attempts/history union, the dry-run diff matches the applied result, a failed revision demonstrably over-weights its weak concepts next session, and Undo import still restores after a v2 merge.
-
-The one outstanding item across the whole project remains the Phase 7 real-key round trip (PHASE_7_REPORT.md §8), which needs a credential and is yours to run.
+With this, phases 0–8 of `DSA_TRACKER_IMPLEMENTATION_PLAN.md` are all complete.
 
 ---
 
 ## Commit
 
-See `git log` on `feat/revision-system` (this file is committed alongside the code it documents).
+See `git log` on `feat/revision-system` (`bb53311` for the phase, `ef28752` for the gating fix, and this report alongside).
