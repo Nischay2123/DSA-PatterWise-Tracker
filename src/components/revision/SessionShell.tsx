@@ -25,7 +25,15 @@ function defaultStep(attempt: RevisionAttempt): Step {
   return "confidence";
 }
 
-export function SessionShell({ topic, onExit }: { topic: Topic; onExit: () => void }) {
+export function SessionShell({
+  topic,
+  onExit,
+  onOpenSettings,
+}: {
+  topic: Topic;
+  onExit: () => void;
+  onOpenSettings: () => void;
+}) {
   const { v2Store, dispatchV2 } = useStore();
   const topicRevision = getTopicRevision(v2Store, topic.id);
   // An in-progress draft (activeSessionId set) always wins; otherwise fall
@@ -58,7 +66,7 @@ export function SessionShell({ topic, onExit }: { topic: Topic; onExit: () => vo
   }
 
   if (attempt.submittedAt) {
-    return <ResultsStep topic={topic} attempt={attempt} onExit={onExit} />;
+    return <ResultsStep topic={topic} attempt={attempt} onExit={onExit} onOpenSettings={onOpenSettings} />;
   }
 
   const currentStep = step ?? defaultStep(attempt);

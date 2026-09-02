@@ -106,6 +106,36 @@ export interface TopicRevision {
   weakConcepts: Record<string, number>;
 }
 
+// The evaluator's response contract (plan §9&10). `passed` and `score` here
+// are the MODEL's own opinion -- advisory only, never authoritative. The real
+// pass/fail is always recomputed client-side by revision/scoring.ts.
+export interface FundamentalEvaluation {
+  conceptId: string;
+  score: number; // 0-5
+  missing: string[];
+  note: string;
+}
+
+export interface QuestionEvaluation {
+  questionId: string;
+  correctness: number; // 0-5
+  approach: number;
+  pseudocode: number;
+  complexity: number;
+  mistakes: string[];
+  note: string;
+}
+
+export interface EvaluationResult {
+  passed: boolean;
+  score: number; // 0-100
+  perFundamental: FundamentalEvaluation[];
+  perQuestion: QuestionEvaluation[];
+  weakConcepts: string[];
+  feedback: string;
+  recommendedFocus: string[];
+}
+
 export interface RevisionAttempt {
   id: string;
   topicId: string;
@@ -122,8 +152,13 @@ export interface RevisionAttempt {
     // existing null-means-unset idiom) -- distinct from a real self-rating.
     confidence: "strong" | "partial" | "forgot" | null;
   }[];
+  // DRAFT = unsubmitted. PENDING = submitted, not yet successfully evaluated
+  // (this is also where every evaluation FAILURE rests, per §9: failures are
+  // always retryable, never terminal). OK = evaluated. FAILED_PERMANENT is
+  // part of the plan's schema but is deliberately never written -- see
+  // PHASE_7_REPORT.md §3.
   evaluationStatus: "DRAFT" | "PENDING" | "OK" | "FAILED_PERMANENT";
-  evaluation: Record<string, unknown> | null;
+  evaluation: EvaluationResult | null;
   error: string | null;
 }
 
@@ -189,4 +224,10 @@ export type V2Action =
       questionId: string;
       confidence: "strong" | "partial" | "forgot";
     }
-  | { type: "SUBMIT_REVISION_SESSION"; attemptId: string };
+  | { type: "SUBMIT_REVISION_SESSION"; attemptId: string }
+  // --- Phase 7: LLM evaluation -----------------------------------------
+  | { type: "SET_SETTINGS"; patch: Partial<AppSettings> }
+  // Records a failed evaluation. Status stays PENDING on purpose -- every
+  // failure is retryable, none is terminal (plan §9).
+  | { type: "SET_ATTEMPT_ERROR"; attemptId: string; error: string | null }
+  | { type: "APPLY_EVALUATION"; attemptId: string; evaluation: EvaluationResult };

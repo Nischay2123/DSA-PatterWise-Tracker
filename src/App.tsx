@@ -5,6 +5,7 @@ import { Filters } from "./components/Filters";
 import { ImportExport } from "./components/ImportExport";
 import { MergeImport } from "./components/MergeImport";
 import { ProgressBar } from "./components/ProgressBar";
+import { SettingsPanel } from "./components/SettingsPanel";
 import { SessionShell } from "./components/revision/SessionShell";
 import { TopicList } from "./components/TopicList";
 import { FiltersContext, StoreContext, useProgressStore } from "./context";
@@ -82,6 +83,7 @@ export function App() {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [backupExists, setBackupExists] = useState(() => hasBackupV2());
   const [hash, navigate] = useHash();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const overallDone = countDone(ALL_PROBLEMS, store);
   const overallTotal = ALL_PROBLEMS.length;
@@ -104,7 +106,14 @@ export function App() {
   if (sessionTopic) {
     return (
       <StoreContext.Provider value={{ store, dispatch, v2Store, dispatchV2 }}>
-        <SessionShell topic={sessionTopic} onExit={() => navigate("#/tracker")} />
+        <SessionShell
+          topic={sessionTopic}
+          onExit={() => navigate("#/tracker")}
+          onOpenSettings={() => {
+            setSettingsOpen(true);
+            navigate("#/tracker");
+          }}
+        />
       </StoreContext.Provider>
     );
   }
@@ -115,8 +124,23 @@ export function App() {
         <header className="sticky top-0 z-10 bg-bg border-b border-border px-5 py-3">
           <div className="flex items-center justify-between gap-3">
             <h1 className="text-[1.2rem] m-0">DSA Tracker</h1>
-            <ImportExport backupExists={backupExists} onBackupChange={refreshBackup} />
+            <div className="flex items-center gap-2">
+              <ImportExport backupExists={backupExists} onBackupChange={refreshBackup} />
+              <button
+                type="button"
+                onClick={() => setSettingsOpen((o) => !o)}
+                title="Evaluation provider, API key and completion gate"
+                className="text-[0.85rem] px-3 py-1.5 border border-border rounded-md bg-transparent text-fg cursor-pointer"
+              >
+                Settings
+              </button>
+            </div>
           </div>
+          {settingsOpen && (
+            <div className="max-w-[460px] ml-auto">
+              <SettingsPanel onClose={() => setSettingsOpen(false)} />
+            </div>
+          )}
           <div className="flex items-center gap-2.5 mt-2.5">
             <ProgressBar done={overallDone} total={overallTotal} />
             <span className="text-[0.85rem] text-muted whitespace-nowrap">{`${overallDone}/${overallTotal} (${overallPct}%)`}</span>

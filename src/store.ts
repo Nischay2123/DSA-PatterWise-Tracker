@@ -1,10 +1,12 @@
 import idMapRaw from "../data/idMap.json";
 import { REVISION_CONFIG } from "./config";
 import { isValidAppStoreV2, liftV1Entry } from "./persistence/migrate";
-import { scheduleInitial } from "./revision/scheduler";
+import { scoreEvaluation } from "./revision/evaluate";
+import { recordAttemptOutcome, scheduleInitial } from "./revision/scheduler";
 import type {
   AppSettings,
   AppStoreV2,
+  EvaluationResult,
   FilterState,
   HeatmapDay,
   HeatmapMonth,
@@ -605,7 +607,79 @@ export function v2Reducer(v2: AppStoreV2, action: V2Action): AppStoreV2 {
         revision: { ...v2.revision, [attempt.topicId]: { ...tr, activeSessionId: null } },
       };
     }
+
+    // --- Phase 7: LLM evaluation ---------------------------------------
+    case "SET_SETTINGS":
+      return { ...v2, settings: { ...v2.settings, ...action.patch } };
+
+    case "SET_ATTEMPT_ERROR": {
+      const attempt = v2.attempts[action.attemptId];
+      if (!attempt) return v2;
+      // evaluationStatus is untouched: a failed evaluation stays PENDING and
+      // retryable, and the topic stays exactly as gated as it already was --
+      // not passed, not failed (plan §9).
+      return { ...v2, attempts: { ...v2.attempts, [action.attemptId]: { ...attempt, error: action.error } } };
+    }
+
+    case "APPLY_EVALUATION":
+      return applyEvaluation(v2, action.attemptId, action.evaluation);
   }
+}
+
+// Exported for direct testing: this is the one place a revision actually
+// passes or fails, so it gets tested without going through a reducer call.
+export function applyEvaluation(v2: AppStoreV2, attemptId: string, evaluation: EvaluationResult): AppStoreV2 {
+  const attempt = v2.attempts[attemptId];
+  if (!attempt) return v2;
+
+  const scored = scoreEvaluation(attempt, evaluation);
+  // Incomplete grading is not a failing grade. Leave the attempt PENDING with
+  // an error so it can be retried, and don't touch the schedule.
+  if (!scored) {
+    return {
+      ...v2,
+      attempts: {
+        ...v2.attempts,
+        [attemptId]: { ...attempt, error: "The evaluation didn't cover every question. Try again." },
+      },
+    };
+  }
+
+  const { scoring, questionScores } = scored;
+
+  // Per-question score is real data now, so revisionStats.lastScore stops
+  // being null and starts feeding selection.ts's weighting.
+  let progress = v2.progress;
+  for (const [questionId, score] of Object.entries(questionScores)) {
+    const existing = getV2Progress(v2, questionId);
+    progress = {
+      ...progress,
+      [questionId]: { ...existing, revisionStats: { ...existing.revisionStats, lastScore: score } },
+    };
+  }
+
+  // Phase 4's scheduler owns the interval advance: pass -> cycle++ and a new
+  // nextDueAt (which is what finally un-gates the topic), fail -> unchanged
+  // and still due, weak concepts recorded either way.
+  const revision = {
+    ...v2.revision,
+    [attempt.topicId]: recordAttemptOutcome(getTopicRevision(v2, attempt.topicId), {
+      passed: scoring.passed,
+      score: scoring.overallScore,
+      attemptId,
+      weakConceptIds: scoring.weakConceptIds,
+    }),
+  };
+
+  return {
+    ...v2,
+    progress,
+    revision,
+    attempts: {
+      ...v2.attempts,
+      [attemptId]: { ...attempt, evaluationStatus: "OK", evaluation, error: null },
+    },
+  };
 }
 
 export interface MergeSummary {

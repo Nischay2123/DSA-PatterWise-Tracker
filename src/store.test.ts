@@ -29,7 +29,18 @@ import {
   v2Reducer,
 } from "./store";
 import { DEFAULT_SETTINGS, emptyAppStoreV2, isValidAppStoreV2, migrateV1ToV2 } from "./persistence/migrate";
-import type { AppSettings, AppStoreV2, FilterState, Problem, ProblemState, ProgressStore, RevisionAttempt, Topic } from "./types";
+import { getFundamentalsForPattern } from "./revision/session";
+import type {
+  AppSettings,
+  AppStoreV2,
+  EvaluationResult,
+  FilterState,
+  Problem,
+  ProblemState,
+  ProgressStore,
+  RevisionAttempt,
+  Topic,
+} from "./types";
 
 function settings(patch: Partial<AppSettings> = {}): AppSettings {
   return { ...DEFAULT_SETTINGS, ...patch };
@@ -839,5 +850,138 @@ describe("v2Reducer -- revision session lifecycle", () => {
       const v2 = emptyAppStoreV2();
       expect(v2Reducer(v2, { type: "SUBMIT_REVISION_SESSION", attemptId: "nope" })).toBe(v2);
     });
+  });
+});
+
+// --- Phase 7: LLM evaluation ------------------------------------------------
+
+const REAL_CONCEPT = getFundamentalsForPattern("arrays__sliding-window").find((c) => c.criticality === "core")!;
+
+function gradedAttempt(): RevisionAttempt {
+  return attemptFixture({
+    submittedAt: "2026-01-01T00:30:00.000Z",
+    evaluationStatus: "PENDING",
+    fundamentals: [{ conceptId: REAL_CONCEPT.id, answer: "recalled" }],
+    questions: [{ questionId: "q1", approach: "a", pseudocode: "p", complexity: "O(n)", edgeCases: "", confidence: "strong" }],
+  });
+}
+
+function gradeOf(score: number): EvaluationResult {
+  return {
+    passed: false, // deliberately the opposite of what the numbers say
+    score: 0,
+    perFundamental: [{ conceptId: REAL_CONCEPT.id, score, missing: [], note: "" }],
+    perQuestion: [{ questionId: "q1", correctness: score, approach: score, pseudocode: score, complexity: score, mistakes: [], note: "" }],
+    weakConcepts: [],
+    feedback: "ok",
+    recommendedFocus: [],
+  };
+}
+
+describe("v2Reducer -- SET_SETTINGS", () => {
+  it("patches only the named settings", () => {
+    const v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_SETTINGS", patch: { apiKey: "k", model: "gemini-2.0-pro" } });
+    expect(v2.settings.apiKey).toBe("k");
+    expect(v2.settings.model).toBe("gemini-2.0-pro");
+    expect(v2.settings.requireEvidence).toBe(true); // untouched
+  });
+
+  it("can clear the key", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_SETTINGS", patch: { apiKey: "k" } });
+    v2 = v2Reducer(v2, { type: "SET_SETTINGS", patch: { apiKey: "" } });
+    expect(v2.settings.apiKey).toBe("");
+  });
+});
+
+describe("v2Reducer -- SET_ATTEMPT_ERROR", () => {
+  it("records the message but leaves the attempt PENDING and retryable", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "START_REVISION_SESSION", topicId: "arrays", attempt: gradedAttempt() });
+    v2 = v2Reducer(v2, { type: "SET_ATTEMPT_ERROR", attemptId: "att1", error: "The provider returned an error." });
+    expect(v2.attempts.att1.error).toBe("The provider returned an error.");
+    expect(v2.attempts.att1.evaluationStatus).toBe("PENDING");
+    expect(v2.attempts.att1.evaluation).toBeNull();
+  });
+
+  it("is a no-op for an unknown attempt id", () => {
+    const v2 = emptyAppStoreV2();
+    expect(v2Reducer(v2, { type: "SET_ATTEMPT_ERROR", attemptId: "nope", error: "x" })).toBe(v2);
+  });
+});
+
+describe("applyEvaluation -- a pass advances the schedule and un-gates the topic", () => {
+  it("records the outcome, advances the cycle, and sets a future nextDueAt", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "START_REVISION_SESSION", topicId: "arrays", attempt: gradedAttempt() });
+    v2 = v2Reducer(v2, { type: "APPLY_EVALUATION", attemptId: "att1", evaluation: gradeOf(5) });
+
+    const tr = v2.revision.arrays;
+    expect(v2.attempts.att1.evaluationStatus).toBe("OK");
+    expect(tr.cycle).toBe(1);
+    expect(tr.nextDueAt).not.toBeNull();
+    expect(tr.lastPassedAt).not.toBeNull();
+    expect(tr.history).toHaveLength(1);
+    expect(tr.history[0].passed).toBe(true);
+    expect(tr.history[0].score).toBe(100);
+    expect(tr.activeSessionId).toBeNull();
+  });
+
+  it("passes even though the model's own `passed` said false -- the client decides", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "START_REVISION_SESSION", topicId: "arrays", attempt: gradedAttempt() });
+    v2 = v2Reducer(v2, { type: "APPLY_EVALUATION", attemptId: "att1", evaluation: gradeOf(5) });
+    expect(gradeOf(5).passed).toBe(false); // what the model claimed
+    expect(v2.revision.arrays.history[0].passed).toBe(true); // what scoring.ts computed
+  });
+
+  it("writes the per-question score into revisionStats.lastScore", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "START_REVISION_SESSION", topicId: "arrays", attempt: gradedAttempt() });
+    v2 = v2Reducer(v2, { type: "APPLY_EVALUATION", attemptId: "att1", evaluation: gradeOf(4) });
+    expect(v2.progress.q1.revisionStats.lastScore).toBe(80);
+  });
+});
+
+describe("applyEvaluation -- a fail keeps the topic gated", () => {
+  it("leaves cycle and nextDueAt untouched and records the weak concept", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "START_REVISION_SESSION", topicId: "arrays", attempt: gradedAttempt() });
+    v2 = v2Reducer(v2, { type: "APPLY_EVALUATION", attemptId: "att1", evaluation: gradeOf(1) });
+
+    const tr = v2.revision.arrays;
+    expect(tr.history[0].passed).toBe(false);
+    expect(tr.cycle).toBe(0);
+    expect(tr.nextDueAt).toBeNull(); // still due
+    expect(tr.lastFailedAt).not.toBeNull();
+    expect(tr.weakConcepts[REAL_CONCEPT.id]).toBe(1);
+  });
+});
+
+describe("applyEvaluation -- incomplete grading is never a failing grade", () => {
+  it("leaves the attempt PENDING with an error and does not touch the schedule", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "START_REVISION_SESSION", topicId: "arrays", attempt: gradedAttempt() });
+    const incomplete = { ...gradeOf(5), perQuestion: [] };
+    v2 = v2Reducer(v2, { type: "APPLY_EVALUATION", attemptId: "att1", evaluation: incomplete });
+
+    expect(v2.attempts.att1.evaluationStatus).toBe("PENDING");
+    expect(v2.attempts.att1.error).toBeTruthy();
+    expect(v2.revision.arrays.history).toEqual([]);
+    expect(v2.revision.arrays.cycle).toBe(0);
+  });
+
+  it("is a no-op for an unknown attempt id", () => {
+    const v2 = emptyAppStoreV2();
+    expect(v2Reducer(v2, { type: "APPLY_EVALUATION", attemptId: "nope", evaluation: gradeOf(5) })).toBe(v2);
+  });
+});
+
+describe("the API key never leaves the browser in an export", () => {
+  it("toExportableV2 blanks a real key that Settings has stored", () => {
+    const v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_SETTINGS", patch: { apiKey: "AIzaSyREAL-LOOKING-KEY-VALUE" } });
+    const exported = toExportableV2(v2);
+    expect(exported.settings.apiKey).toBe("");
+    expect(JSON.stringify(exported)).not.toContain("AIzaSyREAL-LOOKING-KEY-VALUE");
+  });
+
+  it("keeps provider and model, which are not secrets", () => {
+    const v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_SETTINGS", patch: { apiKey: "k", provider: "grok", model: "grok-3" } });
+    const exported = toExportableV2(v2);
+    expect(exported.settings.provider).toBe("grok");
+    expect(exported.settings.model).toBe("grok-3");
   });
 });
