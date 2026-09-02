@@ -2,6 +2,7 @@ import { useFilters, useStore } from "../context";
 import { countDone, getState, isProblemVisible } from "../store";
 import { cx } from "../cx";
 import type { Pattern } from "../types";
+import { FundamentalsPanel } from "./FundamentalsPanel";
 import { QuestionRow } from "./QuestionRow";
 
 export function PatternGroup({
@@ -33,6 +34,7 @@ export function PatternGroup({
         {pattern.name} <span data-pattern-progress={pattern.id}>{`${done}/${total}`}</span>
       </summary>
       <div className="pl-3">
+        <FundamentalsPanel patternId={pattern.id} />
         {pattern.problems.map((p) => (
           <QuestionRow key={p.id} problem={p} topicName={topicName} patternName={pattern.name} gated={gated} />
         ))}
