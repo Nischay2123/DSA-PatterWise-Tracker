@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { REVISION_CONFIG } from "../config";
 import { computeQuestionWeight, selectQuestionsForSession } from "./selection";
 import type { SelectionCandidate } from "./selection";
 
@@ -100,5 +101,59 @@ describe("selectQuestionsForSession", () => {
     const picked = selectQuestionsForSession(pool, 5, 3);
     const patternIds = picked.map((c) => c.patternId);
     expect(new Set(patternIds).size).toBe(patternIds.length); // 5 picks, 10 distinct patterns available -- never forced to repeat
+  });
+});
+
+// Added after mutation testing: the original fixture gave every candidate its
+// own patternId, so "no duplicates" and "spreads across patterns" were
+// indistinguishable -- each guarantee was silently upheld by the OTHER
+// mechanism. Stryker proved it by deleting `usedPatterns.add(...)` and
+// `pool.splice(...)` in turn and having every test still pass. A realistic
+// fixture (several questions per pattern) separates them.
+describe("selection guarantees, with several questions sharing a pattern", () => {
+  const shared = [
+    ...["a1", "a2", "a3"].map((id) => candidate({ id, patternId: "arrays__hashing" })),
+    ...["b1", "b2", "b3"].map((id) => candidate({ id, patternId: "arrays__two-pointers" })),
+    ...["c1", "c2", "c3"].map((id) => candidate({ id, patternId: "arrays__sliding-window" })),
+  ];
+
+  it("never returns the same question twice", () => {
+    for (let seed = 0; seed < 50; seed++) {
+      const ids = selectQuestionsForSession(shared, 3, seed).map((c) => c.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    }
+  });
+
+  it("takes one question from each pattern before repeating a pattern", () => {
+    for (let seed = 0; seed < 50; seed++) {
+      const patterns = selectQuestionsForSession(shared, 3, seed).map((c) => c.patternId);
+      expect(new Set(patterns).size).toBe(3);
+    }
+  });
+
+  it("falls back to the full pool once every pattern has contributed", () => {
+    // 5 picks from 3 patterns: the first 3 must be distinct patterns, then it
+    // has no choice but to reuse one -- without duplicating a question.
+    for (let seed = 0; seed < 25; seed++) {
+      const picked = selectQuestionsForSession(shared, 5, seed);
+      expect(picked).toHaveLength(5);
+      expect(new Set(picked.map((c) => c.id)).size).toBe(5);
+      expect(new Set(picked.slice(0, 3).map((c) => c.patternId)).size).toBe(3);
+    }
+  });
+});
+
+describe("weighting boundaries", () => {
+  it("a score exactly at passScore is not treated as a failure", () => {
+    const atPass = computeQuestionWeight(candidate({ lastRevisionScore: REVISION_CONFIG.passScore }));
+    const justUnder = computeQuestionWeight(candidate({ lastRevisionScore: REVISION_CONFIG.passScore - 1 }));
+    expect(atPass).toBe(computeQuestionWeight(candidate({ lastRevisionScore: 100 })));
+    expect(justUnder).toBe(atPass * 2);
+  });
+
+  it("a zero score still only doubles, never more", () => {
+    expect(computeQuestionWeight(candidate({ lastRevisionScore: 0 }))).toBe(
+      computeQuestionWeight(candidate({ lastRevisionScore: 100 })) * 2
+    );
   });
 });
