@@ -30,7 +30,13 @@ export function ResultsStep({
   for (const q of attempt.questions) if (q.confidence) tally[q.confidence]++;
 
   const hasKey = !!v2Store.settings.apiKey.trim();
-  const evaluated = attempt.evaluationStatus === "OK" && attempt.evaluation;
+  // Two different things: `concluded` means this attempt is finished with
+  // (graded OR marked done by hand); `graded` means an evaluation actually
+  // produced per-item scores. A self-assessed revision is concluded but not
+  // graded, so it must not keep offering the mark-done button or auto-fire
+  // the evaluator, yet has no scores to render either.
+  const concluded = attempt.evaluationStatus === "OK";
+  const graded = concluded && attempt.evaluation;
   const fundamentalGrade = new Map((attempt.evaluation?.perFundamental ?? []).map((f) => [f.conceptId, f]));
   const questionGrade = new Map((attempt.evaluation?.perQuestion ?? []).map((q) => [q.questionId, q]));
 
@@ -58,11 +64,15 @@ export function ResultsStep({
   // a key exists". Bounded by the ref so it can never become a retry loop
   // spending the user's quota; a failure waits for an explicit Retry.
   useEffect(() => {
-    if (evaluated || !hasKey || running) return;
+    if (concluded || !hasKey || running) return;
     if (firedForRef.current === attempt.id) return;
     firedForRef.current = attempt.id;
     void run();
-  }, [evaluated, hasKey, running, attempt.id, run]);
+  }, [concluded, hasKey, running, attempt.id, run]);
+
+  // The escape hatch. Without it, a user with no key (or a provider that's
+  // down) can never clear a due topic, and gating would strand them.
+  const markDone = () => dispatchV2({ type: "MARK_REVISION_SELF_ASSESSED", attemptId: attempt.id });
 
   const revision = getTopicRevision(v2Store, topic.id);
   // The outcome shown is the one scoring.ts computed and the scheduler
@@ -81,22 +91,27 @@ export function ResultsStep({
       <div className="border border-border rounded-lg p-3 mb-5 text-[0.8rem]">
         {running && <div><strong>Evaluating…</strong> Grading your answers with {v2Store.settings.provider}.</div>}
 
-        {!running && evaluated && attempt.evaluation && (
+        {!running && concluded && (
           <div>
-            <strong>{outcome?.passed ? "Passed" : "Not passed"}</strong> — scored {outcome?.score ?? 0}/100.
+            <strong>{outcome?.passed ? "Passed" : "Not passed"}</strong>
+            {outcome?.selfAssessed
+              ? " — marked done by you, not graded."
+              : ` — scored ${outcome?.score ?? 0}/100.`}
             {outcome?.passed ? (
               <span> This topic is unlocked again{revision.nextDueAt ? `, next due ${revision.nextDueAt}` : ""}.</span>
             ) : (
               <span> The topic stays due, so you can run another session whenever you want.</span>
             )}
-            {attempt.evaluation.feedback && <div className="text-muted mt-1.5">{attempt.evaluation.feedback}</div>}
-            {attempt.evaluation.recommendedFocus.length > 0 && (
-              <div className="text-muted mt-1.5">Focus next on: {attempt.evaluation.recommendedFocus.join(", ")}</div>
+            {graded && attempt.evaluation?.feedback && (
+              <div className="text-muted mt-1.5">{attempt.evaluation.feedback}</div>
+            )}
+            {graded && (attempt.evaluation?.recommendedFocus.length ?? 0) > 0 && (
+              <div className="text-muted mt-1.5">Focus next on: {attempt.evaluation?.recommendedFocus.join(", ")}</div>
             )}
           </div>
         )}
 
-        {!running && !evaluated && !hasKey && (
+        {!running && !concluded && !hasKey && (
           <div>
             <strong>Session saved.</strong> No API key set, so it hasn't been graded yet.{" "}
             <button type="button" onClick={onOpenSettings} className="bg-transparent border-0 p-0 font-inherit text-fg underline cursor-pointer">
@@ -106,7 +121,19 @@ export function ResultsStep({
           </div>
         )}
 
-        {!running && !evaluated && hasKey && (
+        {!running && !concluded && (
+          <div className="mt-2">
+            <button type="button" className={BUTTON_CLASS} onClick={markDone}>
+              Mark this revision as done
+            </button>
+            <div className="text-muted mt-1 text-[0.75rem]">
+              Records it as completed and moves the topic on to its next interval. No score is stored, because
+              nothing graded it.
+            </div>
+          </div>
+        )}
+
+        {!running && !concluded && hasKey && (
           <div>
             <strong>Evaluation unavailable. Your submission has been saved.</strong>
             {attempt.error && <div className="text-muted mt-1">{attempt.error}</div>}

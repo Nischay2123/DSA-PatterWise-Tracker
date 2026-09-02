@@ -5,6 +5,7 @@ const ID_MAP: Record<string, string> = idMapRaw;
 
 export const DEFAULT_SETTINGS: AppSettings = {
   requireEvidence: true,
+  gateOnRevisionDue: true,
   llmEnabled: false,
   theme: "system",
   provider: "gemini",

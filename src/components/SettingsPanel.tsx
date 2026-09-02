@@ -109,6 +109,20 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         />
         Require pseudocode or code before marking a question done
       </label>
+
+      <label className="flex items-center gap-2 mt-2 text-[0.8rem] cursor-pointer">
+        <input
+          type="checkbox"
+          checked={settings.gateOnRevisionDue !== false}
+          onChange={(e) => dispatchV2({ type: "SET_SETTINGS", patch: { gateOnRevisionDue: e.target.checked } })}
+        />
+        Block new completions in a topic while its revision is due
+      </label>
+      <div className="text-[0.7rem] text-muted mt-1">
+        {settings.apiKey.trim()
+          ? "Turn this off if you'd rather never be blocked from ticking a question."
+          : "Currently inactive anyway: with no API key nothing can grade a revision, so a blocked topic could never be unblocked."}
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { REVISION_CONFIG } from "../config";
 import { useFilters, useStore } from "../context";
 import { deriveState, isTopicGated } from "../revision/stateMachine";
-import { countDone, getState, getTopicRevision, isProblemVisible } from "../store";
+import { countDone, getState, getTopicRevision, isGatingActive, isProblemVisible } from "../store";
 import { cx } from "../cx";
 import type { Topic } from "../types";
 import { PatternGroup } from "./PatternGroup";
@@ -37,7 +37,9 @@ function TopicItem({ topic }: { topic: Topic }) {
 
   const isExempt = (REVISION_CONFIG.exemptTopics as readonly string[]).includes(topic.id);
   const revisionState = deriveState(getTopicRevision(v2Store, topic.id), total ? done / total : 0, isExempt);
-  const gated = isTopicGated(revisionState);
+  // Gating is a policy on top of the derived state: the Settings switch and
+  // the no-key rule can both turn it off (see isGatingActive).
+  const gated = isTopicGated(revisionState) && isGatingActive(v2Store.settings);
 
   return (
     <details

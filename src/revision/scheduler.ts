@@ -19,7 +19,9 @@ export function incrementWeakConcepts(current: Record<string, number>, ids: stri
 
 export interface AttemptOutcome {
   passed: boolean;
-  score: number;
+  // null = self-assessed: completed, but never graded.
+  score: number | null;
+  selfAssessed?: boolean;
   attemptId: string;
   // Concept/question ids that scored poorly in this attempt -- fed into
   // weakConcepts regardless of pass/fail (plan §8's weighting formula reads
@@ -40,7 +42,7 @@ export function recordAttemptOutcome(
   const nowIso = todayISOUTC(now);
   const history = [
     ...topicRevision.history,
-    { at: nowIso, score: outcome.score, passed: outcome.passed, attemptId: outcome.attemptId },
+    { at: nowIso, score: outcome.score, passed: outcome.passed, attemptId: outcome.attemptId, ...(outcome.selfAssessed ? { selfAssessed: true } : {}) },
   ];
   const weakConcepts = incrementWeakConcepts(topicRevision.weakConcepts, outcome.weakConceptIds ?? []);
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { emptyAppStoreV2 } from "./persistence/migrate";
-import { buildRevisedByDate, mergeNotes, mergeStoresV2, summarizeMergeV2, v2Reducer } from "./store";
-import type { AppStoreV2, QuestionProgressV2, RevisionAttempt, TopicRevision } from "./types";
+import { DEFAULT_SETTINGS, emptyAppStoreV2 } from "./persistence/migrate";
+import { buildRevisedByDate, isGatingActive, mergeNotes, mergeStoresV2, summarizeMergeV2, v2Reducer } from "./store";
+import type { AppSettings, AppStoreV2, QuestionProgressV2, RevisionAttempt, TopicRevision } from "./types";
 
 // Phase 8's merge suite. The governing rule under test throughout: a merge
 // may only ever ADD. Nothing solved is un-solved, no note, mistake, attempt
@@ -305,5 +305,75 @@ describe("mergeNotes -- re-merging must not grow notes without bound", () => {
   it("still appends genuinely new text", () => {
     const first = mergeNotes("mine", "theirs");
     expect(mergeNotes(first, "a third note")).toBe("mine\n\n--- merged ---\n\ntheirs\n\n--- merged ---\n\na third note");
+  });
+});
+
+// --- The no-lockout guarantees -------------------------------------------
+
+describe("isGatingActive -- gating must never be able to strand the user", () => {
+  const settings = (patch: Partial<AppSettings> = {}): AppSettings => ({
+    ...DEFAULT_SETTINGS,
+    apiKey: "a-key",
+    ...patch,
+  });
+
+  it("gates when a key is set and the switch is on", () => {
+    expect(isGatingActive(settings())).toBe(true);
+  });
+
+  it("never gates without an API key -- nothing could grade a revision, so the block would be permanent", () => {
+    expect(isGatingActive(settings({ apiKey: "" }))).toBe(false);
+    expect(isGatingActive(settings({ apiKey: "   " }))).toBe(false);
+  });
+
+  it("never gates when the user has switched it off", () => {
+    expect(isGatingActive(settings({ gateOnRevisionDue: false }))).toBe(false);
+  });
+
+  it("treats a store written before the setting existed as gating on", () => {
+    const legacy = settings();
+    delete (legacy as { gateOnRevisionDue?: boolean }).gateOnRevisionDue;
+    expect(isGatingActive(legacy)).toBe(true);
+  });
+});
+
+describe("MARK_REVISION_SELF_ASSESSED", () => {
+  const withAttempt = () =>
+    v2Reducer(emptyAppStoreV2(), {
+      type: "START_REVISION_SESSION",
+      topicId: "arrays",
+      attempt: attempt({ id: "a1", topicId: "arrays" }),
+    });
+
+  it("advances the schedule so the topic is no longer due", () => {
+    let v2 = withAttempt();
+    v2 = v2Reducer(v2, { type: "MARK_REVISION_SELF_ASSESSED", attemptId: "a1" });
+
+    const tr = v2.revision.arrays;
+    expect(tr.cycle).toBe(1);
+    expect(tr.nextDueAt).not.toBeNull();
+    expect(tr.activeSessionId).toBeNull();
+    expect(tr.history).toHaveLength(1);
+    expect(tr.history[0].passed).toBe(true);
+  });
+
+  it("records no score, rather than inventing one", () => {
+    let v2 = withAttempt();
+    v2 = v2Reducer(v2, { type: "MARK_REVISION_SELF_ASSESSED", attemptId: "a1" });
+    expect(v2.revision.arrays.history[0].score).toBeNull();
+    expect(v2.revision.arrays.history[0].selfAssessed).toBe(true);
+  });
+
+  it("marks the attempt concluded so it stops asking to be graded", () => {
+    let v2 = withAttempt();
+    v2 = v2Reducer(v2, { type: "MARK_REVISION_SELF_ASSESSED", attemptId: "a1" });
+    expect(v2.attempts.a1.evaluationStatus).toBe("OK");
+    expect(v2.attempts.a1.evaluation).toBeNull(); // nothing graded it
+    expect(v2.attempts.a1.error).toBeNull();
+  });
+
+  it("is a no-op for an unknown attempt id", () => {
+    const v2 = emptyAppStoreV2();
+    expect(v2Reducer(v2, { type: "MARK_REVISION_SELF_ASSESSED", attemptId: "nope" })).toBe(v2);
   });
 });

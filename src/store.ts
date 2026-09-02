@@ -597,6 +597,17 @@ export function hasCompletionEvidence(progress: QuestionProgressV2): boolean {
 // completed before (grandfathered -- "editable but not re-gated", never
 // retroactively invalidated), or the setting is off (the friction release
 // valve), or evidence already exists.
+// Whether a due revision is allowed to block new completions at all.
+//
+// Two ways it's off. The explicit one is the Settings switch. The implicit
+// one is "no API key": without a key nothing can grade a revision, so the
+// topic could never be un-gated -- the block would be permanent, and a
+// personal tracker must not be able to lock you out of your own progress
+// over a missing third-party credential.
+export function isGatingActive(settings: AppSettings): boolean {
+  return settings.gateOnRevisionDue !== false && !!settings.apiKey.trim();
+}
+
 export function canCompleteFreely(progress: QuestionProgressV2, settings: AppSettings): boolean {
   return progress.firstCompletedAt !== null || !settings.requireEvidence || hasCompletionEvidence(progress);
 }
@@ -832,6 +843,25 @@ export function v2Reducer(v2: AppStoreV2, action: V2Action): AppStoreV2 {
 
     case "APPLY_EVALUATION":
       return applyEvaluation(v2, action.attemptId, action.evaluation);
+
+    case "MARK_REVISION_SELF_ASSESSED": {
+      const attempt = v2.attempts[action.attemptId];
+      if (!attempt) return v2;
+      return {
+        ...v2,
+        attempts: { ...v2.attempts, [action.attemptId]: { ...attempt, evaluationStatus: "OK", error: null } },
+        revision: {
+          ...v2.revision,
+          [attempt.topicId]: recordAttemptOutcome(getTopicRevision(v2, attempt.topicId), {
+            passed: true,
+            // No score, rather than a made-up one: nothing graded this.
+            score: null,
+            selfAssessed: true,
+            attemptId: action.attemptId,
+          }),
+        },
+      };
+    }
   }
 }
 

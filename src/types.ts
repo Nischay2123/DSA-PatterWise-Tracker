@@ -102,7 +102,9 @@ export interface TopicRevision {
   lastPassedAt: string | null;
   lastFailedAt: string | null;
   activeSessionId: string | null;
-  history: { at: string; score: number; passed: boolean; attemptId: string }[];
+  // score is null for a self-assessed revision: the user confirmed they did
+  // it, but nothing graded it, and inventing a number would be a lie.
+  history: { at: string; score: number | null; passed: boolean; attemptId: string; selfAssessed?: boolean }[];
   weakConcepts: Record<string, number>;
 }
 
@@ -164,6 +166,10 @@ export interface RevisionAttempt {
 
 export interface AppSettings {
   requireEvidence: boolean;
+  // Whether a due revision blocks NEW completions in that topic. Optional
+  // so stores written before this existed keep the original behaviour;
+  // absent is read as true.
+  gateOnRevisionDue?: boolean;
   llmEnabled: boolean;
   theme: string;
   provider: "gemini" | "grok";
@@ -230,4 +236,7 @@ export type V2Action =
   // Records a failed evaluation. Status stays PENDING on purpose -- every
   // failure is retryable, none is terminal (plan §9).
   | { type: "SET_ATTEMPT_ERROR"; attemptId: string; error: string | null }
-  | { type: "APPLY_EVALUATION"; attemptId: string; evaluation: EvaluationResult };
+  | { type: "APPLY_EVALUATION"; attemptId: string; evaluation: EvaluationResult }
+  // The escape hatch: the user states they completed this revision. Records
+  // a pass with NO score, so the schedule advances without fabricating a grade.
+  | { type: "MARK_REVISION_SELF_ASSESSED"; attemptId: string };

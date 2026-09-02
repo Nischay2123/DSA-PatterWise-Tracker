@@ -1,5 +1,5 @@
 import { REVISION_CONFIG } from "../config";
-import type { AppStoreV2, ProgressStore, Topic } from "../types";
+import type { AppStoreV2, ProgressStore, Topic, TopicRevision } from "../types";
 import { daysBetweenUTC, todayISOUTC } from "./dates";
 import { deriveState } from "./stateMachine";
 import type { RevisionState } from "./stateMachine";
@@ -18,7 +18,7 @@ export interface TopicRow {
   // Negative = overdue by that many days. null when nothing is scheduled.
   daysUntilDue: number | null;
   lastScore: number | null;
-  history: { at: string; score: number; passed: boolean; attemptId: string }[];
+  history: TopicRevision["history"];
   weakConcepts: { id: string; weight: number }[];
 }
 
@@ -113,9 +113,11 @@ export function countDashboard(rows: TopicRow[]): DashboardCounts {
 
     if (row.state === "REVISION_SCHEDULED") counts.upcoming++;
 
-    const lastGraded = row.history[row.history.length - 1];
-    if (lastGraded) {
-      if (lastGraded.passed) counts.strong++;
+    // Only a GRADED attempt counts toward strong/weak. A self-assessed
+    // revision says the user did the work, not that anything checked it.
+    const last = row.history[row.history.length - 1];
+    if (last && !last.selfAssessed) {
+      if (last.passed) counts.strong++;
       else counts.weak++;
     }
   }

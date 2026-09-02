@@ -98,6 +98,9 @@ function TopicCard({
         <span className="text-[0.8rem] text-muted">{statusLabel(row)}</span>
         <span className="ml-auto flex items-center gap-2.5">
           {row.lastScore !== null && <span className="text-[0.75rem] text-muted tabular-nums">last {row.lastScore}/100</span>}
+          {row.lastScore === null && row.history.length > 0 && (
+            <span className="text-[0.75rem] text-muted">self-assessed</span>
+          )}
           {gated && (
             <button type="button" className={BUTTON_CLASS} onClick={() => onStartRevision(row.topicId)}>
               Start revision
@@ -120,7 +123,7 @@ function TopicCard({
             <ul className="list-none p-0 m-0 mb-2">
               {[...row.history].reverse().map((h) => (
                 <li key={h.attemptId} className="tabular-nums">
-                  {h.at} — {h.passed ? "passed" : "failed"} at {h.score}/100
+                  {h.at} — {h.selfAssessed ? "marked done (not graded)" : `${h.passed ? "passed" : "failed"} at ${h.score}/100`}
                 </li>
               ))}
             </ul>
