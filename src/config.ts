@@ -8,6 +8,12 @@ export const REVISION_CONFIG = {
   criticalConceptFloor: 2, // a `core` concept scoring below this fails the attempt regardless of overall total
   fundamentalsPerSession: 4,
   questionsPerSession: 3,
+  // Manual revision: you can revise any topic whenever you like, provided
+  // there is enough completed material to fill one session without asking
+  // the same question twice. That is exactly questionsPerSession -- below
+  // it a session gets padded with whatever exists, which is a worse first
+  // experience than being told to solve one more problem first.
+  manualRevisionMinCompleted: 3,
   masteryCycles: 3, // + 100% completion => MASTERED
   weakBoostFactor: 3,
   gracePeriodDays: 0,

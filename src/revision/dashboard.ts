@@ -1,3 +1,4 @@
+import { REVISION_CONFIG } from "../config";
 import type { AppStoreV2, ProgressStore, Topic, TopicRevision } from "../types";
 import { daysBetweenUTC, todayISOUTC } from "./dates";
 import { goalScoped, isExemptTopic, isTopicOutOfGoalScope, resolveGoal } from "./goal";
@@ -19,6 +20,9 @@ export interface TopicRow {
   // Negative = overdue by that many days. null when nothing is scheduled.
   daysUntilDue: number | null;
   lastScore: number | null;
+  /** Solved problems inside the goal scope -- the material a session draws
+   *  from, which is what decides whether one can run at all. */
+  completedInScope: number;
   history: TopicRevision["history"];
   weakConcepts: { id: string; weight: number }[];
 }
@@ -63,6 +67,8 @@ export function buildTopicRows(
     .filter((t) => !isTopicOutOfGoalScope(t.patterns.flatMap((p) => p.problems), goal))
     .map((topic) => {
       const revision = v2.revision[topic.id];
+      const inScope = goalScoped(topic.patterns.flatMap((p) => p.problems), goal);
+      const completedInScope = inScope.filter((p) => store.problems[p.id]?.done).length;
       const pct = completionPct(topic, store, goal);
       const state = deriveState(
         revision ?? {
@@ -91,12 +97,26 @@ export function buildTopicRows(
         nextDueAt: revision?.nextDueAt ?? null,
         daysUntilDue: revision?.nextDueAt ? daysBetweenUTC(today, revision.nextDueAt) : null,
         lastScore: last?.score ?? null,
+        completedInScope,
         history,
         weakConcepts: Object.entries(revision?.weakConcepts ?? {})
           .map(([id, weight]) => ({ id, weight }))
           .sort((a, b) => b.weight - a.weight),
       };
     });
+}
+
+// Whether a session can be started by hand right now. Deliberately NOT
+// gated on completionThreshold: that threshold decides when the scheduler
+// starts nagging you, which is a different question from whether you are
+// allowed to revise something you already know you are shaky on.
+export function canReviseManually(row: TopicRow): boolean {
+  return row.completedInScope >= REVISION_CONFIG.manualRevisionMinCompleted;
+}
+
+// How many more solved problems a topic needs before that becomes true.
+export function problemsUntilRevisable(row: TopicRow): number {
+  return Math.max(0, REVISION_CONFIG.manualRevisionMinCompleted - row.completedInScope);
 }
 
 // The six headline counts. "Strong"/"Weak" are the plan's words without a

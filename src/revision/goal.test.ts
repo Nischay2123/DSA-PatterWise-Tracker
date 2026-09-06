@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import questionsData from "../../data/questions.json";
 import { emptyAppStoreV2 } from "../persistence/migrate";
-import { buildTopicRows } from "./dashboard";
+import { buildTopicRows, canReviseManually, problemsUntilRevisable } from "./dashboard";
+import { REVISION_CONFIG } from "../config";
 import {
   ALL_DIFFICULTIES,
   DEFAULT_GOAL,
@@ -331,5 +332,61 @@ describe("curated lists -- a set of problems, not a predicate", () => {
   it("does not confuse a list goal with the default goal", () => {
     expect(isDefaultGoal(blind)).toBe(false);
     expect(sameGoal(blind, DEFAULT_GOAL)).toBe(false);
+  });
+});
+
+
+describe("manual revision -- revise a topic whenever you decide to", () => {
+  const arrays = DATA.topics.find((t) => t.id === "arrays")!;
+  const arraysProblems = arrays.patterns.flatMap((p) => p.problems);
+  const MIN = REVISION_CONFIG.manualRevisionMinCompleted;
+
+  function rowWith(doneIds: string[], goal?: Goal) {
+    const store: ProgressStore = {
+      version: 1,
+      problems: Object.fromEntries(
+        doneIds.map((id) => [id, { done: true, revise: false, notes: "", completedAt: "2026-01-01", revisedAt: null }])
+      ),
+    };
+    const v2 = emptyAppStoreV2();
+    if (goal) v2.settings = { ...v2.settings, goal };
+    return buildTopicRows([arrays], store, v2)[0];
+  }
+
+  it("is blocked until a whole session can be filled without repeating a question", () => {
+    expect(MIN).toBe(REVISION_CONFIG.questionsPerSession);
+    const justUnder = rowWith(arraysProblems.slice(0, MIN - 1).map((p) => p.id));
+    expect(canReviseManually(justUnder)).toBe(false);
+    expect(problemsUntilRevisable(justUnder)).toBe(1);
+
+    const exactly = rowWith(arraysProblems.slice(0, MIN).map((p) => p.id));
+    expect(canReviseManually(exactly)).toBe(true);
+    expect(problemsUntilRevisable(exactly)).toBe(0);
+  });
+
+  it("unlocks far below the threshold the scheduler waits for", () => {
+    // 3 of 51 is 6% -- the scheduler would not schedule anything until 75%,
+    // and that is exactly the wait this feature exists to skip.
+    const row = rowWith(arraysProblems.slice(0, MIN).map((p) => p.id));
+    expect(row.state).toBe("IN_PROGRESS");
+    expect(row.completionPct).toBeLessThan(0.1);
+    expect(canReviseManually(row)).toBe(true);
+  });
+
+  it("counts only problems inside the goal scope, since that is what a session draws from", () => {
+    const SPRINT = GOAL_PRESETS.find((p) => p.id === "sprint")!.goal;
+    const offGoal = arraysProblems.filter((p) => !matchesGoal(p, SPRINT)).slice(0, 10).map((p) => p.id);
+    // Ten solved problems, none of them in the goal, so nothing to revise.
+    const row = rowWith(offGoal, SPRINT);
+    expect(row.completedInScope).toBe(0);
+    expect(canReviseManually(row)).toBe(false);
+
+    const inGoal = goalScoped(arraysProblems, SPRINT).slice(0, MIN).map((p) => p.id);
+    expect(canReviseManually(rowWith([...offGoal, ...inGoal], SPRINT))).toBe(true);
+  });
+
+  it("never reports a negative shortfall once well past the minimum", () => {
+    const row = rowWith(arraysProblems.slice(0, 20).map((p) => p.id));
+    expect(problemsUntilRevisable(row)).toBe(0);
   });
 });

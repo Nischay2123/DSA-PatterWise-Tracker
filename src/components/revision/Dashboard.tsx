@@ -1,6 +1,13 @@
 import { useState } from "react";
+import { REVISION_CONFIG } from "../../config";
 import { useStore } from "../../context";
-import { buildTopicRows, countDashboard, statusLabel } from "../../revision/dashboard";
+import {
+  buildTopicRows,
+  canReviseManually,
+  countDashboard,
+  problemsUntilRevisable,
+  statusLabel,
+} from "../../revision/dashboard";
 import type { TopicRow } from "../../revision/dashboard";
 import { getConceptById } from "../../revision/session";
 import { cx } from "../../cx";
@@ -97,6 +104,8 @@ function TopicCard({
 }) {
   const [open, setOpen] = useState(false);
   const gated = row.state === "REVISION_DUE" || row.state === "REVISION_FAILED";
+  const canRevise = canReviseManually(row);
+  const needed = problemsUntilRevisable(row);
 
   return (
     <div className={cx("card overflow-hidden", gated && "border-accent-line")}>
@@ -127,10 +136,28 @@ function TopicCard({
             <span className="pill bg-sunken text-muted">self-assessed</span>
           )}
           <Ring pct={row.completionPct} size={28} stroke={3.5} />
-          {gated && (
+          {/* Due topics keep their prominent call to action; everything else
+              gets the same session on demand, because deciding you are shaky
+              on a topic is not something the scheduler can know. */}
+          {gated ? (
             <button type="button" className="btn btn-sm btn-primary" onClick={() => onStartRevision(row.topicId)}>
               Start
               <Icon name="arrowRight" className="size-3.5" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={!canRevise}
+              title={
+                canRevise
+                  ? "Run a revision session for this topic now"
+                  : `Solve ${needed} more problem${needed === 1 ? "" : "s"} in this topic first — a session needs ${REVISION_CONFIG.manualRevisionMinCompleted} to draw from`
+              }
+              onClick={() => onStartRevision(row.topicId)}
+            >
+              <Icon name="repeat" className="size-3.5" />
+              Revise now
             </button>
           )}
         </span>

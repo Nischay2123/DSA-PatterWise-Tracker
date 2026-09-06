@@ -36,6 +36,37 @@ function RevisionBanner({ topic }: { topic: Topic }) {
   );
 }
 
+// The quiet counterpart to RevisionBanner: shown when nothing is forcing a
+// revision but there is enough material to run one on demand.
+function ReviseNow({ topic, remaining }: { topic: Topic; remaining: number }) {
+  const ready = remaining === 0;
+  return (
+    <div className="mx-3.5 mt-3 mb-1 flex items-center gap-2.5 flex-wrap">
+      <button
+        type="button"
+        className="btn btn-sm"
+        disabled={!ready}
+        title={
+          ready
+            ? "Run a revision session for this topic now"
+            : `Solve ${remaining} more problem${remaining === 1 ? "" : "s"} here first — a session needs ${REVISION_CONFIG.manualRevisionMinCompleted} to draw from`
+        }
+        onClick={() => {
+          window.location.hash = `#/revision/${encodeURIComponent(topic.id)}`;
+        }}
+      >
+        <Icon name="repeat" className="size-3.5" />
+        Revise this topic
+      </button>
+      {!ready && (
+        <span className="text-micro text-faint">
+          {remaining} more solved problem{remaining === 1 ? "" : "s"} unlocks a session
+        </span>
+      )}
+    </div>
+  );
+}
+
 function TopicItem({ topic, index }: { topic: Topic; index: number }) {
   const { store, v2Store } = useStore();
   const { filters } = useFilters();
@@ -123,7 +154,16 @@ function TopicItem({ topic, index }: { topic: Topic; index: number }) {
           <Ring pct={pct} size={30} stroke={3.5} />
         </span>
       </summary>
-      {gated && <RevisionBanner topic={topic} />}
+      {gated ? (
+        <RevisionBanner topic={topic} />
+      ) : (
+        !isExempt && (
+          <ReviseNow
+            topic={topic}
+            remaining={Math.max(0, REVISION_CONFIG.manualRevisionMinCompleted - scoredDone)}
+          />
+        )
+      )}
       <div className="py-1.5">
         {topic.patterns.map((p) => (
           <PatternGroup key={p.id} pattern={p} topicName={topic.name} gated={gated} />
