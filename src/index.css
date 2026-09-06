@@ -1,55 +1,112 @@
 @import "tailwindcss";
 
+/* ─── Colour ──────────────────────────────────────────────────────────────
+   Every colour is ONE light/dark pair via light-dark(), and the theme is
+   chosen with `color-scheme` alone. That means one palette instead of two
+   blocks that drift apart on every edit, live prefers-color-scheme following
+   with zero JS, and correct native rendering of form controls, scrollbars
+   and the <input type="search"> clear button.                             */
 @theme {
-  --color-easy: #2fa84f;
-  --color-medium: #d99a1b;
-  --color-hard: #d9463f;
-  --color-border: #d0d0d5;
-  --color-bg: #ffffff;
-  --color-fg: #1a1a1a;
-  --color-muted: #6b6b6f;
-  --color-row-hover: #f4f4f7;
-  --color-heat-0: #ebedf0;
-  --color-heat-1: #c6e6cd;
-  --color-heat-2: #8fd19e;
-  --color-heat-3: #4cb264;
-  --color-heat-4: #2fa84f;
-  --color-tip-bg: #24242a;
-  --color-tip-fg: #f4f4f6;
-  --color-focus: #1a6dd4;
-  /* Badges carry white text, so they need their own darker shades to clear
-     WCAG AA 4.5:1 -- the lighter --color-easy/medium/hard stay for fills. */
-  --color-badge-easy: #26863f;
-  --color-badge-medium: #9a6d13;
-  --color-badge-hard: #d2443d;
+  /* surfaces */
+  --color-bg: light-dark(#ffffff, #15151a);
+  --color-surface: light-dark(#fafafb, #1c1c22);
+  --color-fg: light-dark(#17171b, #e9e9ec);
+  --color-muted: light-dark(#67676d, #9b9ba3);
+  --color-border: light-dark(#e2e2e7, #2c2c34);
+  --color-border-strong: light-dark(#cfcfd6, #3d3d47);
+  --color-row-hover: light-dark(#f5f5f8, #212129);
+
+  /* THE accent. Blue, because every other hue is already spoken for here:
+     green = done/activity, amber = starred, red = Hard. This is the pair
+     --color-focus already held, promoted from a focus ring to a real role. */
+  --color-accent: light-dark(#2563c9, #6ea8f0);
+  --color-accent-fg: light-dark(#ffffff, #10131a);
+  --color-accent-soft: light-dark(#eaf1fd, #1b2740);
+  --color-focus: var(--color-accent);
+
+  /* was a raw text-[#e0a300]; the light value is darkened to clear AA */
+  --color-star: light-dark(#a97a00, #e6ae1f);
+
+  /* progress + activity green (renamed from the misleading --color-easy) */
+  --color-progress: light-dark(#2fa84f, #39c261);
+  --color-heat-0: light-dark(#ebedf0, #202027);
+  --color-heat-1: light-dark(#c6e6cd, #1c4229);
+  --color-heat-2: light-dark(#8fd19e, #216b39);
+  --color-heat-3: light-dark(#4cb264, #2a9147);
+  --color-heat-4: light-dark(#2fa84f, #39c261);
+
+  --color-tip-bg: light-dark(#24242a, #3a3a42);
+  --color-tip-fg: light-dark(#f4f4f6, #f4f4f6);
+
+  /* Badges carry white text in both themes, so they need their own darker
+     shades to clear WCAG AA 4.5:1. */
+  --color-badge-easy: light-dark(#26863f, #2b9247);
+  --color-badge-medium: light-dark(#9a6d13, #a4761a);
+  --color-badge-hard: light-dark(#c93b34, #d0453e);
+
+  /* ─── Type scale ──────────────────────────────────────────────────────
+     Six semantic steps replacing 12 arbitrary rem values. Deliberately NOT
+     overriding --text-xs/sm/base: this ramp sits a notch below Tailwind's,
+     and --text-base must stay exactly 1rem because it is the iOS zoom
+     guard (see --text-field below).                                      */
+  --text-micro: 0.6875rem;      /* 11 */
+  --text-micro--line-height: 1rem;
+  --text-caption: 0.75rem;      /* 12 */
+  --text-caption--line-height: 1.0625rem;
+  --text-ui: 0.8125rem;         /* 13 */
+  --text-ui--line-height: 1.125rem;
+  --text-body: 0.875rem;        /* 14 */
+  --text-body--line-height: 1.25rem;
+  --text-head: 0.9375rem;       /* 15 */
+  --text-head--line-height: 1.3125rem;
+  --text-title: 1.125rem;       /* 18 */
+  --text-title--line-height: 1.5rem;
+
+  /* Fields get their own size so the mobile bump below is one rule instead
+     of `max-[700px]:text-base` repeated across 11 class strings. */
+  --text-field: 0.875rem;
+
+  /* ─── Layout ──────────────────────────────────────────────────────────
+     Three intentional widths replacing five arbitrary ones.             */
+  --container-shell: 78rem;    /* tracker + revision dashboard */
+  --container-reading: 46rem;  /* session steps, results — measured for prose */
+  --container-panel: 30rem;    /* settings, merge, error screen */
+
+  /* 768 is also hardcoded in src/breakpoints.ts for the Filters
+     matchMedia. The two MUST move together — see the note there. */
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 64rem;
+  --breakpoint-xl: 80rem;
 }
 
-@media (prefers-color-scheme: dark) {
+/* iOS Safari zooms the viewport when a focused field is under 16px. */
+@media (width < 48rem) {
   :root {
-    --color-border: #3a3a40;
-    --color-bg: #16161a;
-    --color-fg: #e8e8ea;
-    --color-muted: #9a9aa0;
-    --color-row-hover: #202024;
-    --color-heat-0: #202024;
-    --color-heat-1: #1c4229;
-    --color-heat-2: #216b39;
-    --color-heat-3: #2a9147;
-    --color-heat-4: #39c261;
-    --color-tip-bg: #3a3a42;
-    --color-tip-fg: #f4f4f6;
-    --color-focus: #6ea8f0;
+    --text-field: 1rem;
   }
 }
 
+/* ─── Theme switch ────────────────────────────────────────────────────────
+   Three lines, and no JS owns a colour value. `system` is :root's default
+   and follows the OS live for free — that is what `light dark` means, and
+   light-dark() re-resolves when the preference changes.                   */
 @layer base {
   :root {
     color-scheme: light dark;
   }
+  [data-theme="light"] {
+    color-scheme: light;
+  }
+  [data-theme="dark"] {
+    color-scheme: dark;
+  }
+
   body {
     background: var(--color-bg);
     color: var(--color-fg);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
 
   /* Keyboard navigation had no visible indicator anywhere before this. */
@@ -64,7 +121,7 @@
   @keyframes jump-flash {
     0%,
     40% {
-      background: var(--color-heat-1);
+      background: var(--color-accent-soft);
     }
     100% {
       background: transparent;
@@ -78,5 +135,136 @@
       animation: none;
       outline: 2px solid var(--color-focus);
     }
+  }
+}
+
+/* ─── Components ──────────────────────────────────────────────────────────
+   @utility rather than TS constants or @apply. A TS constant expands to
+   plain utilities, so cx(BUTTON_CLASS, "px-5") emits two competing px-*
+   and Tailwind's source order decides the winner, not the string order --
+   the footgun tailwind-merge exists to fix, and we are not adding a
+   dependency. Custom utilities sort before single-property ones, so
+   `btn px-5` reliably yields px-5.                                       */
+
+@utility btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: --spacing(1.5);
+  font: inherit;
+  font-size: var(--text-ui);
+  line-height: var(--text-ui--line-height);
+  font-weight: 500;
+  padding: --spacing(1.5) --spacing(2.5);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+  &:hover:not(:disabled) {
+    background: var(--color-row-hover);
+    border-color: var(--color-muted);
+  }
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+/* Defined after `btn` so it sorts later; use as `btn btn-primary`. */
+@utility btn-primary {
+  border-color: transparent;
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  &:hover:not(:disabled) {
+    background: var(--color-accent);
+    border-color: transparent;
+    filter: brightness(1.08);
+  }
+}
+
+/* Borderless text button — the old ghost/Cancel/Back variants. */
+@utility btn-quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-muted);
+  &:hover:not(:disabled) {
+    background: var(--color-row-hover);
+    border-color: transparent;
+    color: var(--color-fg);
+  }
+}
+
+@utility btn-sm {
+  font-size: var(--text-micro);
+  line-height: var(--text-micro--line-height);
+  padding: --spacing(1) --spacing(2);
+}
+
+/* Inline link-styled button. Replaces the invalid `font-inherit` sites --
+   that utility does not exist in Tailwind v4, so those buttons were
+   silently rendering in the UA button font. */
+@utility btn-link {
+  font: inherit;
+  font-size: inherit;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  &:hover {
+    color: var(--color-fg);
+  }
+}
+
+@utility field {
+  width: 100%;
+  font: inherit;
+  font-size: var(--text-field);
+  padding: --spacing(1.5) --spacing(2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  &::placeholder {
+    color: var(--color-muted);
+  }
+}
+
+@utility card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+}
+
+/* Slightly recessed surface for nested/secondary panels. */
+@utility card-soft {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+@utility field-label {
+  display: block;
+  font-size: var(--text-micro);
+  line-height: var(--text-micro--line-height);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--color-muted);
+  margin-bottom: --spacing(1);
+}
+
+/* The shared disclosure caret. Six components hand-rolled this pair. */
+@utility disclosure {
+  list-style: none;
+  cursor: pointer;
+  &::-webkit-details-marker {
+    display: none;
   }
 }

@@ -25,15 +25,18 @@ export function PatternGroup({
   return (
     <details
       data-accordion
-      className={cx("pattern group/pattern pt-0.5 pr-3.5 pb-0.5 pl-[30px]", !anyVisible && "hidden")}
+      className={cx("pattern group/pattern px-3.5 sm:pl-7", !anyVisible && "hidden")}
     >
       <summary
-        className="group-open/pattern:mb-0.5 flex items-center gap-2 py-1.5 text-[0.85rem] text-muted font-semibold cursor-pointer list-none
-          [&::-webkit-details-marker]:hidden before:content-['▸'] before:mr-1.5 group-open/pattern:before:content-['▾']"
+        className="disclosure flex items-center gap-2 py-2 text-ui text-muted font-semibold
+          hover:text-fg before:content-['▸'] before:text-micro group-open/pattern:before:content-['▾']"
       >
-        {pattern.name} <span data-pattern-progress={pattern.id}>{`${done}/${total}`}</span>
+        {pattern.name}
+        <span data-pattern-progress={pattern.id} className="text-caption tabular-nums opacity-70">
+          {done}/{total}
+        </span>
       </summary>
-      <div className="pl-3">
+      <div className="pb-1.5">
         <FundamentalsPanel patternId={pattern.id} />
         {pattern.problems.map((p) => (
           <QuestionRow key={p.id} problem={p} topicName={topicName} patternName={pattern.name} gated={gated} />

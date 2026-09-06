@@ -124,7 +124,7 @@ export function Heatmap({ months, cardRef }: { months: HeatmapMonth[]; cardRef: 
                 </div>
               ))}
             </div>
-            <div className="text-[0.7rem] text-muted text-center whitespace-nowrap">{month.label}</div>
+            <div className="text-micro text-muted text-center whitespace-nowrap">{month.label}</div>
           </div>
         ))}
       </div>
@@ -133,7 +133,7 @@ export function Heatmap({ months, cardRef }: { months: HeatmapMonth[]; cardRef: 
         role="status"
         aria-live="polite"
         hidden
-        className="absolute z-[5] pointer-events-none py-[5px] px-[9px] rounded-md bg-tip-bg text-tip-fg text-[0.72rem] whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.25)]"
+        className="absolute z-[5] pointer-events-none py-[5px] px-[9px] rounded-md bg-tip-bg text-tip-fg text-micro whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.25)]"
       />
     </div>
   );

@@ -4,7 +4,6 @@ import { Dashboard } from "./components/Dashboard";
 import { Filters } from "./components/Filters";
 import { ImportExport } from "./components/ImportExport";
 import { MergeImport } from "./components/MergeImport";
-import { ProgressBar } from "./components/ProgressBar";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { RevisionDashboard } from "./components/revision/Dashboard";
 import { SessionShell } from "./components/revision/SessionShell";
@@ -13,7 +12,9 @@ import { FiltersContext, StoreContext, useProgressStore } from "./context";
 import { downloadBackupFile } from "./persistence/backup";
 import { countDone, getState, hasBackupV2, isProblemVisible } from "./store";
 import { useFilterAccordions } from "./useFilterAccordions";
+import { useTheme } from "./useTheme";
 import { useHash } from "./useHash";
+import { cx } from "./cx";
 import type { FilterState, QuestionData } from "./types";
 
 const DATA = questionsData as QuestionData;
@@ -51,7 +52,7 @@ function jumpToProblem(id: string) {
 
 function LoadingScreen() {
   return (
-    <div className="flex items-center justify-center h-screen text-muted text-[0.9rem]">Loading your progress…</div>
+    <div className="flex items-center justify-center h-screen text-muted text-body">Loading your progress…</div>
   );
 }
 
@@ -61,17 +62,17 @@ function ErrorScreen({ error }: { error: string | null }) {
     if (raw) downloadBackupFile(raw);
   };
   return (
-    <div className="max-w-[500px] mx-auto mt-20 px-5 text-center">
-      <h1 className="text-[1.1rem] font-semibold mb-2">Couldn't load your progress</h1>
-      <p className="text-[0.85rem] text-muted mb-1">
+    <div className="max-w-panel mx-auto mt-20 px-5 text-center">
+      <h1 className="text-title font-semibold mb-2">Couldn't load your progress</h1>
+      <p className="text-body text-muted mb-1">
         Something went wrong migrating your saved data, so nothing was overwritten. Your original progress is still
         safe in this browser.
       </p>
-      {error && <p className="text-[0.75rem] text-muted mb-4 font-mono break-words">{error}</p>}
+      {error && <p className="text-caption text-muted mb-4 font-mono break-words">{error}</p>}
       <button
         type="button"
         onClick={exportRaw}
-        className="border border-border rounded-md px-3 py-1.5 text-[0.85rem] cursor-pointer bg-transparent text-fg"
+        className="btn"
       >
         Export raw progress as JSON
       </button>
@@ -97,6 +98,10 @@ export function App() {
   const refreshBackup = () => setBackupExists(hasBackupV2());
 
   useFilterAccordions(filters);
+  // Gated on `ready`: before boot, v2Store holds the default "system", and
+  // applying that would strip the data-theme index.html's head script just
+  // set -- causing the very flash that script exists to prevent.
+  useTheme(status === "ready" ? v2Store.settings.theme : null);
 
   if (status === "loading") return <LoadingScreen />;
   if (status === "error") return <ErrorScreen error={bootError} />;
@@ -134,57 +139,66 @@ export function App() {
   return (
     <StoreContext.Provider value={{ store, dispatch, v2Store, dispatchV2 }}>
       <FiltersContext.Provider value={{ filters, setFilters }}>
-        <header className="sticky top-0 z-10 bg-bg border-b border-border px-5 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <h1 className="text-[1.2rem] m-0">DSA Tracker</h1>
-            <div className="flex items-center gap-2">
-              <ImportExport backupExists={backupExists} onBackupChange={refreshBackup} />
-              <button
-                type="button"
-                onClick={() => navigate("#/revision")}
-                title="Revision dashboard"
-                className="text-[0.85rem] px-3 py-1.5 border border-border rounded-md bg-transparent text-fg cursor-pointer"
-              >
-                Revision
-              </button>
-              <button
-                type="button"
-                onClick={() => setSettingsOpen((o) => !o)}
-                title="Evaluation provider, API key and completion gate"
-                className="text-[0.85rem] px-3 py-1.5 border border-border rounded-md bg-transparent text-fg cursor-pointer"
-              >
-                Settings
-              </button>
+        {/* Two rows, not three: the progress bar became the header's bottom
+            edge, which frees a whole row on a phone. scroll-mt-* on the rows
+            is tuned to this height -- change one, change the other. */}
+        <header className="sticky top-0 z-20 bg-bg/90 backdrop-blur-sm">
+          <div className="mx-auto w-full max-w-shell px-4 md:px-6">
+            <div className="flex items-center gap-x-3 gap-y-2 py-2.5 flex-wrap">
+              <h1 className="text-title font-semibold tracking-tight m-0">DSA Tracker</h1>
+              <span className="text-caption text-muted tabular-nums" aria-label={`${overallDone} of ${overallTotal} solved`}>
+                {overallDone}
+                <span className="opacity-60">/{overallTotal}</span> · {overallPct}%
+              </span>
+              <div className="ml-auto flex items-center gap-1.5">
+                <ImportExport backupExists={backupExists} onBackupChange={refreshBackup} />
+                <button type="button" className="btn" onClick={() => navigate("#/revision")} title="Revision dashboard">
+                  Revision
+                </button>
+                <button
+                  type="button"
+                  className={cx("btn", settingsOpen && "btn-primary")}
+                  aria-expanded={settingsOpen}
+                  onClick={() => setSettingsOpen((o) => !o)}
+                  title="Theme, evaluation provider, API key and completion gate"
+                >
+                  Settings
+                </button>
+              </div>
             </div>
+            <Filters />
+            {settingsOpen && (
+              <div className="pb-3">
+                <div className="ml-auto w-full max-w-panel">
+                  <SettingsPanel onClose={() => setSettingsOpen(false)} />
+                </div>
+              </div>
+            )}
           </div>
-          {settingsOpen && (
-            <div className="max-w-[460px] ml-auto">
-              <SettingsPanel onClose={() => setSettingsOpen(false)} />
-            </div>
-          )}
-          <div className="flex items-center gap-2.5 mt-2.5">
-            <ProgressBar done={overallDone} total={overallTotal} />
-            <span className="text-[0.85rem] text-muted whitespace-nowrap">{`${overallDone}/${overallTotal} (${overallPct}%)`}</span>
+          {/* Overall progress as the header's bottom border: the track IS the
+              border, so this costs no vertical space at all. */}
+          <div className="h-[3px] w-full bg-border" role="presentation">
+            <div
+              className="h-full bg-progress transition-[width] duration-300"
+              style={{ width: `${overallPct}%` }}
+            />
           </div>
-          <Filters />
         </header>
-        <main className="max-w-[900px] mx-auto pt-4 px-5 pb-15">
+
+        <main className="mx-auto w-full max-w-shell px-4 md:px-6 pt-5 pb-16">
           <Dashboard allProblems={ALL_PROBLEMS} onContinue={jumpToProblem} />
           <TopicList key={importNonce} topics={DATA.topics} />
           {visibleCount === 0 && (
-            <p className="text-[0.85rem] text-muted text-center py-6">
+            <p className="text-body text-muted text-center py-10">
               No problems match these filters.{" "}
-              <button
-                type="button"
-                className="bg-transparent border-0 p-0 font-inherit text-fg underline cursor-pointer"
-                onClick={() => setFilters(DEFAULT_FILTERS)}
-              >
+              <button type="button" className="btn-link" onClick={() => setFilters(DEFAULT_FILTERS)}>
                 Clear filters
               </button>
             </p>
           )}
         </main>
-        <footer className="text-center text-[0.75rem] text-muted p-5">
+
+        <footer className="mx-auto w-full max-w-shell px-4 md:px-6 pb-10 text-center text-caption text-muted">
           <p className="m-0">
             Progress is saved in this browser only — no account, no sync. Use Export regularly as a backup.
           </p>

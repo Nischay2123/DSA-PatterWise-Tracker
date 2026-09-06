@@ -18,30 +18,30 @@ export function Analytics({ allProblems }: { allProblems: Problem[] }) {
   ];
 
   return (
-    <details className="group border-t border-border mt-3">
+    <details className="group/analytics border-t border-border mt-4">
       <summary
-        className="text-[0.85rem] font-semibold pt-2.5 cursor-pointer list-none
+        className="text-body font-semibold pt-2.5 cursor-pointer list-none
           [&::-webkit-details-marker]:hidden before:content-['▸'] before:mr-1.5 group-open:before:content-['▾']"
       >
         Analytics
       </summary>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-3 pt-2.5 pb-0.5">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-3 pt-3 pb-0.5">
         {sections.map((sec) => (
-          <div className="border border-border rounded-lg py-2.5 px-3" key={sec.title}>
-            <div className="text-[0.8rem] font-semibold mb-2">{sec.title}</div>
+          <div className="card-soft py-3 px-3.5" key={sec.title}>
+            <div className="text-ui font-semibold mb-2.5">{sec.title}</div>
             {sec.rows.map((r) => (
-              <div className="flex items-center gap-2 my-1.5 text-[0.78rem]" key={r.label}>
-                <span className="w-[70px] shrink-0 text-muted">{r.label}</span>
+              <div className="flex items-center gap-2.5 my-1.5 text-caption" key={r.label}>
+                <span className="w-20 shrink-0 text-muted">{r.label}</span>
                 <ProgressBar done={r.done} total={r.total} mini />
-                <span className="w-12 shrink-0 text-right text-muted">{`${r.done}/${r.total}`}</span>
+                <span className="w-12 shrink-0 text-right text-muted tabular-nums">{`${r.done}/${r.total}`}</span>
               </div>
             ))}
           </div>
         ))}
-        <div className="border border-border rounded-lg py-2.5 px-3">
-          <div className="text-[0.8rem] font-semibold mb-2">Marked for revision</div>
-          <div className="flex items-center gap-2 my-1.5 text-[0.78rem]">
-            <span className="w-[70px] shrink-0 text-muted">★ Revision</span>
+        <div className="card-soft py-3 px-3.5">
+          <div className="text-ui font-semibold mb-2.5">Marked for revision</div>
+          <div className="flex items-center gap-2.5 my-1.5 text-caption">
+            <span className="w-20 shrink-0 text-muted">★ Revision</span>
             <span className="text-muted">{revised}</span>
           </div>
         </div>

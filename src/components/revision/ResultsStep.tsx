@@ -8,7 +8,6 @@ import { getTopicRevision, getV2Progress } from "../../store";
 import type { RevisionAttempt, Topic } from "../../types";
 
 const CONFIDENCE_LABEL: Record<string, string> = { strong: "Strong", partial: "Partial", forgot: "Forgot" };
-const BUTTON_CLASS = "text-[0.8rem] px-2.5 py-1 border border-border rounded-md bg-transparent text-fg cursor-pointer";
 
 export function ResultsStep({
   topic,
@@ -80,15 +79,15 @@ export function ResultsStep({
   const outcome = revision.history[revision.history.length - 1];
 
   return (
-    <div className="max-w-[640px] mx-auto mt-6 px-5 pb-16">
+    <div className="mx-auto w-full max-w-reading px-4 md:px-6 pt-6 pb-16">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-[1.1rem] font-semibold m-0">Revision — {topic.name}</h1>
-        <button type="button" onClick={onExit} className="text-[0.8rem] text-muted bg-transparent border-0 cursor-pointer underline">
+        <h1 className="text-title font-semibold tracking-tight m-0">Revision — {topic.name}</h1>
+        <button type="button" onClick={onExit} className="btn-link text-ui">
           Back to tracker
         </button>
       </div>
 
-      <div className="border border-border rounded-lg p-3 mb-5 text-[0.8rem]">
+      <div className="card p-4 mb-5 text-ui">
         {running && <div><strong>Evaluating…</strong> Grading your answers with {v2Store.settings.provider}.</div>}
 
         {!running && concluded && (
@@ -114,22 +113,10 @@ export function ResultsStep({
         {!running && !concluded && !hasKey && (
           <div>
             <strong>Session saved.</strong> No API key set, so it hasn't been graded yet.{" "}
-            <button type="button" onClick={onOpenSettings} className="bg-transparent border-0 p-0 font-inherit text-fg underline cursor-pointer">
+            <button type="button" onClick={onOpenSettings} className="btn-link">
               Add a key in Settings
             </button>{" "}
             and come back — this submission will still be here.
-          </div>
-        )}
-
-        {!running && !concluded && (
-          <div className="mt-2">
-            <button type="button" className={BUTTON_CLASS} onClick={markDone}>
-              Mark this revision as done
-            </button>
-            <div className="text-muted mt-1 text-[0.75rem]">
-              Records it as completed and moves the topic on to its next interval. No score is stored, because
-              nothing graded it.
-            </div>
           </div>
         )}
 
@@ -138,78 +125,92 @@ export function ResultsStep({
             <strong>Evaluation unavailable. Your submission has been saved.</strong>
             {attempt.error && <div className="text-muted mt-1">{attempt.error}</div>}
             <div className="mt-2">
-              <button type="button" className={BUTTON_CLASS} onClick={() => void run()}>
+              <button type="button" className="btn" onClick={() => void run()}>
                 Retry evaluation
               </button>
             </div>
           </div>
         )}
 
+        {/* Placed after the status, not before it: this is the escape hatch
+            for the situation the status just described. */}
+        {!running && !concluded && (
+          <div className="mt-3 pt-3 border-t border-border">
+            <button type="button" className="btn" onClick={markDone}>
+              Mark this revision as done
+            </button>
+            <p className="text-muted mt-1.5 mb-0 text-caption">
+              Records it as completed and moves the topic on to its next interval. No score is stored, because
+              nothing graded it.
+            </p>
+          </div>
+        )}
+
         {attempt.questions.length > 0 && (
-          <div className="text-muted mt-1.5">
+          <div className="text-muted mt-3 pt-3 border-t border-border text-caption">
             Self-rated confidence: {tally.strong} strong · {tally.partial} partial · {tally.forgot} forgot
           </div>
         )}
       </div>
 
-      <h2 className="text-[0.95rem] font-semibold mb-2">Fundamentals</h2>
+      <h2 className="text-head font-semibold mb-2.5">Fundamentals</h2>
       {attempt.fundamentals.map((f) => {
         const concept = getConceptById(f.conceptId);
         const grade = fundamentalGrade.get(f.conceptId);
         return (
-          <div key={f.conceptId} className="mb-4 border border-border rounded-lg p-3">
-            <div className="font-semibold text-[0.85rem] mb-1.5">
+          <div key={f.conceptId} className="card p-3.5 mb-3">
+            <div className="font-semibold text-body mb-1.5">
               {concept?.prompt ?? f.conceptId}
-              {grade && <span className="ml-2 text-[0.7rem] text-muted font-normal">{grade.score}/5</span>}
+              {grade && <span className="ml-2 text-micro text-muted font-normal">{grade.score}/5</span>}
             </div>
-            <div className="text-[0.8rem] mb-2">
+            <div className="text-ui mb-2">
               <span className="text-muted">Your answer: </span>
               {f.answer || <span className="text-muted italic">(left blank)</span>}
             </div>
-            {grade?.note && <div className="text-[0.78rem] mb-1.5">{grade.note}</div>}
+            {grade?.note && <div className="text-ui mb-1.5">{grade.note}</div>}
             {grade && grade.missing.length > 0 && (
-              <div className="text-[0.75rem] text-muted mb-1.5">Missed: {grade.missing.join("; ")}</div>
+              <div className="text-caption text-muted mb-1.5">Missed: {grade.missing.join("; ")}</div>
             )}
-            {concept && <div className="text-[0.75rem] text-muted">Should cover: {concept.expectedConcepts.join("; ")}</div>}
+            {concept && <div className="text-caption text-muted">Should cover: {concept.expectedConcepts.join("; ")}</div>}
           </div>
         );
       })}
 
-      {attempt.questions.length > 0 && <h2 className="text-[0.95rem] font-semibold mb-2 mt-5">Questions</h2>}
+      {attempt.questions.length > 0 && <h2 className="text-head font-semibold mb-2.5 mt-6">Questions</h2>}
       {attempt.questions.map((q) => {
         const problem = problemById.get(q.questionId);
         const progress = getV2Progress(v2Store, q.questionId);
         const grade = questionGrade.get(q.questionId);
         return (
-          <div key={q.questionId} className="mb-5 border border-border rounded-lg p-3">
+          <div key={q.questionId} className="card p-3.5 mb-3">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className="font-semibold">{problem?.question ?? q.questionId}</span>
-              {q.confidence && <span className="text-[0.7rem] text-muted">{CONFIDENCE_LABEL[q.confidence]}</span>}
+              {q.confidence && <span className="text-micro text-muted">{CONFIDENCE_LABEL[q.confidence]}</span>}
               {grade && (
-                <span className="text-[0.7rem] text-muted">
+                <span className="text-micro text-muted">
                   correctness {grade.correctness}/5 · approach {grade.approach}/5 · pseudocode {grade.pseudocode}/5 ·
                   complexity {grade.complexity}/5
                 </span>
               )}
             </div>
-            {grade?.note && <div className="text-[0.78rem] mb-2">{grade.note}</div>}
+            {grade?.note && <div className="text-ui mb-2">{grade.note}</div>}
             {grade && grade.mistakes.length > 0 && (
-              <div className="text-[0.75rem] text-muted mb-2">Flagged: {grade.mistakes.join("; ")}</div>
+              <div className="text-caption text-muted mb-2">Flagged: {grade.mistakes.join("; ")}</div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[0.8rem]">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-ui">
               <div>
-                <div className="text-[0.7rem] font-semibold text-muted mb-1">Your recall</div>
+                <div className="field-label">Your recall</div>
                 <div className="mb-1.5"><span className="text-muted">Approach: </span>{q.approach || "—"}</div>
                 <div className="mb-1.5"><span className="text-muted">Pseudocode: </span>{q.pseudocode || "—"}</div>
                 <div className="mb-1.5"><span className="text-muted">Complexity: </span>{q.complexity || "—"}</div>
                 {q.edgeCases && <div><span className="text-muted">Edge cases: </span>{q.edgeCases}</div>}
               </div>
               <div>
-                <div className="text-[0.7rem] font-semibold text-muted mb-1">Your stored solution</div>
+                <div className="field-label">Your stored solution</div>
                 <div className="mb-1.5"><span className="text-muted">Approach: </span>{progress.approach || "—"}</div>
                 <div className="mb-1.5"><span className="text-muted">Pseudocode: </span>{progress.pseudocode || "—"}</div>
                 {progress.code && (
-                  <pre className="whitespace-pre-wrap font-mono text-[0.75rem] bg-row-hover rounded-md p-1.5">{progress.code}</pre>
+                  <pre className="whitespace-pre-wrap font-mono text-caption card-soft p-2 overflow-x-auto">{progress.code}</pre>
                 )}
               </div>
             </div>

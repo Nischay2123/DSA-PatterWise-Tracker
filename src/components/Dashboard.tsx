@@ -12,6 +12,7 @@ import {
 import type { Problem } from "../types";
 import { Analytics } from "./Analytics";
 import { Heatmap } from "./Heatmap";
+import { StatTile } from "./StatTile";
 
 export function Dashboard({ allProblems, onContinue }: { allProblems: Problem[]; onContinue: (id: string) => void }) {
   const { store, v2Store } = useStore();
@@ -32,12 +33,12 @@ export function Dashboard({ allProblems, onContinue }: { allProblems: Problem[];
   const maxOffset = Math.max(earliestYearOffset(store), 1);
 
   return (
-    <section ref={cardRef} className="relative border border-border rounded-lg py-3 px-3.5 mb-3.5">
+    <section ref={cardRef} className="card relative p-4 mb-4">
       <div className="flex items-center justify-between gap-3 flex-wrap mb-2.5">
-        <h2 className="text-[0.95rem] font-semibold m-0">Activity</h2>
+        <h2 className="text-head font-semibold m-0">Activity</h2>
         {next && (
           <button
-            className="mr-auto text-[0.8rem] px-2.5 py-[5px] border border-border rounded-md bg-transparent text-fg cursor-pointer hover:bg-row-hover"
+            className="btn btn-sm mr-auto"
             onClick={() => onContinue(next.id)}
           >
             Continue →
@@ -45,7 +46,7 @@ export function Dashboard({ allProblems, onContinue }: { allProblems: Problem[];
         )}
         <div className="flex items-center gap-2.5">
           <button
-            className="text-[0.95rem] leading-none py-1 px-2.5 border border-border rounded-md bg-transparent text-fg cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
+            className="btn btn-sm px-2"
             title="Previous year"
             aria-label="Previous year"
             disabled={yearOffset >= maxOffset}
@@ -53,9 +54,9 @@ export function Dashboard({ allProblems, onContinue }: { allProblems: Problem[];
           >
             ‹
           </button>
-          <span className="text-[0.85rem] font-semibold min-w-[60px] text-center">{range.label}</span>
+          <span className="text-ui font-semibold min-w-16 text-center tabular-nums">{range.label}</span>
           <button
-            className="text-[0.95rem] leading-none py-1 px-2.5 border border-border rounded-md bg-transparent text-fg cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
+            className="btn btn-sm px-2"
             title="Next year"
             aria-label="Next year"
             disabled={yearOffset === 0}
@@ -66,7 +67,7 @@ export function Dashboard({ allProblems, onContinue }: { allProblems: Problem[];
         </div>
       </div>
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-2 mb-3">
+      <div className="grid grid-cols-3 gap-2 mb-4 max-w-md">
         <StatTile value={streak} label="day streak" />
         <StatTile value={todayCount} label="solved today" />
         <StatTile value={totalDone} label="in this range" />
@@ -75,10 +76,10 @@ export function Dashboard({ allProblems, onContinue }: { allProblems: Problem[];
       <Heatmap months={months} cardRef={cardRef} />
 
       <div className="flex items-center justify-between gap-3 flex-wrap mt-2">
-        <span className="text-[0.8rem] text-muted">
+        <span className="text-caption text-muted">
           {`${totalDone} solved · ${totalRevised} revised in sessions on ${activeDays} active day${activeDays === 1 ? "" : "s"} in this range`}
         </span>
-        <div className="flex items-center gap-1 text-[0.7rem] text-muted">
+        <div className="flex items-center gap-1 text-micro text-muted">
           <span>Less</span>
           {[0, 1, 2, 3, 4].map((l) => (
             <div key={l} className={`w-2.5 h-2.5 rounded-sm ${["bg-heat-0", "bg-heat-1", "bg-heat-2", "bg-heat-3", "bg-heat-4"][l]}`} />
@@ -92,11 +93,3 @@ export function Dashboard({ allProblems, onContinue }: { allProblems: Problem[];
   );
 }
 
-function StatTile({ value, label }: { value: number; label: string }) {
-  return (
-    <div className="flex flex-col gap-px border border-border rounded-lg py-2 px-2.5">
-      <span className="text-[1.15rem] font-semibold tabular-nums">{value}</span>
-      <span className="text-[0.7rem] text-muted">{label}</span>
-    </div>
-  );
-}

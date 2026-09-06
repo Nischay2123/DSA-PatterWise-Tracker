@@ -14,7 +14,6 @@ import {
   v2ProgressToV1Store,
 } from "../store";
 
-const BUTTON_CLASS = "text-[0.85rem] px-3 py-1.5 border border-border rounded-md bg-transparent text-fg cursor-pointer";
 
 export function ImportExport({
   backupExists,
@@ -111,17 +110,17 @@ export function ImportExport({
   };
 
   return (
-    <div className="flex gap-2">
-      <button className={BUTTON_CLASS} onClick={handleExport} title="Download progress as JSON">
+    <div className="flex gap-1.5">
+      <button className="btn" onClick={handleExport} title="Download progress as JSON">
         Export
       </button>
-      <label className={BUTTON_CLASS} title="Load progress from JSON">
+      <label className="btn" title="Load progress from JSON">
         Import
         <input type="file" accept="application/json" hidden onChange={handleImport} />
       </label>
       {backupExists && (
         <button
-          className={BUTTON_CLASS}
+          className="btn"
           onClick={handleUndoImport}
           title="Restore the progress you had before the last import"
         >

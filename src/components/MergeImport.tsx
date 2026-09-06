@@ -81,18 +81,19 @@ export function MergeImport({ onBackupChange }: { onBackupChange: () => void }) 
   };
 
   return (
-    <details className="mt-3.5">
-      <summary className="inline-block text-muted cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+    <details className="group/advanced mt-3.5">
+      <summary className="disclosure inline-flex items-center gap-1.5 text-muted hover:text-fg
+        before:content-['▸'] before:text-micro group-open/advanced:before:content-['▾']">
         Advanced
       </summary>
-      <div className="max-w-[460px] mx-auto mt-2.5 p-3 border border-border rounded-lg text-left">
+      <div className="card-soft max-w-panel mx-auto mt-2.5 p-3.5 text-left">
         <p className="m-0 mb-2.5 leading-relaxed">
           <strong>Merge a backup</strong> combines another device's file with what's already here instead of
           replacing it. A problem stays solved if it's solved in either copy, the earliest completion date wins, and
           differing notes are kept side by side. Revision history, mistakes and past sessions are unioned too.
           Nothing already solved is ever un-solved.
         </p>
-        <label className="text-[0.75rem] px-3 py-1.5 border border-border rounded-md bg-transparent text-fg cursor-pointer hover:bg-row-hover">
+        <label className="btn btn-sm">
           Choose a file to merge…
           <input type="file" accept="application/json" hidden onChange={handleMerge} />
         </label>

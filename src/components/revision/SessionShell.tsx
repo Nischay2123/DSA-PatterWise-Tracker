@@ -3,6 +3,7 @@ import questionsData from "../../../data/questions.json";
 import { useStore } from "../../context";
 import { createRevisionAttempt, mostRecentAttemptForTopic } from "../../revision/session";
 import { getTopicRevision } from "../../store";
+import { cx } from "../../cx";
 import { ConfidenceStep } from "./ConfidenceStep";
 import { FundamentalsStep } from "./FundamentalsStep";
 import { RecallStep } from "./RecallStep";
@@ -12,6 +13,12 @@ import type { QuestionData, RevisionAttempt, Topic } from "../../types";
 const QUESTIONS = questionsData as QuestionData;
 
 type Step = "fundamentals" | "recall" | "confidence";
+
+const STEPS: { id: Step; label: string }[] = [
+  { id: "fundamentals", label: "Fundamentals" },
+  { id: "recall", label: "Question recall" },
+  { id: "confidence", label: "Confidence" },
+];
 
 // Resumability (plan §6/§12: "refresh mid-session resumes exactly") is
 // derived from what's already answered in the persisted attempt, not from a
@@ -62,7 +69,7 @@ export function SessionShell({
   }, [attempt, topic.id, v2Store, dispatchV2]);
 
   if (!attempt) {
-    return <div className="max-w-[640px] mx-auto mt-10 px-5 text-center text-muted text-[0.85rem]">Starting session…</div>;
+    return <div className="mx-auto w-full max-w-reading px-5 pt-16 text-center text-muted text-body">Starting session…</div>;
   }
 
   if (attempt.submittedAt) {
@@ -72,19 +79,33 @@ export function SessionShell({
   const currentStep = step ?? defaultStep(attempt);
 
   return (
-    <div className="max-w-[640px] mx-auto mt-6 px-5 pb-16">
+    <div className="mx-auto w-full max-w-reading px-4 md:px-6 pt-6 pb-16">
       <div className="flex items-center justify-between mb-1">
-        <h1 className="text-[1.1rem] font-semibold m-0">Revision — {topic.name}</h1>
-        <button type="button" onClick={onExit} className="text-[0.8rem] text-muted bg-transparent border-0 cursor-pointer underline">
+        <h1 className="text-title font-semibold tracking-tight m-0">Revision — {topic.name}</h1>
+        <button type="button" onClick={onExit} className="btn-link text-ui">
           Exit
         </button>
       </div>
-      <div className="text-[0.75rem] text-muted mb-4">
-        {currentStep === "fundamentals" && "Step 1 of 3 — Fundamentals"}
-        {currentStep === "recall" && "Step 2 of 3 — Question recall"}
-        {currentStep === "confidence" && "Step 3 of 3 — Confidence"}
-        {" · saved automatically, safe to exit and resume anytime"}
-      </div>
+      <ol className="flex items-center gap-2 mt-3 mb-1.5" aria-label="Session progress">
+        {STEPS.map((s, i) => {
+          const active = s.id === currentStep;
+          const done = STEPS.findIndex((x) => x.id === currentStep) > i;
+          return (
+            <li key={s.id} className="flex-1 min-w-0" aria-current={active ? "step" : undefined}>
+              <div
+                className={cx(
+                  "h-1 rounded-full transition-colors",
+                  done ? "bg-accent" : active ? "bg-accent" : "bg-border"
+                )}
+              />
+              <span className={cx("block mt-1.5 text-micro truncate", active ? "text-fg font-semibold" : "text-muted")}>
+                {i + 1}. {s.label}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="text-micro text-muted mb-5 mt-2">Saved automatically — safe to exit and resume anytime.</p>
       {currentStep === "fundamentals" && <FundamentalsStep attempt={attempt} onNext={() => setStep("recall")} />}
       {currentStep === "recall" && (
         <RecallStep attempt={attempt} topic={topic} onBack={() => setStep("fundamentals")} onNext={() => setStep("confidence")} />

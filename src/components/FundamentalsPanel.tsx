@@ -17,21 +17,21 @@ export function FundamentalsPanel({ patternId }: { patternId: string }) {
   return (
     <details className="group/fundamentals mb-1.5">
       <summary
-        className="inline-flex items-center gap-1.5 py-1 text-[0.78rem] text-muted cursor-pointer list-none
-          [&::-webkit-details-marker]:hidden before:content-['▸'] group-open/fundamentals:before:content-['▾']"
+        className="disclosure inline-flex items-center gap-1.5 py-1 text-caption text-muted hover:text-fg
+          before:content-['▸'] before:text-micro group-open/fundamentals:before:content-['▾']"
       >
         Fundamentals ({concepts.length})
       </summary>
-      <div className="pl-3.5 pb-1.5">
+      <div className="mt-1 mb-2 pl-3 border-l-2 border-border">
         {concepts.map((concept) => (
-          <div key={concept.id} className="mb-2.5">
-            <div className="text-[0.8rem] font-semibold flex items-start gap-2">
+          <div key={concept.id} className="mb-2.5 last:mb-0">
+            <div className="text-ui font-semibold flex items-start gap-2">
               <span>{concept.prompt}</span>
               {concept.criticality === "core" && (
-                <span className="mt-px text-[0.6rem] uppercase tracking-wide text-muted font-normal shrink-0">core</span>
+                <span className="mt-px text-micro uppercase tracking-wider text-accent font-semibold shrink-0">core</span>
               )}
             </div>
-            <ul className="list-disc pl-4 my-1 text-[0.75rem] text-muted">
+            <ul className="list-disc pl-4 my-1 text-caption text-muted">
               {concept.expectedConcepts.map((point) => (
                 <li key={point}>{point}</li>
               ))}

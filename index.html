@@ -4,6 +4,21 @@
 <meta charset="utf-8">
 <title>DSA Tracker</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Track and revise data-structures and algorithms practice, with spaced repetition.">
+<meta name="color-scheme" content="light dark">
+<script>
+  // Settings live in IndexedDB, which is async and cannot be read before
+  // first paint. This reads a synchronous mirror so an explicit light/dark
+  // choice applies with no flash of the wrong theme.
+  // "system" needs nothing: :root's `color-scheme: light dark` is correct.
+  try {
+    var t = localStorage.getItem("dsa-tracker-theme");
+    if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  } catch (e) {
+    // Private-mode Safari throws on localStorage; an unhandled error in a
+    // head script would leave the page unstyled.
+  }
+</script>
 </head>
 <body>
 <div id="root"></div>

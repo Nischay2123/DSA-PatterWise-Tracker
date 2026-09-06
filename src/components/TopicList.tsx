@@ -9,14 +9,14 @@ import { ProgressBar } from "./ProgressBar";
 
 function RevisionBanner({ topic }: { topic: Topic }) {
   return (
-    <div className="mx-3.5 mb-2.5 flex items-center justify-between gap-2 border border-border rounded-md bg-row-hover px-3 py-2 text-[0.8rem]">
-      <span>Revision due for {topic.name}.</span>
+    <div className="mx-3 mb-2 flex items-center justify-between gap-3 flex-wrap rounded-md bg-accent-soft border border-accent/25 px-3 py-2 text-ui">
+      <span className="font-medium">Revision due for {topic.name}.</span>
       <button
         type="button"
         onClick={() => {
           window.location.hash = `#/revision/${encodeURIComponent(topic.id)}`;
         }}
-        className="text-[0.8rem] px-2.5 py-1 border border-border rounded-md bg-transparent text-fg cursor-pointer whitespace-nowrap"
+        className="btn btn-sm btn-primary"
       >
         Start revision
       </button>
@@ -44,17 +44,18 @@ function TopicItem({ topic }: { topic: Topic }) {
   return (
     <details
       data-accordion
-      className={cx("topic group/topic border border-border rounded-lg mb-2.5", !anyVisible && "hidden")}
+      className={cx("topic group/topic card mb-2 overflow-hidden", !anyVisible && "hidden")}
     >
       <summary
-        className="flex items-center gap-2.5 py-2.5 px-3.5 font-semibold cursor-pointer list-none
-          [&::-webkit-details-marker]:hidden before:content-['▸'] before:mr-1.5 group-open/topic:before:content-['▾']"
+        className="disclosure flex items-center gap-2.5 py-2.5 px-3.5 text-head font-semibold
+          hover:bg-row-hover group-open/topic:border-b group-open/topic:border-border
+          before:content-['▸'] before:text-muted before:text-ui group-open/topic:before:content-['▾']"
       >
         {topic.name}
-        <span className="ml-auto w-[90px] shrink-0">
+        <span className="ml-auto w-20 sm:w-28 shrink-0">
           <ProgressBar done={done} total={total} mini />
         </span>
-        <span className="font-normal text-[0.8rem] text-muted w-[52px] shrink-0 text-right tabular-nums">
+        <span className="font-normal text-caption text-muted w-14 shrink-0 text-right tabular-nums">
           {`${done}/${total}`}
         </span>
       </summary>

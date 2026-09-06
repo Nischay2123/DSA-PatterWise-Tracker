@@ -31,17 +31,17 @@ export function ConfidenceStep({
 
   return (
     <div>
-      <p className="text-[0.8rem] text-muted mb-3">
+      <p className="text-ui text-muted mb-4">
         How confident were you on each, before you saw anything else? This shapes what comes up more often next time.
       </p>
       {attempt.questions.length === 0 && (
-        <p className="text-[0.8rem] text-muted mb-3">No questions to rate this session.</p>
+        <p className="text-ui text-muted mb-4">No questions to rate this session.</p>
       )}
       {attempt.questions.map((q) => {
         const problem = problemById.get(q.questionId);
         return (
-          <div key={q.questionId} className="mb-4">
-            <div className="font-semibold text-[0.85rem] mb-1.5">{problem?.question ?? q.questionId}</div>
+          <div key={q.questionId} className="card p-3.5 mb-3">
+            <div className="font-semibold text-body mb-2.5">{problem?.question ?? q.questionId}</div>
             <div className="flex gap-2 flex-wrap">
               {OPTIONS.map((opt) => (
                 <button
@@ -50,10 +50,8 @@ export function ConfidenceStep({
                   onClick={() =>
                     dispatchV2({ type: "SAVE_QUESTION_CONFIDENCE", attemptId: attempt.id, questionId: q.questionId, confidence: opt.value })
                   }
-                  className={cx(
-                    "text-[0.8rem] px-2.5 py-1.5 border rounded-md cursor-pointer",
-                    q.confidence === opt.value ? "border-fg bg-row-hover font-semibold" : "border-border bg-transparent text-muted"
-                  )}
+                  className={cx("btn btn-sm", q.confidence === opt.value && "btn-primary")}
+                  aria-pressed={q.confidence === opt.value}
                 >
                   {opt.label}
                 </button>
@@ -63,14 +61,14 @@ export function ConfidenceStep({
         );
       })}
       <div className="flex gap-2">
-        <button type="button" onClick={onBack} className="text-[0.85rem] px-3 py-1.5 border-0 bg-transparent text-muted cursor-pointer">
+        <button type="button" onClick={onBack} className="btn btn-quiet">
           Back
         </button>
         <button
           type="button"
           onClick={submit}
           disabled={!allRated}
-          className="text-[0.85rem] px-3 py-1.5 border border-border rounded-md bg-transparent text-fg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn btn-primary"
         >
           Submit session
         </button>
