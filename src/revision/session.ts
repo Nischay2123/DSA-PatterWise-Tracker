@@ -5,6 +5,7 @@
 import fundamentalsData from "../../data/fundamentals.json";
 import questionsData from "../../data/questions.json";
 import { REVISION_CONFIG } from "../config";
+import { matchesGoal, resolveGoal } from "./goal";
 import { selectQuestionsForSession } from "./selection";
 import type { SelectionCandidate } from "./selection";
 import type { AppStoreV2, QuestionData, RevisionAttempt } from "../types";
@@ -157,12 +158,16 @@ export function buildSelectionCandidates(
   const topic = questions.topics.find((t) => t.id === topicId);
   if (!topic) return [];
   const weakConcepts = v2.revision[topicId]?.weakConcepts ?? {};
+  // A sprint goal should quiz the sprint problems, not whatever else happens
+  // to be completed in the topic. Default goal matches everything.
+  const goal = resolveGoal(v2.settings);
 
   const candidates: SelectionCandidate[] = [];
   for (const pattern of topic.patterns) {
     for (const problem of pattern.problems) {
       const progress = v2.progress[problem.id];
       if (!progress?.completed) continue;
+      if (!matchesGoal(problem, goal)) continue;
       candidates.push({
         id: problem.id,
         patternId: pattern.id,

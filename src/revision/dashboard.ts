@@ -1,6 +1,8 @@
 import { REVISION_CONFIG } from "../config";
 import type { AppStoreV2, ProgressStore, Topic, TopicRevision } from "../types";
 import { daysBetweenUTC, todayISOUTC } from "./dates";
+import { goalScoped, isTopicOutOfGoalScope, resolveGoal } from "./goal";
+import type { Goal } from "./goal";
 import { deriveState } from "./stateMachine";
 import type { RevisionState } from "./stateMachine";
 
@@ -31,8 +33,11 @@ export interface DashboardCounts {
   mastered: number;
 }
 
-function completionPct(topic: Topic, store: ProgressStore): number {
-  const problems = topic.patterns.flatMap((p) => p.problems);
+// The denominator is the GOAL scope, not the whole topic -- that is the
+// entire mechanism by which a goal makes revision unlock sooner. Under the
+// default goal every problem matches, so this is byte-identical to before.
+function completionPct(topic: Topic, store: ProgressStore, goal: Goal): number {
+  const problems = goalScoped(topic.patterns.flatMap((p) => p.problems), goal);
   if (!problems.length) return 0;
   const done = problems.filter((p) => store.problems[p.id]?.done).length;
   return done / problems.length;
@@ -51,12 +56,16 @@ export function buildTopicRows(
   now: Date = new Date()
 ): TopicRow[] {
   const today = todayISOUTC(now);
+  const goal = resolveGoal(v2.settings);
 
   return topics
     .filter((t) => !isExemptTopic(t.id))
+    // A topic the goal leaves too thin to schedule against is omitted for
+    // exactly the same reason an exempt topic is -- see GOAL_MIN_TOPIC_PROBLEMS.
+    .filter((t) => !isTopicOutOfGoalScope(t.patterns.flatMap((p) => p.problems), goal))
     .map((topic) => {
       const revision = v2.revision[topic.id];
-      const pct = completionPct(topic, store);
+      const pct = completionPct(topic, store, goal);
       const state = deriveState(
         revision ?? {
           topicId: topic.id,

@@ -3,6 +3,7 @@ import { useStore } from "../context";
 import { ERROR_MESSAGE, validateKey } from "../llm/client";
 import { getProvider, PROVIDERS, resolveModel } from "../llm/providers";
 import type { ProviderId } from "../llm/providers";
+import { GoalSettings } from "./GoalSettings";
 import { Icon, type IconName } from "./Icon";
 
 type ProbeState = { kind: "idle" } | { kind: "checking" } | { kind: "ok" } | { kind: "error"; message: string };
@@ -89,6 +90,10 @@ export function SettingsPanel() {
 
   return (
     <div>
+      <Section title="Revision goal" icon="target">
+        <GoalSettings />
+      </Section>
+
       <Section title="Evaluation provider" icon="brain">
         <label className="field-label" htmlFor="settings-provider">
           Provider

@@ -17,7 +17,16 @@ import { DIFFICULTY_PILL } from "./QuestionRow";
 import { StatTile } from "./StatTile";
 import { cx } from "../cx";
 
-export function Dashboard({ allProblems, onContinue }: { allProblems: Problem[]; onContinue: (id: string) => void }) {
+export function Dashboard({
+  allProblems,
+  goalProblems,
+  onContinue,
+}: {
+  allProblems: Problem[];
+  /** The goal scope. Equal to allProblems under the default goal. */
+  goalProblems: Problem[];
+  onContinue: (id: string) => void;
+}) {
   const { store, v2Store } = useStore();
   const [yearOffset, setYearOffset] = useState(0);
   // The heatmap tooltip is absolutely positioned and measures against this
@@ -35,7 +44,9 @@ export function Dashboard({ allProblems, onContinue }: { allProblems: Problem[];
   const activeDays = allDays.filter((d) => d.done > 0).length;
   const streak = computeStreak(doneByDate);
   const todayCount = doneByDate.get(todayISO()) || 0;
-  const next = findNextUnsolved(allProblems, store);
+  // Points at the next unsolved problem IN THE GOAL, so "Continue" sends you
+  // somewhere that counts toward what you actually set out to do.
+  const next = findNextUnsolved(goalProblems, store) ?? findNextUnsolved(allProblems, store);
   const maxOffset = Math.max(earliestYearOffset(store), 1);
 
   return (

@@ -12,6 +12,7 @@ import { SessionShell } from "./components/revision/SessionShell";
 import { TopicList } from "./components/TopicList";
 import { FiltersContext, StoreContext, useProgressStore } from "./context";
 import { downloadBackupFile } from "./persistence/backup";
+import { goalScoped, isDefaultGoal, resolveGoal } from "./revision/goal";
 import { countDone, getState, hasBackupV2, isProblemVisible } from "./store";
 import { useFilterAccordions } from "./useFilterAccordions";
 import { useTheme } from "./useTheme";
@@ -98,8 +99,13 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
 
-  const overallDone = countDone(ALL_PROBLEMS, store);
-  const overallTotal = ALL_PROBLEMS.length;
+  // The headline figure tracks the goal, so "34/143" replaces "34/467" the
+  // moment a goal is set -- that reframing is most of the point of the
+  // feature. Default goal matches everything, so nothing changes by default.
+  const goal = resolveGoal(v2Store.settings);
+  const goalProblems = isDefaultGoal(goal) ? ALL_PROBLEMS : goalScoped(ALL_PROBLEMS, goal);
+  const overallDone = countDone(goalProblems, store);
+  const overallTotal = goalProblems.length;
   const overallPct = overallTotal ? Math.round((overallDone / overallTotal) * 100) : 0;
 
   const visibleCount = ALL_PROBLEMS_WITH_CONTEXT.filter(({ problem, topicName, patternName }) =>
@@ -215,7 +221,7 @@ export function App() {
             </div>
 
             <main className="mx-auto w-full max-w-shell px-3 md:px-6 pt-5 pb-20">
-              <Dashboard allProblems={ALL_PROBLEMS} onContinue={jumpToProblem} />
+              <Dashboard allProblems={ALL_PROBLEMS} goalProblems={goalProblems} onContinue={jumpToProblem} />
 
               <div className="flex items-center gap-2 mt-7 mb-2.5">
                 <h2 className="font-display text-title font-bold m-0">Problems</h2>

@@ -1,5 +1,6 @@
 import { REVISION_CONFIG } from "../config";
 import { useFilters, useStore } from "../context";
+import { goalScoped, isDefaultGoal, isTopicOutOfGoalScope, resolveGoal } from "../revision/goal";
 import { deriveState, isTopicGated } from "../revision/stateMachine";
 import { countDone, getState, getTopicRevision, isGatingActive, isProblemVisible } from "../store";
 import { cx } from "../cx";
@@ -43,12 +44,27 @@ function TopicItem({ topic, index }: { topic: Topic; index: number }) {
   const anyVisible = allProblems.some((p) =>
     isProblemVisible(p, getState(store, p.id), filters, { topicName: topic.name, patternName: "" })
   );
-  const done = countDone(allProblems, store);
-  const total = allProblems.length;
+
+  const goal = resolveGoal(v2Store.settings);
+  // "Exempt" here means revision ignores this topic entirely -- either it is
+  // on the permanent exempt list, or the goal thinned it below the floor.
+  const isExempt =
+    (REVISION_CONFIG.exemptTopics as readonly string[]).includes(topic.id) ||
+    isTopicOutOfGoalScope(allProblems, goal);
+
+  // The row reports progress against whatever revision measures it by, so a
+  // gated topic's numbers explain why it is gated. A topic revision does NOT
+  // govern keeps its full count: scoping `fundamentals` to a sprint goal
+  // would read "0/0", and scoping a dropped topic would imply a target that
+  // nothing is actually tracking.
+  const governedByGoal = !isExempt && !isDefaultGoal(goal);
+  const counted = governedByGoal ? goalScoped(allProblems, goal) : allProblems;
+  const narrowed = counted.length < allProblems.length;
+  const done = countDone(counted, store);
+  const total = counted.length;
   const pct = total ? done / total : 0;
   const complete = total > 0 && done === total;
 
-  const isExempt = (REVISION_CONFIG.exemptTopics as readonly string[]).includes(topic.id);
   const revisionState = deriveState(getTopicRevision(v2Store, topic.id), pct, isExempt);
   // Gating is a policy on top of the derived state: the Settings switch and
   // the no-key rule can both turn it off (see isGatingActive).
@@ -89,9 +105,13 @@ function TopicItem({ topic, index }: { topic: Topic; index: number }) {
           </span>
         )}
         <span className="ml-auto flex items-center gap-2.5 shrink-0">
-          <span className="text-caption text-muted tabular-nums font-medium">
+          <span
+            className="text-caption text-muted tabular-nums font-medium"
+            title={narrowed ? `${done} of ${total} problems in your goal (topic has ${allProblems.length})` : undefined}
+          >
             {done}
             <span className="text-faint">/{total}</span>
+            {narrowed && <span className="ml-1 text-accent" aria-hidden="true">&#9679;</span>}
           </span>
           <Ring pct={pct} size={30} stroke={3.5} />
         </span>

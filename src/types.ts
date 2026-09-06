@@ -171,6 +171,10 @@ export interface AppSettings {
   // absent is read as true.
   gateOnRevisionDue?: boolean;
   llmEnabled: boolean;
+  // Narrows the scope revision schedules against (src/revision/goal.ts).
+  // Optional so stores written before this existed keep the original
+  // full-syllabus behaviour; absent is read as DEFAULT_GOAL.
+  goal?: { minFreq: string; difficulties: string[] };
   theme: string;
   provider: "gemini" | "grok";
   model: string;
