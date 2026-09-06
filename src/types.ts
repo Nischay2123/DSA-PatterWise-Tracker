@@ -174,7 +174,7 @@ export interface AppSettings {
   // Narrows the scope revision schedules against (src/revision/goal.ts).
   // Optional so stores written before this existed keep the original
   // full-syllabus behaviour; absent is read as DEFAULT_GOAL.
-  goal?: { minFreq: string; difficulties: string[] };
+  goal?: { minFreq: string; difficulties: string[]; listId?: string };
   theme: string;
   provider: "gemini" | "grok";
   model: string;

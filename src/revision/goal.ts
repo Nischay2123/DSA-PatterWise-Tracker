@@ -1,3 +1,4 @@
+import listsData from "../../data/lists.json";
 import type { AppSettings, Problem, ProgressStore, Topic } from "../types";
 import { isExemptTopic } from "./dashboard";
 
@@ -33,9 +34,35 @@ const FREQ_FLOORS: readonly FreqFloor[] = ["All", "Medium", "High", "Very High"]
 
 export const ALL_DIFFICULTIES: readonly Difficulty[] = ["Easy", "Medium", "Hard"];
 
+// ─── Curated lists ──────────────────────────────────────────────────────────
+// A goal is normally a predicate. Some goals are not expressible as one:
+// "Blind 75" is a specific set of problems, not a rule. Those live in
+// data/lists.json as explicit id sets and, when a goal names one, membership
+// replaces the predicate entirely.
+//
+// The lists reference frozen ids and never invent them. Where a listed
+// problem is simply not in this sheet it is recorded in `absent` rather than
+// padded with a near-match, so the count the UI shows is the true overlap.
+export interface CuratedList {
+  label: string;
+  note: string;
+  /** Size of the canonical list, which is >= ids.length. */
+  total: number;
+  ids: string[];
+  absent: string[];
+}
+
+export const CURATED_LISTS = listsData as Record<string, CuratedList>;
+
+export function getCuratedList(listId: string | undefined): CuratedList | null {
+  return listId ? (CURATED_LISTS[listId] ?? null) : null;
+}
+
 export interface Goal {
   minFreq: FreqFloor;
   difficulties: Difficulty[];
+  /** When set to a known list, membership replaces minFreq/difficulties. */
+  listId?: string;
 }
 
 export const DEFAULT_GOAL: Goal = { minFreq: "All", difficulties: [...ALL_DIFFICULTIES] };
@@ -51,6 +78,12 @@ export const DEFAULT_GOAL: Goal = { minFreq: "All", difficulties: [...ALL_DIFFIC
 export const GOAL_MIN_TOPIC_PROBLEMS = 3;
 
 export function matchesGoal(problem: Problem, goal: Goal): boolean {
+  // A curated list is an exhaustive answer, not an extra filter -- narrowing
+  // it further by frequency would silently shrink a list whose whole point
+  // is being a fixed, known set.
+  const list = getCuratedList(goal.listId);
+  if (list) return list.ids.includes(problem.id);
+
   if (!goal.difficulties.includes(problem.difficulty)) return false;
   if (goal.minFreq === "All") return true;
   // indexOf returns -1 for a missing or unrecognised frequency, which is
@@ -69,6 +102,10 @@ export function resolveGoal(settings: Pick<AppSettings, "goal"> | undefined | nu
   const raw = settings?.goal;
   if (!raw || typeof raw !== "object") return DEFAULT_GOAL;
 
+  // An unknown list id -- a renamed list, or an import from a newer build --
+  // must not silently scope everything to nothing, so it is dropped and the
+  // frequency/difficulty fields underneath take over.
+  const listId = getCuratedList(raw.listId) ? raw.listId : undefined;
   const minFreq = FREQ_FLOORS.includes(raw.minFreq as FreqFloor) ? (raw.minFreq as FreqFloor) : "All";
   // Rebuilt from ALL_DIFFICULTIES rather than copied, so the result is
   // always canonically ordered and free of junk entries.
@@ -76,10 +113,14 @@ export function resolveGoal(settings: Pick<AppSettings, "goal"> | undefined | nu
 
   // An empty difficulty set would scope every topic to nothing and silently
   // disable revision across the board; that is never what anyone meant.
-  return { minFreq, difficulties: difficulties.length ? difficulties : [...ALL_DIFFICULTIES] };
+  const resolved: Goal = { minFreq, difficulties: difficulties.length ? difficulties : [...ALL_DIFFICULTIES] };
+  return listId ? { ...resolved, listId } : resolved;
 }
 
 export function sameGoal(a: Goal, b: Goal): boolean {
+  // Two list goals are the same list or they are not; the predicate fields
+  // underneath are inert while a list is set.
+  if (a.listId || b.listId) return a.listId === b.listId;
   return (
     a.minFreq === b.minFreq &&
     a.difficulties.length === b.difficulties.length &&
@@ -132,16 +173,10 @@ export const GOAL_PRESETS: GoalPreset[] = [
     goal: { minFreq: "All", difficulties: ["Hard"] },
   },
   {
-    id: "ease-back",
-    label: "Ease back in",
-    description: "High-frequency, nothing Hard. The quickest route to a revision rhythm.",
-    goal: { minFreq: "High", difficulties: ["Easy", "Medium"] },
-  },
-  {
-    id: "core",
-    label: "Must-know only",
-    description: "Very High frequency. The smallest set — drops most topics from revision.",
-    goal: { minFreq: "Very High", difficulties: [...ALL_DIFFICULTIES] },
+    id: "blind75",
+    label: "Blind 75",
+    description: "The classic 75-problem list. 51 of them are in this sheet; the rest simply aren't.",
+    goal: { minFreq: "All", difficulties: [...ALL_DIFFICULTIES], listId: "blind75" },
   },
 ];
 

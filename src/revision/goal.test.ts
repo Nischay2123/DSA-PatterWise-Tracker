@@ -7,6 +7,7 @@ import {
   DEFAULT_GOAL,
   GOAL_MIN_TOPIC_PROBLEMS,
   GOAL_PRESETS,
+  getCuratedList,
   goalPresetId,
   goalScoped,
   isDefaultGoal,
@@ -177,8 +178,7 @@ describe("against the real dataset", () => {
     ["no-hard", 288, 16, 1],
     ["sprint", 143, 12, 5],
     ["hard-only", 134, 13, 4],
-    ["ease-back", 83, 12, 5],
-    ["core", 49, 8, 9],
+    ["blind75", 51, 7, 10],
   ])("scopes the %s preset to %i problems across %i topics", (id, problems, topicsInScope, dropped) => {
     const preset = GOAL_PRESETS.find((p) => p.id === id)!;
     const scope = summarizeGoal(DATA.topics, preset.goal);
@@ -188,7 +188,9 @@ describe("against the real dataset", () => {
   });
 
   it("gives every preset a distinct scope, so none is a duplicate of another", () => {
-    const seen = GOAL_PRESETS.map((p) => `${p.goal.minFreq}|${[...p.goal.difficulties].sort().join()}`);
+    const seen = GOAL_PRESETS.map(
+      (p) => p.goal.listId ?? `${p.goal.minFreq}|${[...p.goal.difficulties].sort().join()}`
+    );
     expect(new Set(seen).size).toBe(GOAL_PRESETS.length);
   });
 
@@ -279,5 +281,55 @@ describe("a goal unlocks revision sooner -- the reason this exists", () => {
 
   it("still lists all 17 non-exempt topics under the default goal", () => {
     expect(buildTopicRows(DATA.topics, storeWith([]), v2WithGoal(null))).toHaveLength(17);
+  });
+});
+
+
+describe("curated lists -- a set of problems, not a predicate", () => {
+  const blind = GOAL_PRESETS.find((p) => p.id === "blind75")!.goal;
+  const list = getCuratedList("blind75")!;
+
+  it("never invents an id: every listed problem exists in the sheet", () => {
+    const known = new Set(ALL.map((p) => p.id));
+    expect(list.ids.filter((id) => !known.has(id))).toEqual([]);
+  });
+
+  it("accounts for all 75 -- what is present plus what is recorded absent", () => {
+    expect(list.ids).toHaveLength(51);
+    expect(list.absent).toHaveLength(24);
+    expect(list.ids.length + list.absent.length).toBe(list.total);
+  });
+
+  it("holds no duplicate ids", () => {
+    expect(new Set(list.ids).size).toBe(list.ids.length);
+  });
+
+  it("selects exactly the listed problems and nothing else", () => {
+    const selected = goalScoped(ALL, blind).map((p) => p.id).sort();
+    expect(selected).toEqual([...list.ids].sort());
+  });
+
+  it("ignores the frequency and difficulty fields while a list is set", () => {
+    // A list is exhaustive by definition; narrowing it further would shrink
+    // a set whose whole point is being fixed and known.
+    const narrowed = { ...blind, minFreq: "Very High" as const, difficulties: ["Hard" as const] };
+    expect(goalScoped(ALL, narrowed)).toHaveLength(51);
+  });
+
+  it("falls back to the predicate when the list id is unknown", () => {
+    const resolved = resolveGoal({ goal: { minFreq: "High", difficulties: ["Easy"], listId: "grind169" } });
+    expect(resolved.listId).toBeUndefined();
+    expect(resolved.minFreq).toBe("High");
+    expect(goalScoped(ALL, resolved).length).toBeGreaterThan(0);
+  });
+
+  it("round-trips a list goal through resolveGoal", () => {
+    expect(resolveGoal({ goal: blind }).listId).toBe("blind75");
+    expect(goalPresetId(resolveGoal({ goal: blind }))).toBe("blind75");
+  });
+
+  it("does not confuse a list goal with the default goal", () => {
+    expect(isDefaultGoal(blind)).toBe(false);
+    expect(sameGoal(blind, DEFAULT_GOAL)).toBe(false);
   });
 });

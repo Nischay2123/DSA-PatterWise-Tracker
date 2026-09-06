@@ -5,6 +5,7 @@ import {
   ALL_DIFFICULTIES,
   GOAL_MIN_TOPIC_PROBLEMS,
   GOAL_PRESETS,
+  getCuratedList,
   goalPresetId,
   resolveGoal,
   summarizeGoal,
@@ -29,9 +30,18 @@ function ScopeLine({ goal }: { goal: Goal }) {
   // `done` comes from the same walk as `problems`, so the two can never
   // describe different sets.
   const scope = summarizeGoal(TOPICS, goal, store);
+  const list = getCuratedList(goal.listId);
 
   return (
     <span className="flex flex-wrap items-center gap-1.5 mt-1.5">
+      {list && (
+        <span
+          className="pill bg-sunken text-muted tabular-nums"
+          title={`Not in this sheet: ${list.absent.join(", ")}`}
+        >
+          {list.ids.length} of {list.total} in this sheet
+        </span>
+      )}
       <span className="pill bg-accent-soft text-accent tabular-nums">
         {scope.done}/{scope.problems} revisable
       </span>
@@ -53,8 +63,16 @@ export function GoalSettings() {
   const { v2Store, dispatchV2 } = useStore();
   const goal = resolveGoal(v2Store.settings);
   const activeId = goalPresetId(goal);
+  // While a curated list is active the custom controls describe what you
+  // would get by switching to them, not the list you are currently on.
+  const customGoal: Goal = { minFreq: goal.minFreq, difficulties: goal.difficulties };
 
   const setGoal = (next: Goal) => dispatchV2({ type: "SET_SETTINGS", patch: { goal: next } });
+
+  // Editing the frequency or difficulty means leaving any curated list
+  // behind -- while listId is set those fields select nothing, so keeping it
+  // would make the controls appear broken.
+  const setCustom = ({ listId: _drop, ...next }: Goal) => setGoal(next);
 
   return (
     <div>
@@ -127,8 +145,8 @@ export function GoalSettings() {
             <select
               id="goal-freq"
               className="field"
-              value={goal.minFreq}
-              onChange={(e) => setGoal({ ...goal, minFreq: e.target.value as FreqFloor })}
+              value={customGoal.minFreq}
+              onChange={(e) => setCustom({ ...goal, minFreq: e.target.value as FreqFloor })}
             >
               {FREQ_FLOOR_LABELS.map((f) => (
                 <option key={f.value} value={f.value}>
@@ -140,10 +158,10 @@ export function GoalSettings() {
             <span className="field-label mt-3">Difficulty</span>
             <div className="flex gap-1.5 flex-wrap" role="group" aria-label="Difficulty in scope">
               {ALL_DIFFICULTIES.map((d) => {
-                const on = goal.difficulties.includes(d);
+                const on = customGoal.difficulties.includes(d);
                 // Never let the last one be unticked: an empty set would
                 // scope every topic to nothing and silently kill revision.
-                const isLast = on && goal.difficulties.length === 1;
+                const isLast = on && customGoal.difficulties.length === 1;
                 return (
                   <button
                     key={d}
@@ -152,7 +170,7 @@ export function GoalSettings() {
                     disabled={isLast}
                     title={isLast ? "At least one difficulty has to stay in scope" : undefined}
                     onClick={() =>
-                      setGoal({
+                      setCustom({
                         ...goal,
                         difficulties: (on
                           ? goal.difficulties.filter((x) => x !== d)
@@ -168,7 +186,7 @@ export function GoalSettings() {
               })}
             </div>
 
-            <ScopeLine goal={goal} />
+            <ScopeLine goal={customGoal} />
           </div>
         </div>
       </div>
