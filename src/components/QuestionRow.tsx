@@ -37,9 +37,10 @@ export function QuestionRow({
   const progress = getV2Progress(v2Store, problem.id);
   const goal = resolveGoal(v2Store.settings);
   const visible = isProblemVisible(problem, state, filters, { topicName, patternName, goal });
-  // Marks the rows that count toward the goal. Silent under the default
-  // goal, where every row counts and a marker would say nothing.
-  const inGoal = !isDefaultGoal(goal) && matchesGoal(problem, goal);
+  // Marks the rows that count toward the goal -- but only while the list is
+  // showing everything. With the list already scoped to the goal, every
+  // visible row would carry one, which says nothing.
+  const inGoal = !isDefaultGoal(goal) && !filters.goalOnly && matchesGoal(problem, goal);
   const notesIndicator = hasNotes(progress);
   // Gating blocks only a NEW completion (plan §6) -- un-completing, and
   // everything else on an already-done question, stays free.

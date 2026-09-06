@@ -1,7 +1,7 @@
 import { useFilters, useStore } from "../context";
 import { countDone, getState, isProblemVisible } from "../store";
 import { cx } from "../cx";
-import { resolveGoal } from "../revision/goal";
+import { goalScoped, isDefaultGoal, resolveGoal } from "../revision/goal";
 import type { Pattern } from "../types";
 import { FundamentalsPanel } from "./FundamentalsPanel";
 import { Icon } from "./Icon";
@@ -19,10 +19,14 @@ export function PatternGroup({
   const { store, v2Store } = useStore();
   const { filters } = useFilters();
 
-  const context = { topicName, patternName: pattern.name, goal: resolveGoal(v2Store.settings) };
+  const goal = resolveGoal(v2Store.settings);
+  const context = { topicName, patternName: pattern.name, goal };
   const anyVisible = pattern.problems.some((p) => isProblemVisible(p, getState(store, p.id), filters, context));
-  const done = countDone(pattern.problems, store);
-  const total = pattern.problems.length;
+  // Display only -- nothing derives from this count. It follows the list so
+  // the chip never contradicts the rows underneath it.
+  const shown = !isDefaultGoal(goal) && filters.goalOnly ? goalScoped(pattern.problems, goal) : pattern.problems;
+  const done = countDone(shown, store);
+  const total = shown.length;
   const complete = total > 0 && done === total;
 
   return (

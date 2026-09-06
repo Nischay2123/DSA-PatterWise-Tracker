@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { MOBILE_QUERY } from "../breakpoints";
 import { useFilters, useStore } from "../context";
-import { getCuratedList, isDefaultGoal, resolveGoal } from "../revision/goal";
+import { GOAL_PRESETS, goalPresetId, isDefaultGoal, resolveGoal } from "../revision/goal";
 import { cx } from "../cx";
 import { Icon, type IconName } from "./Icon";
 
@@ -87,7 +87,7 @@ export function Filters() {
   // same reason, so switching back to the full syllabus can never strand
   // anyone behind an invisible filter.
   const goalActive = !isDefaultGoal(goal);
-  const goalName = getCuratedList(goal.listId)?.label ?? "goal";
+  const goalName = GOAL_PRESETS.find((p) => p.id === goalPresetId(goal))?.label ?? "Goal";
   const detailsRef = useRef<HTMLDetailsElement>(null);
 
   // <details> hides its content when closed regardless of display, so the
@@ -113,7 +113,7 @@ export function Filters() {
     (filters.freq !== "All" ? 1 : 0) +
     (filters.hideCompleted ? 1 : 0) +
     (filters.reviseOnly ? 1 : 0) +
-    (goalActive && filters.goalOnly ? 1 : 0);
+    (goalActive && !filters.goalOnly ? 1 : 0);
 
   return (
     <div className="flex items-center gap-2 py-2.5 flex-wrap">
@@ -205,7 +205,7 @@ export function Filters() {
               onToggle={() => setFilters((f) => ({ ...f, goalOnly: !f.goalOnly }))}
               icon="target"
             >
-              In my {goalName}
+              {goalName} only
             </Toggle>
           )}
           <Toggle

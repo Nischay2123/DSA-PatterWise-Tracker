@@ -202,8 +202,7 @@ export function areFiltersActive(filters: FilterState): boolean {
     filters.difficulty !== "All" ||
     filters.importance !== "All" ||
     filters.freq !== "All" ||
-    filters.reviseOnly ||
-    !!filters.goalOnly
+    filters.reviseOnly
   );
 }
 

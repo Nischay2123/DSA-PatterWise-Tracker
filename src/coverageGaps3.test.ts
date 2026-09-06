@@ -39,9 +39,11 @@ describe("isProblemVisible -- the goal-only filter", () => {
     expect(isProblemVisible(p, state(), filters({ goalOnly: true }), CTX)).toBe(true);
   });
 
-  it("counts as an active filter, so the accordions force open for it", () => {
-    expect(areFiltersActive(filters())).toBe(false);
-    expect(areFiltersActive(filters({ goalOnly: true }))).toBe(true);
+  it("is not treated as an active filter, so picking a goal does not fling 123 accordions open", () => {
+    // It is the baseline state once a goal is set, not something the user
+    // reached for -- unlike search, which should reveal its matches.
+    expect(areFiltersActive(filters({ goalOnly: true }))).toBe(false);
+    expect(areFiltersActive(filters({ goalOnly: true, search: "two sum" }))).toBe(true);
   });
 });
 

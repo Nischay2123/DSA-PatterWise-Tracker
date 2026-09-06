@@ -32,6 +32,10 @@ const DEFAULT_FILTERS: FilterState = {
   freq: "All",
   hideCompleted: false,
   reviseOnly: false,
+  // A goal drives the page the way a filter does: picking one re-scopes the
+  // list, the counts and the topic rows immediately. Inert under the default
+  // goal, which matches every problem.
+  goalOnly: true,
 };
 
 function prefersReducedMotion(): boolean {
