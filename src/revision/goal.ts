@@ -98,6 +98,14 @@ export interface GoalPreset {
   goal: Goal;
 }
 
+// Ordered widest to narrowest so the counts descend as you read down and
+// the list tells its own story. Every entry has to be a goal someone would
+// actually hold -- two obvious-looking candidates were cut for failing that:
+//
+//   "Medium and above" scopes to 405 of 422, which is Full syllabus with a
+//   rounding error, and
+//   "Hard, High-frequency only" is 60 problems but strands 10 of 17 topics
+//   below the floor, so most of the dashboard would simply vanish.
 export const GOAL_PRESETS: GoalPreset[] = [
   {
     id: "full",
@@ -106,10 +114,28 @@ export const GOAL_PRESETS: GoalPreset[] = [
     goal: DEFAULT_GOAL,
   },
   {
+    id: "no-hard",
+    label: "Skip the hard ones",
+    description: "Easy and Medium across every topic. Rebuild breadth without hitting a wall.",
+    goal: { minFreq: "All", difficulties: ["Easy", "Medium"] },
+  },
+  {
     id: "sprint",
     label: "Interview sprint",
     description: "Asked High or Very High. Unlocks revision about three times sooner.",
     goal: { minFreq: "High", difficulties: [...ALL_DIFFICULTIES] },
+  },
+  {
+    id: "hard-only",
+    label: "Hard practice",
+    description: "Only the Hard problems, for when the basics are already back.",
+    goal: { minFreq: "All", difficulties: ["Hard"] },
+  },
+  {
+    id: "ease-back",
+    label: "Ease back in",
+    description: "High-frequency, nothing Hard. The quickest route to a revision rhythm.",
+    goal: { minFreq: "High", difficulties: ["Easy", "Medium"] },
   },
   {
     id: "core",

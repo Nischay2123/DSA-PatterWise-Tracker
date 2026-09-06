@@ -170,6 +170,33 @@ describe("against the real dataset", () => {
     expect(scope.topicsInScope).toBe(12);
   });
 
+  // One row per preset, so a change to questions.json that shifts what a
+  // preset means fails loudly here instead of quietly changing the product.
+  it.each([
+    ["full", 422, 17, 0],
+    ["no-hard", 288, 16, 1],
+    ["sprint", 143, 12, 5],
+    ["hard-only", 134, 13, 4],
+    ["ease-back", 83, 12, 5],
+    ["core", 49, 8, 9],
+  ])("scopes the %s preset to %i problems across %i topics", (id, problems, topicsInScope, dropped) => {
+    const preset = GOAL_PRESETS.find((p) => p.id === id)!;
+    const scope = summarizeGoal(DATA.topics, preset.goal);
+    expect(scope.problems).toBe(problems);
+    expect(scope.topicsInScope).toBe(topicsInScope);
+    expect(scope.topicsDropped).toBe(dropped);
+  });
+
+  it("gives every preset a distinct scope, so none is a duplicate of another", () => {
+    const seen = GOAL_PRESETS.map((p) => `${p.goal.minFreq}|${[...p.goal.difficulties].sort().join()}`);
+    expect(new Set(seen).size).toBe(GOAL_PRESETS.length);
+  });
+
+  it("orders the presets widest to narrowest", () => {
+    const sizes = GOAL_PRESETS.map((p) => summarizeGoal(DATA.topics, p.goal).problems);
+    expect(sizes).toEqual([...sizes].sort((a, b) => b - a));
+  });
+
   it("counts the full syllabus as every non-exempt topic, with none dropped", () => {
     const scope = summarizeGoal(DATA.topics, DEFAULT_GOAL);
     expect(scope.topicsDropped).toBe(0);
