@@ -141,12 +141,20 @@ export interface GoalPreset {
 
 // Ordered widest to narrowest so the counts descend as you read down and
 // the list tells its own story. Every entry has to be a goal someone would
-// actually hold -- two obvious-looking candidates were cut for failing that:
+// actually hold, and every one has to be derivable without inventing data.
+// Four candidates were measured and cut for failing one of those:
 //
-//   "Medium and above" scopes to 405 of 422, which is Full syllabus with a
-//   rounding error, and
+//   "Medium and above" scopes to 405 of 422 -- Full syllabus with a
+//   rounding error, so choosing it would change nothing.
 //   "Hard, High-frequency only" is 60 problems but strands 10 of 17 topics
-//   below the floor, so most of the dashboard would simply vanish.
+//   below the floor, so most of the dashboard would vanish.
+//   "Top 100 most asked" is not derivable at all. interviewFreq is a
+//   four-value band (Very High 49, High 94) and there is no rank field, so
+//   reaching exactly 100 means inventing an ordering for 51 of the 94.
+//   `Most asked` below is the honest version of it: the full 143.
+//   "High-frequency problems that exist on LeetCode" lands at a tempting
+//   117, but the 26 it drops are LRU Cache, Dijkstra's, LIS, LCS, Disjoint
+//   Set and the like -- a missing URL is a gap in the sheet, not a signal.
 export const GOAL_PRESETS: GoalPreset[] = [
   {
     id: "full",
@@ -161,9 +169,11 @@ export const GOAL_PRESETS: GoalPreset[] = [
     goal: { minFreq: "All", difficulties: ["Easy", "Medium"] },
   },
   {
+    // Kept as `sprint` -- the id is persisted in settings, so renaming it
+    // would silently reset anyone already on this goal.
     id: "sprint",
-    label: "Interview sprint",
-    description: "Asked High or Very High. Unlocks revision about three times sooner.",
+    label: "Most asked",
+    description: "The 143 the sheet marks High or Very High. Unlocks revision about three times sooner.",
     goal: { minFreq: "High", difficulties: [...ALL_DIFFICULTIES] },
   },
   {
