@@ -109,7 +109,7 @@ export function App() {
   const overallPct = overallTotal ? Math.round((overallDone / overallTotal) * 100) : 0;
 
   const visibleCount = ALL_PROBLEMS_WITH_CONTEXT.filter(({ problem, topicName, patternName }) =>
-    isProblemVisible(problem, getState(store, problem.id), filters, { topicName, patternName })
+    isProblemVisible(problem, getState(store, problem.id), filters, { topicName, patternName, goal })
   ).length;
 
   const refreshBackup = () => setBackupExists(hasBackupV2());

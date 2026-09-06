@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { MOBILE_QUERY } from "../breakpoints";
-import { useFilters } from "../context";
+import { useFilters, useStore } from "../context";
+import { getCuratedList, isDefaultGoal, resolveGoal } from "../revision/goal";
 import { cx } from "../cx";
 import { Icon, type IconName } from "./Icon";
 
@@ -79,6 +80,14 @@ function Toggle({
 
 export function Filters() {
   const { filters, setFilters } = useFilters();
+  const { v2Store } = useStore();
+  const goal = resolveGoal(v2Store.settings);
+  // Hidden under the default goal: it would match every row, so it would be
+  // a control that does nothing. Leaving it switched on is harmless for the
+  // same reason, so switching back to the full syllabus can never strand
+  // anyone behind an invisible filter.
+  const goalActive = !isDefaultGoal(goal);
+  const goalName = getCuratedList(goal.listId)?.label ?? "goal";
   const detailsRef = useRef<HTMLDetailsElement>(null);
 
   // <details> hides its content when closed regardless of display, so the
@@ -103,7 +112,8 @@ export function Filters() {
     (filters.importance !== "All" ? 1 : 0) +
     (filters.freq !== "All" ? 1 : 0) +
     (filters.hideCompleted ? 1 : 0) +
-    (filters.reviseOnly ? 1 : 0);
+    (filters.reviseOnly ? 1 : 0) +
+    (goalActive && filters.goalOnly ? 1 : 0);
 
   return (
     <div className="flex items-center gap-2 py-2.5 flex-wrap">
@@ -189,6 +199,15 @@ export function Filters() {
             ]}
           />
 
+          {goalActive && (
+            <Toggle
+              on={!!filters.goalOnly}
+              onToggle={() => setFilters((f) => ({ ...f, goalOnly: !f.goalOnly }))}
+              icon="target"
+            >
+              In my {goalName}
+            </Toggle>
+          )}
           <Toggle
             on={filters.hideCompleted}
             onToggle={() => setFilters((f) => ({ ...f, hideCompleted: !f.hideCompleted }))}

@@ -2,6 +2,8 @@ import idMapRaw from "../data/idMap.json";
 import { REVISION_CONFIG } from "./config";
 import { isValidAppStoreV2, liftV1Entry } from "./persistence/migrate";
 import { scoreEvaluation } from "./revision/evaluate";
+import { matchesGoal } from "./revision/goal";
+import type { Goal } from "./revision/goal";
 import { recordAttemptOutcome, scheduleInitial } from "./revision/scheduler";
 import type {
   AppSettings,
@@ -164,6 +166,9 @@ export function breakdownBy(
 export interface VisibilityContext {
   topicName: string;
   patternName: string;
+  // The active goal. Only read when filters.goalOnly is on, so callers that
+  // never offer that toggle can leave it out.
+  goal?: Goal;
 }
 
 export function isProblemVisible(
@@ -183,7 +188,12 @@ export function isProblemVisible(
   const matchesFreq = filters.freq === "All" || problem.interviewFreq === filters.freq;
   const matchesCompleted = !filters.hideCompleted || !state.done;
   const matchesRevise = !filters.reviseOnly || state.revise;
-  return matchesText && matchesDiff && matchesImportance && matchesFreq && matchesCompleted && matchesRevise;
+  // No goal on the context means nothing to narrow to -- the toggle cannot
+  // hide every row just because a caller forgot to pass one.
+  const matchesGoalFilter = !filters.goalOnly || !context.goal || matchesGoal(problem, context.goal);
+  return (
+    matchesText && matchesDiff && matchesImportance && matchesFreq && matchesCompleted && matchesRevise && matchesGoalFilter
+  );
 }
 
 export function areFiltersActive(filters: FilterState): boolean {
@@ -192,7 +202,8 @@ export function areFiltersActive(filters: FilterState): boolean {
     filters.difficulty !== "All" ||
     filters.importance !== "All" ||
     filters.freq !== "All" ||
-    filters.reviseOnly
+    filters.reviseOnly ||
+    !!filters.goalOnly
   );
 }
 

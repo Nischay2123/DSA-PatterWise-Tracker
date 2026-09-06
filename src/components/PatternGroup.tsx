@@ -1,6 +1,7 @@
 import { useFilters, useStore } from "../context";
 import { countDone, getState, isProblemVisible } from "../store";
 import { cx } from "../cx";
+import { resolveGoal } from "../revision/goal";
 import type { Pattern } from "../types";
 import { FundamentalsPanel } from "./FundamentalsPanel";
 import { Icon } from "./Icon";
@@ -15,10 +16,10 @@ export function PatternGroup({
   topicName: string;
   gated: boolean;
 }) {
-  const { store } = useStore();
+  const { store, v2Store } = useStore();
   const { filters } = useFilters();
 
-  const context = { topicName, patternName: pattern.name };
+  const context = { topicName, patternName: pattern.name, goal: resolveGoal(v2Store.settings) };
   const anyVisible = pattern.problems.some((p) => isProblemVisible(p, getState(store, p.id), filters, context));
   const done = countDone(pattern.problems, store);
   const total = pattern.problems.length;

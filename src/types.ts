@@ -48,6 +48,9 @@ export interface FilterState {
   freq: string;
   hideCompleted: boolean;
   reviseOnly: boolean;
+  // Show only the problems the active revision goal counts. Optional so a
+  // FilterState built before this existed still type-checks as one.
+  goalOnly?: boolean;
 }
 
 export interface HeatmapDay {

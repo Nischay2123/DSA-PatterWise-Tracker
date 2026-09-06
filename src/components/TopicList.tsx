@@ -40,12 +40,12 @@ function TopicItem({ topic, index }: { topic: Topic; index: number }) {
   const { store, v2Store } = useStore();
   const { filters } = useFilters();
 
+  const goal = resolveGoal(v2Store.settings);
   const allProblems = topic.patterns.flatMap((p) => p.problems);
   const anyVisible = allProblems.some((p) =>
-    isProblemVisible(p, getState(store, p.id), filters, { topicName: topic.name, patternName: "" })
+    isProblemVisible(p, getState(store, p.id), filters, { topicName: topic.name, patternName: "", goal })
   );
 
-  const goal = resolveGoal(v2Store.settings);
   // "Exempt" here means revision ignores this topic entirely -- either it is
   // on the permanent exempt list, or the goal thinned it below the floor.
   const isExempt =

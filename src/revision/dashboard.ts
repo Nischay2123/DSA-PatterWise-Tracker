@@ -1,7 +1,6 @@
-import { REVISION_CONFIG } from "../config";
 import type { AppStoreV2, ProgressStore, Topic, TopicRevision } from "../types";
 import { daysBetweenUTC, todayISOUTC } from "./dates";
-import { goalScoped, isTopicOutOfGoalScope, resolveGoal } from "./goal";
+import { goalScoped, isExemptTopic, isTopicOutOfGoalScope, resolveGoal } from "./goal";
 import type { Goal } from "./goal";
 import { deriveState } from "./stateMachine";
 import type { RevisionState } from "./stateMachine";
@@ -43,9 +42,8 @@ function completionPct(topic: Topic, store: ProgressStore, goal: Goal): number {
   return done / problems.length;
 }
 
-export function isExemptTopic(topicId: string): boolean {
-  return (REVISION_CONFIG.exemptTopics as readonly string[]).includes(topicId);
-}
+// Re-exported so existing importers (and their tests) keep working.
+export { isExemptTopic };
 
 // Exempt topics are omitted entirely (plan §5: "never scheduled, never
 // gated, omitted from every dashboard count"), so they never appear here.

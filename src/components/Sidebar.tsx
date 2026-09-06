@@ -1,5 +1,6 @@
 import { useStore } from "../context";
 import { cx } from "../cx";
+import { GOAL_PRESETS, goalPresetId, isDefaultGoal, resolveGoal } from "../revision/goal";
 import type { Theme } from "../useTheme";
 import { Icon, type IconName } from "./Icon";
 import { ImportExport } from "./ImportExport";
@@ -80,7 +81,11 @@ export function SidebarContent({
   /** The drawer draws its own titled header, so it opts out of this one. */
   showBrand?: boolean;
 }) {
+  const { v2Store } = useStore();
   const pct = total ? done / total : 0;
+  const goal = resolveGoal(v2Store.settings);
+  const preset = GOAL_PRESETS.find((p) => p.id === goalPresetId(goal));
+  const goalCaption = isDefaultGoal(goal) ? "problems solved" : `solved in ${preset?.label ?? "your goal"}`;
 
   return (
     <div className="flex h-full flex-col gap-5 p-4">
@@ -109,7 +114,9 @@ export function SidebarContent({
             {done}
             <span className="text-body font-medium text-faint">/{total}</span>
           </div>
-          <div className="text-micro text-muted mt-1">problems solved</div>
+          {/* Names the goal the figure above is measured against -- without
+              it "0/143" is a number with no explanation. */}
+          <div className="text-micro text-muted mt-1 truncate">{goalCaption}</div>
         </div>
       </div>
 

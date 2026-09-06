@@ -1,6 +1,6 @@
 import listsData from "../../data/lists.json";
+import { REVISION_CONFIG } from "../config";
 import type { AppSettings, Problem, ProgressStore, Topic } from "../types";
-import { isExemptTopic } from "./dashboard";
 
 // ─── The revision goal ──────────────────────────────────────────────────────
 //
@@ -24,6 +24,14 @@ import { isExemptTopic } from "./dashboard";
 //     second axis would be a control that pretends to do something.
 //
 // That leaves exactly two real axes: a frequency floor and a difficulty set.
+
+// Lives here rather than in dashboard.ts because goal scoping needs it and
+// dashboard.ts already depends on this module -- defining it there made the
+// two import each other, which happens to work today only because every use
+// is at call time. dashboard.ts re-exports it for its existing callers.
+export function isExemptTopic(topicId: string): boolean {
+  return (REVISION_CONFIG.exemptTopics as readonly string[]).includes(topicId);
+}
 
 export type FreqFloor = "All" | "Medium" | "High" | "Very High";
 export type Difficulty = "Easy" | "Medium" | "Hard";

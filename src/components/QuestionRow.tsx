@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useFilters, useStore } from "../context";
+import { isDefaultGoal, matchesGoal, resolveGoal } from "../revision/goal";
 import { canCompleteFreely, getState, getV2Progress, hasNotes, isProblemVisible } from "../store";
 import { cx } from "../cx";
 import { CompletionPanel } from "./CompletionPanel";
@@ -34,7 +35,11 @@ export function QuestionRow({
   const [completionPanelOpen, setCompletionPanelOpen] = useState(false);
   const state = getState(store, problem.id);
   const progress = getV2Progress(v2Store, problem.id);
-  const visible = isProblemVisible(problem, state, filters, { topicName, patternName });
+  const goal = resolveGoal(v2Store.settings);
+  const visible = isProblemVisible(problem, state, filters, { topicName, patternName, goal });
+  // Marks the rows that count toward the goal. Silent under the default
+  // goal, where every row counts and a marker would say nothing.
+  const inGoal = !isDefaultGoal(goal) && matchesGoal(problem, goal);
   const notesIndicator = hasNotes(progress);
   // Gating blocks only a NEW completion (plan §6) -- un-completing, and
   // everything else on an already-done question, stays free.
@@ -69,7 +74,10 @@ export function QuestionRow({
     <div
       className={cx(
         "problem-row group/row grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1",
-        "rounded-lg py-2 px-2.5 -mx-1 scroll-mt-32 transition-colors",
+        // The 2px edge is always reserved, coloured only when the row is in
+        // the goal, so nothing shifts as goals change.
+        "rounded-lg py-2 pr-2.5 pl-2 -mx-1 scroll-mt-32 transition-colors border-l-2",
+        inGoal ? "border-accent" : "border-transparent",
         "hover:bg-row-hover",
         (detailsOpen || completionPanelOpen) && "bg-row-hover",
         !visible && "hidden"

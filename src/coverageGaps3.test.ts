@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { earlierDate, isProblemVisible, mergeStores, mergeStoresV2 } from "./store";
+import { areFiltersActive, earlierDate, isProblemVisible, mergeStores, mergeStoresV2 } from "./store";
 import { emptyAppStoreV2 } from "./persistence/migrate";
 import type { AppStoreV2, FilterState, Problem, ProblemState, QuestionProgressV2, TopicRevision } from "./types";
 
@@ -17,6 +17,33 @@ function filters(patch: Partial<FilterState> = {}): FilterState {
   return { search: "", difficulty: "All", importance: "All", freq: "All", hideCompleted: false, reviseOnly: false, ...patch };
 }
 const CTX = { topicName: "Arrays", patternName: "Hashing" };
+
+describe("isProblemVisible -- the goal-only filter", () => {
+  const SPRINT = { minFreq: "High" as const, difficulties: ["Easy", "Medium", "Hard"] as const };
+  const goalCtx = { ...CTX, goal: { ...SPRINT, difficulties: [...SPRINT.difficulties] } };
+
+  it("keeps a problem the goal counts", () => {
+    const p = problem({ interviewFreq: "Very High" });
+    expect(isProblemVisible(p, state(), filters({ goalOnly: true }), goalCtx)).toBe(true);
+  });
+
+  it("hides a problem the goal does not count", () => {
+    const p = problem({ interviewFreq: "Low" });
+    expect(isProblemVisible(p, state(), filters({ goalOnly: true }), goalCtx)).toBe(false);
+    // ...and shows it again the moment the toggle is off.
+    expect(isProblemVisible(p, state(), filters({ goalOnly: false }), goalCtx)).toBe(true);
+  });
+
+  it("hides nothing when the context carries no goal, so a caller that forgets one cannot blank the list", () => {
+    const p = problem({ interviewFreq: "Low" });
+    expect(isProblemVisible(p, state(), filters({ goalOnly: true }), CTX)).toBe(true);
+  });
+
+  it("counts as an active filter, so the accordions force open for it", () => {
+    expect(areFiltersActive(filters())).toBe(false);
+    expect(areFiltersActive(filters({ goalOnly: true }))).toBe(true);
+  });
+});
 
 describe("isProblemVisible -- each filter rejects independently", () => {
   it("hides a problem whose difficulty doesn't match", () => {
