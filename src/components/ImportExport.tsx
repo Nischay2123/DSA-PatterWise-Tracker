@@ -1,6 +1,7 @@
 import type { ChangeEvent } from "react";
 import { useStore } from "../context";
 import { isValidAppStoreV2 } from "../persistence/migrate";
+import { Icon } from "./Icon";
 import {
   clearBackupV2,
   countDoneInStore,
@@ -110,20 +111,28 @@ export function ImportExport({
   };
 
   return (
-    <div className="flex gap-1.5">
-      <button className="btn" onClick={handleExport} title="Download progress as JSON">
-        Export
+    // Vertical, icon-led entries: these moved out of the header button row
+    // and into the sidebar's "Your data" group, where they read as a menu
+    // rather than three competing toolbar buttons.
+    <div className="flex flex-col gap-0.5">
+      <button className="nav-item" onClick={handleExport} title="Download progress as JSON">
+        <Icon name="download" className="size-4" />
+        Export backup
       </button>
-      <label className="btn" title="Load progress from JSON">
-        Import
+      {/* <label> wrapping a hidden <input type="file"> -- the only way to
+          style a file picker; the input must stay a descendant. */}
+      <label className="nav-item" title="Load progress from JSON">
+        <Icon name="upload" className="size-4" />
+        Import backup
         <input type="file" accept="application/json" hidden onChange={handleImport} />
       </label>
       {backupExists && (
         <button
-          className="btn"
+          className="nav-item text-accent"
           onClick={handleUndoImport}
           title="Restore the progress you had before the last import"
         >
+          <Icon name="undo" className="size-4" />
           Undo import
         </button>
       )}

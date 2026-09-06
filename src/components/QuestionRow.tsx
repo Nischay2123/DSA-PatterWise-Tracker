@@ -3,15 +3,18 @@ import { useFilters, useStore } from "../context";
 import { canCompleteFreely, getState, getV2Progress, hasNotes, isProblemVisible } from "../store";
 import { cx } from "../cx";
 import { CompletionPanel } from "./CompletionPanel";
+import { Icon, type IconName } from "./Icon";
 import { MistakeList } from "./MistakeList";
 import { NotesEditor } from "./NotesEditor";
 import { SolutionEditor } from "./SolutionEditor";
 import type { Problem } from "../types";
 
-const BADGE_COLOR = {
-  Easy: "bg-badge-easy",
-  Medium: "bg-badge-medium",
-  Hard: "bg-badge-hard",
+// Soft tint + coloured text, not a saturated block. 467 of these appear on
+// one page; solid badges turned the list into confetti.
+export const DIFFICULTY_PILL = {
+  Easy: "bg-easy-soft text-easy",
+  Medium: "bg-medium-soft text-medium",
+  Hard: "bg-hard-soft text-hard",
 } as const;
 
 export function QuestionRow({
@@ -37,15 +40,14 @@ export function QuestionRow({
   // everything else on an already-done question, stays free.
   const checkboxBlocked = gated && !state.done;
 
-  const meta = [
-    problem.platform && problem.platform !== "-" ? problem.platform : null,
-    problem.estMinutes ? `${problem.estMinutes} min` : null,
-    problem.importance ? `Importance: ${problem.importance}` : null,
-    problem.interviewFreq ? `Interview freq: ${problem.interviewFreq}` : null,
-    problem.originalStep || null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  // Was one dot-joined string in muted 11px. Chips give each fact an edge so
+  // the eye can pick out "Importance: High" without reading the whole line.
+  const meta: { icon: IconName; text: string }[] = [];
+  if (problem.platform && problem.platform !== "-") meta.push({ icon: "external", text: problem.platform });
+  if (problem.estMinutes) meta.push({ icon: "clock", text: `${problem.estMinutes} min` });
+  if (problem.importance) meta.push({ icon: "target", text: `Importance: ${problem.importance}` });
+  if (problem.interviewFreq) meta.push({ icon: "flame", text: `Interview freq: ${problem.interviewFreq}` });
+  if (problem.originalStep) meta.push({ icon: "book", text: problem.originalStep });
 
   const handleCheckboxChange = (checked: boolean) => {
     if (!checked) {
@@ -61,36 +63,67 @@ export function QuestionRow({
   };
 
   return (
-    // Grid, not flex-wrap: a fixed checkbox column, a flexible title that
-    // truncates, and an action cluster pinned right that never reflows.
     // .problem-row / data-id / scroll-mt stay on THIS element -- App.tsx's
-    // jumpToProblem and useFilterAccordions both select on them.
+    // jumpToProblem and useFilterAccordions both select on them, and the
+    // filter hook specifically reads the literal `hidden` CLASS.
     <div
       className={cx(
-        "problem-row group/row grid grid-cols-[auto_1fr_auto] items-start gap-x-2.5 gap-y-1",
-        "py-1.5 px-2 -mx-2 rounded-md border-t border-border/60 first:border-t-0",
-        "hover:bg-row-hover scroll-mt-28",
+        "problem-row group/row grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1",
+        "rounded-lg py-2 px-2.5 -mx-1 scroll-mt-32 transition-colors",
+        "hover:bg-row-hover",
+        (detailsOpen || completionPanelOpen) && "bg-row-hover",
         !visible && "hidden"
       )}
       data-id={problem.id}
     >
-      <input
-        type="checkbox"
-        className="mt-[3px] accent-progress [@media(pointer:coarse)]:w-5 [@media(pointer:coarse)]:h-5 disabled:cursor-not-allowed"
-        checked={state.done}
-        disabled={checkboxBlocked}
-        title={checkboxBlocked ? "Revision due for this topic — complete a revision session to unlock new completions" : undefined}
-        aria-label={`Mark "${problem.question}" as done`}
-        aria-expanded={completionPanelOpen}
-        onChange={(e) => handleCheckboxChange(e.target.checked)}
-      />
+      {/* A real control instead of the UA checkbox: the native input keeps
+          every bit of keyboard and screen-reader behaviour, and the styled
+          sibling is what anyone actually sees. */}
+      <label
+        className="mt-px flex cursor-pointer"
+        title={
+          checkboxBlocked
+            ? "Revision due for this topic — complete a revision session to unlock new completions"
+            : undefined
+        }
+      >
+        <input
+          type="checkbox"
+          className="peer sr-only"
+          checked={state.done}
+          disabled={checkboxBlocked}
+          aria-label={`Mark "${problem.question}" as done`}
+          aria-expanded={completionPanelOpen}
+          onChange={(e) => handleCheckboxChange(e.target.checked)}
+        />
+        <span
+          className="grid size-[19px] [@media(pointer:coarse)]:size-6 place-items-center rounded-md
+            border-[1.5px] border-border-strong bg-surface text-transparent transition-all
+            peer-hover:border-accent
+            peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-fg
+            peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-accent
+            peer-focus-visible:outline-offset-2
+            peer-disabled:opacity-35 peer-disabled:cursor-not-allowed peer-disabled:border-border-strong"
+        >
+          <Icon name="check" className="size-3 [@media(pointer:coarse)]:size-3.5" />
+        </span>
+      </label>
 
-      <div className="min-w-0 flex items-baseline gap-2 flex-wrap">
+      <div className="min-w-0 flex items-center gap-2 flex-wrap">
+        <span
+          className={cx(
+            "pill leading-none px-1.5 shrink-0 font-bold tracking-wide",
+            DIFFICULTY_PILL[problem.difficulty]
+          )}
+          title={problem.difficulty}
+        >
+          {problem.difficulty[0]}
+        </span>
         {problem.link ? (
           <a
             className={cx(
-              "text-body text-fg hover:text-accent hover:underline underline-offset-2 min-w-0",
-              state.done && "line-through text-muted hover:text-muted"
+              "text-body min-w-0 decoration-accent/40 underline-offset-2 hover:underline hover:text-accent",
+              state.done ? "line-through text-faint hover:text-faint" : "text-fg"
             )}
             href={problem.link}
             target="_blank"
@@ -99,47 +132,42 @@ export function QuestionRow({
             {problem.question}
           </a>
         ) : (
-          // Was missing text-fg, so it rendered muted next to real links.
-          <span className={cx("text-body text-fg min-w-0", state.done && "line-through text-muted")}>
+          <span className={cx("text-body min-w-0", state.done ? "line-through text-faint" : "text-fg")}>
             {problem.question}
           </span>
         )}
-        <span
-          className={cx(
-            "text-micro font-medium leading-none py-0.5 px-1.5 rounded text-white whitespace-nowrap",
-            BADGE_COLOR[problem.difficulty]
-          )}
-        >
-          {problem.difficulty}
-        </span>
       </div>
 
+      {/* Actions stay put instead of wrapping: the star and the expander are
+          in the same place on every one of 467 rows. */}
       <div className="flex items-center gap-0.5 justify-self-end">
+        {notesIndicator && (
+          <span className="size-1.5 rounded-full bg-accent mr-1" title="Has saved notes" aria-hidden="true" />
+        )}
         <button
           type="button"
           className={cx(
-            "bg-transparent border-0 cursor-pointer text-base leading-none px-1 py-0.5 rounded",
-            "hover:bg-border/50 [@media(pointer:coarse)]:p-1.5 [@media(pointer:coarse)]:min-w-8 [@media(pointer:coarse)]:min-h-8",
-            state.revise ? "text-star" : "text-muted opacity-70 group-hover/row:opacity-100"
+            "icon-btn size-7",
+            state.revise
+              ? "text-star hover:text-star"
+              : "text-faint opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100"
           )}
-          title={state.revise ? "Unmark for revision" : "Mark for revision"}
+          title={state.revise ? "Unstar" : "Star for revision"}
           aria-label="Mark for revision"
           aria-pressed={state.revise}
           onClick={() => dispatch({ type: "TOGGLE_REVISE", id: problem.id })}
         >
-          ★
+          <Icon name="star" className="size-4" filled={state.revise} />
         </button>
         <button
           type="button"
-          className={cx(
-            "bg-transparent border-0 cursor-pointer text-ui px-1.5 py-0.5 rounded hover:bg-border/50",
-            "[@media(pointer:coarse)]:p-1.5 [@media(pointer:coarse)]:min-w-8 [@media(pointer:coarse)]:min-h-8",
-            notesIndicator ? "text-fg font-semibold after:content-['_•']" : "text-muted"
-          )}
+          className={cx("icon-btn size-7", (detailsOpen || notesIndicator) && "text-fg")}
+          title={detailsOpen ? "Hide details" : "Show notes, solution and mistakes"}
+          aria-label="Toggle details"
           aria-expanded={detailsOpen}
           onClick={() => setDetailsOpen((o) => !o)}
         >
-          details
+          <Icon name="chevronDown" className={cx("size-4 transition-transform", detailsOpen && "rotate-180")} />
         </button>
       </div>
 
@@ -157,8 +185,17 @@ export function QuestionRow({
           {/* Kept mounted-but-hidden rather than unmounted: the editors below
               are uncontrolled (defaultValue), so unmounting would discard an
               unblurred draft. */}
-          <div className={cx("text-ui text-muted mt-1.5", detailsOpen ? "block" : "hidden")}>
-            <div className="mb-2 text-micro">{meta}</div>
+          <div className={cx("mt-2 border-l-2 border-accent-line pl-3.5", detailsOpen ? "block" : "hidden")}>
+            {meta.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {meta.map((m) => (
+                  <span key={m.text} className="chip">
+                    <Icon name={m.icon} className="size-3" />
+                    {m.text}
+                  </span>
+                ))}
+              </div>
+            )}
             <SolutionEditor problemId={problem.id} />
             <NotesEditor problemId={problem.id} />
             <MistakeList problemId={problem.id} />

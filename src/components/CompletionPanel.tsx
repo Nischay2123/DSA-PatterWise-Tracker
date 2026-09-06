@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useStore } from "../context";
 import { getV2Progress } from "../store";
-
+import { Icon } from "./Icon";
 
 // Shown only when a completion is actually gated (never-yet-completed, and
 // settings.requireEvidence is on) -- see canCompleteFreely in store.ts.
@@ -35,59 +35,61 @@ export function CompletionPanel({
   };
 
   return (
-    <div className="card-soft p-3.5 mt-2">
-      <div className="text-body font-semibold mb-3">
-        Show your work before marking this done — pseudocode or code is required.
+    <div className="mt-2 rounded-lg border border-accent-line bg-accent-soft p-3.5">
+      <div className="flex items-start gap-2.5 mb-3">
+        <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-accent text-accent-fg">
+          <Icon name="target" className="size-4" />
+        </span>
+        <div className="min-w-0">
+          <div className="text-body font-bold">Show your work first</div>
+          <div className="text-caption text-muted">Pseudocode or code is required to mark this done.</div>
+        </div>
       </div>
-      <div className="mb-2">
-        <label className="field-label">Approach</label>
-        <textarea
-          value={approach}
-          onChange={(e) => setApproach(e.target.value)}
-          onBlur={(e) => dispatchV2({ type: "SET_APPROACH", id: problemId, approach: e.target.value })}
-          className="field"
-              rows={2}
-        />
+
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <label className="field-label">Approach</label>
+          <textarea
+            value={approach}
+            onChange={(e) => setApproach(e.target.value)}
+            onBlur={(e) => dispatchV2({ type: "SET_APPROACH", id: problemId, approach: e.target.value })}
+            className="field resize-y"
+            rows={2}
+          />
+        </div>
+        <div>
+          <label className="field-label">Pseudocode</label>
+          <textarea
+            value={pseudocode}
+            onChange={(e) => setPseudocode(e.target.value)}
+            onBlur={(e) => dispatchV2({ type: "SET_PSEUDOCODE", id: problemId, pseudocode: e.target.value })}
+            className="field resize-y font-mono text-caption"
+            rows={4}
+          />
+        </div>
+        <div>
+          <label className="field-label">Code</label>
+          <textarea
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            onBlur={(e) => dispatchV2({ type: "SET_CODE", id: problemId, code: e.target.value })}
+            className="field resize-y font-mono text-caption"
+            rows={4}
+          />
+        </div>
       </div>
-      <div className="mb-2">
-        <label className="field-label">Pseudocode</label>
-        <textarea
-          value={pseudocode}
-          onChange={(e) => setPseudocode(e.target.value)}
-          onBlur={(e) => dispatchV2({ type: "SET_PSEUDOCODE", id: problemId, pseudocode: e.target.value })}
-          className="field"
-              rows={2}
-        />
-      </div>
-      <div className="mb-2">
-        <label className="field-label">Code</label>
-        <textarea
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          onBlur={(e) => dispatchV2({ type: "SET_CODE", id: problemId, code: e.target.value })}
-          className="field font-mono"
-              rows={2}
-        />
-      </div>
-      {!hasEvidence && (
-        <div className="text-caption text-muted mb-2.5">Add pseudocode or code to mark this question complete.</div>
-      )}
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={markComplete}
-          disabled={!hasEvidence}
-          className="btn btn-primary"
-        >
+
+      <div className="flex items-center gap-2 mt-3 flex-wrap">
+        <button type="button" onClick={markComplete} disabled={!hasEvidence} className="btn btn-primary">
+          <Icon name="check" className="size-4" />
           Mark complete
         </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="btn btn-quiet"
-        >
+        <button type="button" onClick={onCancel} className="btn btn-quiet">
           Cancel
         </button>
+        {!hasEvidence && (
+          <span className="text-caption text-muted">Add pseudocode or code to enable this.</span>
+        )}
       </div>
     </div>
   );

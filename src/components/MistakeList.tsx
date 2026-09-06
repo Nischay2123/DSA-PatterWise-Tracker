@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useStore } from "../context";
 import { getV2Progress } from "../store";
-
+import { Icon } from "./Icon";
 
 export function MistakeList({ problemId }: { problemId: string }) {
   const { v2Store, dispatchV2 } = useStore();
@@ -23,29 +23,46 @@ export function MistakeList({ problemId }: { problemId: string }) {
   };
 
   return (
-    <div>
-      <div className="field-label">Mistakes</div>
+    <div className="mb-1">
+      <div className="flex items-center gap-1.5 mb-2">
+        <Icon name="alert" className="size-3.5 text-faint" />
+        <span className="text-ui font-bold">Mistakes</span>
+        {progress.mistakes.length > 0 && <span className="chip py-0.5 px-1.5">{progress.mistakes.length}</span>}
+      </div>
+
       {progress.mistakes.length > 0 && (
-        <ul className="m-0 mb-2 p-0 list-none">
+        <ul className="m-0 mb-2.5 p-0 list-none flex flex-col gap-1.5">
           {progress.mistakes.map((m) => (
-            <li key={m.at} className="flex items-start gap-2 text-ui border-t border-border py-2 first:border-t-0">
+            <li
+              key={m.at}
+              className="group/mistake card-inset flex items-start gap-2 p-2.5 border-l-2 border-l-hard"
+            >
               <div className="flex-1 min-w-0">
-                <div>{m.what}</div>
-                {m.remember && <div className="text-muted">{m.remember}</div>}
-                <div className="text-micro text-muted">{m.at.slice(0, 10)}</div>
+                <div className="text-ui font-medium">{m.what}</div>
+                {m.remember && (
+                  <div className="text-caption text-muted mt-0.5 flex items-start gap-1">
+                    <Icon name="arrowRight" className="size-3 mt-0.5 shrink-0" />
+                    {m.remember}
+                  </div>
+                )}
+                <div className="text-micro text-faint mt-1 tabular-nums">{m.at.slice(0, 10)}</div>
               </div>
               <button
                 type="button"
-                className="btn-link text-caption text-muted ml-auto shrink-0"
+                className="icon-btn size-6 shrink-0 opacity-0 group-hover/mistake:opacity-100
+                  focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:text-hard"
+                title="Remove this mistake"
+                aria-label="Remove mistake"
                 onClick={() => dispatchV2({ type: "REMOVE_MISTAKE", id: problemId, at: m.at })}
               >
-                remove
+                <Icon name="trash" className="size-3.5" />
               </button>
             </li>
           ))}
         </ul>
       )}
-      <div className="flex flex-col gap-1.5">
+
+      <div className="flex flex-col sm:flex-row gap-2">
         <input
           type="text"
           placeholder="What went wrong?"
@@ -60,13 +77,9 @@ export function MistakeList({ problemId }: { problemId: string }) {
           onChange={(e) => setRemember(e.target.value)}
           className="field"
         />
-        <button
-          type="button"
-          onClick={addMistake}
-          disabled={!what.trim()}
-          className="btn btn-sm self-start"
-        >
-          Add mistake
+        <button type="button" onClick={addMistake} disabled={!what.trim()} className="btn shrink-0">
+          <Icon name="plus" className="size-3.5" />
+          Add
         </button>
       </div>
     </div>

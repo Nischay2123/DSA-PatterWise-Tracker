@@ -26,7 +26,8 @@ function buildWeeks(month: HeatmapMonth): Cell[][] {
 }
 
 const HEATMAP_DAY_CLASS =
-  "heatmap-day w-2.5 h-2.5 rounded-sm bg-heat-0 focus-visible:outline-offset-1 " +
+  "heatmap-day w-[11px] h-[11px] rounded-[3px] bg-heat-0 focus-visible:outline-offset-1 " +
+  "transition-transform hover:scale-125 " +
   "[@media(pointer:coarse)]:w-[13px] [@media(pointer:coarse)]:h-[13px] " +
   "data-[level='1']:bg-heat-1 data-[level='2']:bg-heat-2 data-[level='3']:bg-heat-3 data-[level='4']:bg-heat-4";
 
@@ -96,45 +97,57 @@ export function Heatmap({ months, cardRef }: { months: HeatmapMonth[]; cardRef: 
   }, [cardRef, months]);
 
   return (
-    <div className="overflow-x-auto pb-1">
-      <div id="heatmapGrid" ref={gridRef} className="flex gap-1.5 w-max">
-        {months.map((month, i) => (
-          <div key={i} className="flex flex-col gap-1.5">
-            <div className="flex gap-0.5">
-              {buildWeeks(month).map((week, wi) => (
-                <div
-                  key={wi}
-                  className="grid gap-0.5 grid-rows-[repeat(7,10px)] [@media(pointer:coarse)]:grid-rows-[repeat(7,13px)]"
-                >
-                  {week.map((cell) =>
-                    cell.tip !== undefined ? (
-                      <div
-                        key={cell.key}
-                        className={HEATMAP_DAY_CLASS}
-                        data-level={cell.level}
-                        data-tip={cell.tip}
-                        tabIndex={0}
-                        role="img"
-                        aria-label={cell.tip}
-                      />
-                    ) : (
-                      <div key={cell.key} className="w-2.5 h-2.5 [@media(pointer:coarse)]:w-[13px] [@media(pointer:coarse)]:h-[13px]" />
-                    )
-                  )}
-                </div>
-              ))}
+    // The tooltip is a SIBLING of the scroller, not a child: the horizontal
+    // scroll is intentional on a year grid, but the fade mask below would
+    // otherwise fade the tooltip out along with the edge cells.
+    <>
+      <div
+        className="overflow-x-auto pb-1 [scrollbar-width:thin]
+          [mask-image:linear-gradient(to_right,transparent_0,#000_14px,#000_calc(100%-14px),transparent_100%)]"
+      >
+        <div id="heatmapGrid" ref={gridRef} className="flex gap-2 w-max px-0.5">
+          {months.map((month, i) => (
+            <div key={i} className="flex flex-col gap-1.5">
+              <div className="flex gap-[3px]">
+                {buildWeeks(month).map((week, wi) => (
+                  <div
+                    key={wi}
+                    className="grid gap-[3px] grid-rows-[repeat(7,11px)] [@media(pointer:coarse)]:grid-rows-[repeat(7,13px)]"
+                  >
+                    {week.map((cell) =>
+                      cell.tip !== undefined ? (
+                        <div
+                          key={cell.key}
+                          className={HEATMAP_DAY_CLASS}
+                          data-level={cell.level}
+                          data-tip={cell.tip}
+                          tabIndex={0}
+                          role="img"
+                          aria-label={cell.tip}
+                        />
+                      ) : (
+                        <div
+                          key={cell.key}
+                          className="w-[11px] h-[11px] [@media(pointer:coarse)]:w-[13px] [@media(pointer:coarse)]:h-[13px]"
+                        />
+                      )
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="text-micro text-faint text-center whitespace-nowrap font-medium">{month.label}</div>
             </div>
-            <div className="text-micro text-muted text-center whitespace-nowrap">{month.label}</div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
       <div
         ref={tipRef}
         role="status"
         aria-live="polite"
         hidden
-        className="absolute z-[5] pointer-events-none py-[5px] px-[9px] rounded-md bg-tip-bg text-tip-fg text-micro whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.25)]"
+        className="absolute z-[5] pointer-events-none py-1.5 px-2.5 rounded-lg bg-tip-bg text-tip-fg
+          text-micro font-medium whitespace-nowrap shadow-pop"
       />
-    </div>
+    </>
   );
 }

@@ -1,4 +1,5 @@
 import { getFundamentalsForPattern } from "../revision/session";
+import { Icon } from "./Icon";
 
 // Makes data/fundamentals.json readable while simply browsing the tracker.
 // Until this existed, the 550 authored concepts were only reachable from
@@ -15,25 +16,34 @@ export function FundamentalsPanel({ patternId }: { patternId: string }) {
   if (concepts.length === 0) return null;
 
   return (
-    <details className="group/fundamentals mb-1.5">
+    <details className="group/fundamentals mb-2">
       <summary
-        className="disclosure inline-flex items-center gap-1.5 py-1 text-caption text-muted hover:text-fg
-          before:content-['▸'] before:text-micro group-open/fundamentals:before:content-['▾']"
+        className="disclosure inline-flex items-center gap-1.5 rounded-full border border-border bg-bg
+          py-1 px-2.5 text-micro font-semibold text-muted hover:text-accent hover:border-accent-line"
       >
-        Fundamentals ({concepts.length})
+        <Icon name="brain" className="size-3.5" />
+        Fundamentals
+        <span className="tabular-nums text-faint">{concepts.length}</span>
+        <Icon
+          name="chevronDown"
+          className="size-3 transition-transform group-open/fundamentals:rotate-180"
+        />
       </summary>
-      <div className="mt-1 mb-2 pl-3 border-l-2 border-border">
+      <div className="mt-2 mb-3 rounded-lg border border-border bg-sunken p-3">
         {concepts.map((concept) => (
-          <div key={concept.id} className="mb-2.5 last:mb-0">
+          <div key={concept.id} className="mb-3 last:mb-0">
             <div className="text-ui font-semibold flex items-start gap-2">
-              <span>{concept.prompt}</span>
+              <span className="min-w-0">{concept.prompt}</span>
               {concept.criticality === "core" && (
-                <span className="mt-px text-micro uppercase tracking-wider text-accent font-semibold shrink-0">core</span>
+                <span className="pill bg-accent-soft text-accent shrink-0 uppercase tracking-wider">core</span>
               )}
             </div>
-            <ul className="list-disc pl-4 my-1 text-caption text-muted">
+            <ul className="list-none p-0 mt-1.5 mb-0 flex flex-col gap-1">
               {concept.expectedConcepts.map((point) => (
-                <li key={point}>{point}</li>
+                <li key={point} className="flex items-start gap-1.5 text-caption text-muted">
+                  <span className="mt-1.5 size-1 shrink-0 rounded-full bg-accent/50" aria-hidden="true" />
+                  {point}
+                </li>
               ))}
             </ul>
           </div>

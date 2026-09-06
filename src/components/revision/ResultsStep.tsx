@@ -5,9 +5,35 @@ import { buildEvaluationPrompt } from "../../llm/prompt";
 import { buildPromptInput } from "../../revision/evaluate";
 import { getConceptById } from "../../revision/session";
 import { getTopicRevision, getV2Progress } from "../../store";
+import { cx } from "../../cx";
+import { Icon } from "../Icon";
+import { Ring } from "../Ring";
+import { SessionHeader } from "./SessionShell";
 import type { RevisionAttempt, Topic } from "../../types";
 
-const CONFIDENCE_LABEL: Record<string, string> = { strong: "Strong", partial: "Partial", forgot: "Forgot" };
+const CONFIDENCE_STYLE: Record<string, { label: string; cls: string }> = {
+  strong: { label: "Strong", cls: "bg-easy-soft text-easy" },
+  partial: { label: "Partial", cls: "bg-medium-soft text-medium" },
+  forgot: { label: "Forgot", cls: "bg-hard-soft text-hard" },
+};
+
+// A 0–5 sub-score rendered as five segments rather than "4/5" in grey text.
+function ScoreBar({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-micro text-muted w-20 shrink-0">{label}</span>
+      <span className="flex gap-0.5">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <span
+            key={n}
+            className={cx("h-1.5 w-3 rounded-full", n <= value ? "bg-accent" : "bg-border")}
+          />
+        ))}
+      </span>
+      <span className="text-micro text-faint tabular-nums">{value}/5</span>
+    </div>
+  );
+}
 
 export function ResultsStep({
   topic,
@@ -77,55 +103,110 @@ export function ResultsStep({
   // The outcome shown is the one scoring.ts computed and the scheduler
   // recorded -- never the model's own `passed`, which is advisory (plan §9).
   const outcome = revision.history[revision.history.length - 1];
+  const passed = !!outcome?.passed;
 
   return (
-    <div className="mx-auto w-full max-w-reading px-4 md:px-6 pt-6 pb-16">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-title font-semibold tracking-tight m-0">Revision — {topic.name}</h1>
-        <button type="button" onClick={onExit} className="btn-link text-ui">
-          Back to tracker
-        </button>
-      </div>
+    <div className="mx-auto w-full max-w-reading px-4 md:px-6 pt-6 pb-20">
+      <SessionHeader topic={topic} onExit={onExit} exitLabel="Back to tracker" />
 
-      <div className="card p-4 mb-5 text-ui">
-        {running && <div><strong>Evaluating…</strong> Grading your answers with {v2Store.settings.provider}.</div>}
+      {/* The verdict is now the biggest thing on the page instead of a bold
+          word inside a paragraph. */}
+      <div
+        className={cx(
+          "card p-4 mb-6",
+          concluded && !outcome?.selfAssessed && (passed ? "border-easy/40" : "border-hard/40")
+        )}
+      >
+        {running && (
+          <div className="flex items-center gap-3">
+            <Icon name="repeat" className="size-5 text-accent motion-safe:animate-spin [animation-duration:1.6s]" />
+            <div>
+              <div className="text-body font-bold">Evaluating…</div>
+              <div className="text-caption text-muted">Grading your answers with {v2Store.settings.provider}.</div>
+            </div>
+          </div>
+        )}
 
         {!running && concluded && (
-          <div>
-            <strong>{outcome?.passed ? "Passed" : "Not passed"}</strong>
-            {outcome?.selfAssessed
-              ? " — marked done by you, not graded."
-              : ` — scored ${outcome?.score ?? 0}/100.`}
-            {outcome?.passed ? (
-              <span> This topic is unlocked again{revision.nextDueAt ? `, next due ${revision.nextDueAt}` : ""}.</span>
+          <div className="flex items-start gap-4 flex-wrap">
+            {outcome?.selfAssessed ? (
+              <span className="grid size-14 shrink-0 place-items-center rounded-full bg-sunken text-muted">
+                <Icon name="check" className="size-6" />
+              </span>
             ) : (
-              <span> The topic stays due, so you can run another session whenever you want.</span>
+              <Ring pct={(outcome?.score ?? 0) / 100} size={56} stroke={5}>
+                <span className="font-display text-head font-bold tabular-nums">{outcome?.score ?? 0}</span>
+              </Ring>
             )}
-            {graded && attempt.evaluation?.feedback && (
-              <div className="text-muted mt-1.5">{attempt.evaluation.feedback}</div>
-            )}
-            {graded && (attempt.evaluation?.recommendedFocus.length ?? 0) > 0 && (
-              <div className="text-muted mt-1.5">Focus next on: {attempt.evaluation?.recommendedFocus.join(", ")}</div>
-            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span
+                  className={cx(
+                    "pill",
+                    outcome?.selfAssessed
+                      ? "bg-sunken text-muted"
+                      : passed
+                        ? "bg-easy-soft text-easy"
+                        : "bg-hard-soft text-hard"
+                  )}
+                >
+                  <Icon name={passed ? "check" : "alert"} className="size-3" />
+                  {passed ? "Passed" : "Not passed"}
+                </span>
+                <span className="text-caption text-muted">
+                  {outcome?.selfAssessed ? "marked done by you, not graded" : `scored ${outcome?.score ?? 0}/100`}
+                </span>
+              </div>
+              <p className="text-ui text-muted m-0">
+                {passed
+                  ? `This topic is unlocked again${revision.nextDueAt ? `, next due ${revision.nextDueAt}` : ""}.`
+                  : "The topic stays due, so you can run another session whenever you want."}
+              </p>
+              {graded && attempt.evaluation?.feedback && (
+                <p className="card-inset mt-3 p-2.5 text-ui m-0">{attempt.evaluation.feedback}</p>
+              )}
+              {graded && (attempt.evaluation?.recommendedFocus.length ?? 0) > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2.5">
+                  <span className="text-micro text-faint self-center">Focus next on:</span>
+                  {attempt.evaluation?.recommendedFocus.map((f) => (
+                    <span key={f} className="chip">
+                      {f}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {!running && !concluded && !hasKey && (
-          <div>
-            <strong>Session saved.</strong> No API key set, so it hasn't been graded yet.{" "}
-            <button type="button" onClick={onOpenSettings} className="btn-link">
-              Add a key in Settings
-            </button>{" "}
-            and come back — this submission will still be here.
+          <div className="flex items-start gap-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
+              <Icon name="check" className="size-4" />
+            </span>
+            <div>
+              <div className="text-body font-bold">Session saved</div>
+              <p className="text-ui text-muted m-0 mt-0.5">
+                No API key set, so it hasn't been graded yet.{" "}
+                <button type="button" onClick={onOpenSettings} className="btn-link">
+                  Add a key in Settings
+                </button>{" "}
+                and come back — this submission will still be here.
+              </p>
+            </div>
           </div>
         )}
 
         {!running && !concluded && hasKey && (
-          <div>
-            <strong>Evaluation unavailable. Your submission has been saved.</strong>
-            {attempt.error && <div className="text-muted mt-1">{attempt.error}</div>}
-            <div className="mt-2">
-              <button type="button" className="btn" onClick={() => void run()}>
+          <div className="flex items-start gap-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-hard-soft text-hard">
+              <Icon name="alert" className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-body font-bold">Evaluation unavailable — your submission has been saved</div>
+              {attempt.error && <p className="text-ui text-muted m-0 mt-0.5">{attempt.error}</p>}
+              <button type="button" className="btn mt-2.5" onClick={() => void run()}>
+                <Icon name="repeat" className="size-4" />
                 Retry evaluation
               </button>
             </div>
@@ -135,11 +216,12 @@ export function ResultsStep({
         {/* Placed after the status, not before it: this is the escape hatch
             for the situation the status just described. */}
         {!running && !concluded && (
-          <div className="mt-3 pt-3 border-t border-border">
+          <div className="mt-4 pt-3.5 border-t border-border">
             <button type="button" className="btn" onClick={markDone}>
+              <Icon name="check" className="size-4" />
               Mark this revision as done
             </button>
-            <p className="text-muted mt-1.5 mb-0 text-caption">
+            <p className="text-micro text-muted mt-2 mb-0">
               Records it as completed and moves the topic on to its next interval. No score is stored, because
               nothing graded it.
             </p>
@@ -147,76 +229,130 @@ export function ResultsStep({
         )}
 
         {attempt.questions.length > 0 && (
-          <div className="text-muted mt-3 pt-3 border-t border-border text-caption">
-            Self-rated confidence: {tally.strong} strong · {tally.partial} partial · {tally.forgot} forgot
+          <div className="mt-4 pt-3.5 border-t border-border flex flex-wrap items-center gap-1.5">
+            <span className="text-micro text-faint mr-1">Self-rated:</span>
+            {(["strong", "partial", "forgot"] as const).map((k) => (
+              <span key={k} className={cx("pill", CONFIDENCE_STYLE[k].cls)}>
+                {tally[k]} {CONFIDENCE_STYLE[k].label.toLowerCase()}
+              </span>
+            ))}
           </div>
         )}
       </div>
 
-      <h2 className="text-head font-semibold mb-2.5">Fundamentals</h2>
+      <h2 className="font-display text-head font-bold mb-2.5 flex items-center gap-2">
+        <Icon name="brain" className="size-4 text-accent" />
+        Fundamentals
+      </h2>
       {attempt.fundamentals.map((f) => {
         const concept = getConceptById(f.conceptId);
         const grade = fundamentalGrade.get(f.conceptId);
         return (
-          <div key={f.conceptId} className="card p-3.5 mb-3">
-            <div className="font-semibold text-body mb-1.5">
-              {concept?.prompt ?? f.conceptId}
-              {grade && <span className="ml-2 text-micro text-muted font-normal">{grade.score}/5</span>}
+          <div key={f.conceptId} className="card p-4 mb-3">
+            <div className="flex items-start gap-2 mb-2.5">
+              <div className="font-semibold text-body min-w-0 flex-1">{concept?.prompt ?? f.conceptId}</div>
+              {grade && (
+                <span
+                  className={cx(
+                    "pill shrink-0 tabular-nums",
+                    grade.score >= 4 ? "bg-easy-soft text-easy" : grade.score >= 3 ? "bg-medium-soft text-medium" : "bg-hard-soft text-hard"
+                  )}
+                >
+                  {grade.score}/5
+                </span>
+              )}
             </div>
-            <div className="text-ui mb-2">
-              <span className="text-muted">Your answer: </span>
-              {f.answer || <span className="text-muted italic">(left blank)</span>}
+            <div className="mb-2.5">
+              <div className="field-label">Your answer</div>
+              <div className="text-ui">{f.answer || <span className="text-faint italic">(left blank)</span>}</div>
             </div>
-            {grade?.note && <div className="text-ui mb-1.5">{grade.note}</div>}
+            {grade?.note && <p className="card-inset p-2.5 text-ui m-0 mb-2.5">{grade.note}</p>}
             {grade && grade.missing.length > 0 && (
-              <div className="text-caption text-muted mb-1.5">Missed: {grade.missing.join("; ")}</div>
+              <div className="mb-2.5">
+                <div className="field-label text-hard">Missed</div>
+                <div className="text-caption text-muted">{grade.missing.join("; ")}</div>
+              </div>
             )}
-            {concept && <div className="text-caption text-muted">Should cover: {concept.expectedConcepts.join("; ")}</div>}
+            {concept && (
+              <div>
+                <div className="field-label">Should cover</div>
+                <div className="text-caption text-muted">{concept.expectedConcepts.join("; ")}</div>
+              </div>
+            )}
           </div>
         );
       })}
 
-      {attempt.questions.length > 0 && <h2 className="text-head font-semibold mb-2.5 mt-6">Questions</h2>}
+      {attempt.questions.length > 0 && (
+        <h2 className="font-display text-head font-bold mb-2.5 mt-7 flex items-center gap-2">
+          <Icon name="target" className="size-4 text-accent" />
+          Questions
+        </h2>
+      )}
       {attempt.questions.map((q) => {
         const problem = problemById.get(q.questionId);
         const progress = getV2Progress(v2Store, q.questionId);
         const grade = questionGrade.get(q.questionId);
         return (
-          <div key={q.questionId} className="card p-3.5 mb-3">
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className="font-semibold">{problem?.question ?? q.questionId}</span>
-              {q.confidence && <span className="text-micro text-muted">{CONFIDENCE_LABEL[q.confidence]}</span>}
-              {grade && (
-                <span className="text-micro text-muted">
-                  correctness {grade.correctness}/5 · approach {grade.approach}/5 · pseudocode {grade.pseudocode}/5 ·
-                  complexity {grade.complexity}/5
+          <div key={q.questionId} className="card p-4 mb-3">
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
+              <span className="font-semibold text-body">{problem?.question ?? q.questionId}</span>
+              {q.confidence && (
+                <span className={cx("pill", CONFIDENCE_STYLE[q.confidence].cls)}>
+                  {CONFIDENCE_STYLE[q.confidence].label}
                 </span>
               )}
             </div>
-            {grade?.note && <div className="text-ui mb-2">{grade.note}</div>}
-            {grade && grade.mistakes.length > 0 && (
-              <div className="text-caption text-muted mb-2">Flagged: {grade.mistakes.join("; ")}</div>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-ui">
-              <div>
-                <div className="field-label">Your recall</div>
-                <div className="mb-1.5"><span className="text-muted">Approach: </span>{q.approach || "—"}</div>
-                <div className="mb-1.5"><span className="text-muted">Pseudocode: </span>{q.pseudocode || "—"}</div>
-                <div className="mb-1.5"><span className="text-muted">Complexity: </span>{q.complexity || "—"}</div>
-                {q.edgeCases && <div><span className="text-muted">Edge cases: </span>{q.edgeCases}</div>}
+
+            {grade && (
+              <div className="card-inset p-3 mb-3 grid gap-1.5 sm:grid-cols-2">
+                <ScoreBar label="Correctness" value={grade.correctness} />
+                <ScoreBar label="Approach" value={grade.approach} />
+                <ScoreBar label="Pseudocode" value={grade.pseudocode} />
+                <ScoreBar label="Complexity" value={grade.complexity} />
               </div>
-              <div>
+            )}
+            {grade?.note && <p className="text-ui m-0 mb-2.5">{grade.note}</p>}
+            {grade && grade.mistakes.length > 0 && (
+              <div className="mb-3 rounded-lg border-l-2 border-l-hard bg-hard-soft/40 px-2.5 py-2">
+                <div className="field-label text-hard mb-0.5">Flagged</div>
+                <div className="text-caption text-muted">{grade.mistakes.join("; ")}</div>
+              </div>
+            )}
+
+            {/* Side by side so recall and the stored solution can actually be
+                compared, which is the whole point of this screen. */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-ui">
+              <div className="rounded-lg border border-accent-line bg-accent-soft/40 p-3">
+                <div className="field-label text-accent">Your recall</div>
+                <Field label="Approach" value={q.approach} />
+                <Field label="Pseudocode" value={q.pseudocode} />
+                <Field label="Complexity" value={q.complexity} />
+                {q.edgeCases && <Field label="Edge cases" value={q.edgeCases} />}
+              </div>
+              <div className="card-inset p-3">
                 <div className="field-label">Your stored solution</div>
-                <div className="mb-1.5"><span className="text-muted">Approach: </span>{progress.approach || "—"}</div>
-                <div className="mb-1.5"><span className="text-muted">Pseudocode: </span>{progress.pseudocode || "—"}</div>
+                <Field label="Approach" value={progress.approach} />
+                <Field label="Pseudocode" value={progress.pseudocode} />
                 {progress.code && (
-                  <pre className="whitespace-pre-wrap font-mono text-caption card-soft p-2 overflow-x-auto">{progress.code}</pre>
+                  <pre className="mt-2 whitespace-pre-wrap font-mono text-caption rounded-md bg-bg border border-border p-2 overflow-x-auto">
+                    {progress.code}
+                  </pre>
                 )}
               </div>
             </div>
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="mb-2 last:mb-0">
+      <span className="text-micro text-faint block">{label}</span>
+      <span className="text-ui">{value || "—"}</span>
     </div>
   );
 }

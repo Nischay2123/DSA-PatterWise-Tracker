@@ -1,76 +1,102 @@
 @import "tailwindcss";
 
-/* ─── Colour ──────────────────────────────────────────────────────────────
-   Every colour is ONE light/dark pair via light-dark(), and the theme is
-   chosen with `color-scheme` alone. That means one palette instead of two
-   blocks that drift apart on every edit, live prefers-color-scheme following
-   with zero JS, and correct native rendering of form controls, scrollbars
-   and the <input type="search"> clear button.                             */
-@theme {
-  /* surfaces */
-  --color-bg: light-dark(#ffffff, #15151a);
-  --color-surface: light-dark(#fafafb, #1c1c22);
-  --color-fg: light-dark(#17171b, #e9e9ec);
-  --color-muted: light-dark(#67676d, #9b9ba3);
-  --color-border: light-dark(#e2e2e7, #2c2c34);
-  --color-border-strong: light-dark(#cfcfd6, #3d3d47);
-  --color-row-hover: light-dark(#f5f5f8, #212129);
+/* ═══════════════════════════════════════════════════════════════════════════
+   DSA Tracker — visual system
 
-  /* THE accent. Blue, because every other hue is already spoken for here:
-     green = done/activity, amber = starred, red = Hard. This is the pair
-     --color-focus already held, promoted from a focus ring to a real role. */
-  --color-accent: light-dark(#2563c9, #6ea8f0);
-  --color-accent-fg: light-dark(#ffffff, #10131a);
-  --color-accent-soft: light-dark(#eaf1fd, #1b2740);
+   One accent (violet) owns the product: navigation, progress, the activity
+   calendar, focus rings. Difficulty is the only other hue, and it is carried
+   as soft tinted pills rather than saturated blocks, because 467 of them
+   appear on one page.
+
+   Every colour is a single light-dark() pair, so the theme switches on
+   `color-scheme` alone — one palette instead of two blocks that drift.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* ─── Surfaces: a three-step elevation stack, not a flat white page ──── */
+  --color-bg: light-dark(#f4f4f8, #0a0a0f);
+  --color-surface: light-dark(#ffffff, #14141c);
+  --color-raised: light-dark(#ffffff, #1c1c26);
+  --color-sunken: light-dark(#eeeef4, #0f0f16);
+
+  --color-fg: light-dark(#14141c, #eceaf4);
+  --color-muted: light-dark(#63637a, #8d8da6);
+  --color-faint: light-dark(#9292a6, #5f5f76);
+  --color-border: light-dark(#e6e6ef, #232330);
+  --color-border-strong: light-dark(#d2d2e0, #32323f);
+  --color-row-hover: light-dark(#f3f3f8, #1a1a24);
+
+  /* ─── The accent ─────────────────────────────────────────────────────── */
+  --color-accent: light-dark(#5a48d6, #8f7dff);
+  --color-accent-fg: light-dark(#ffffff, #0a0a0f);
+  --color-accent-soft: light-dark(#edeafe, #1e1943);
+  --color-accent-line: light-dark(#cbc2fa, #3b3178);
   --color-focus: var(--color-accent);
 
-  /* was a raw text-[#e0a300]; the light value is darkened to clear AA */
-  --color-star: light-dark(#a97a00, #e6ae1f);
+  /* Progress reads as the accent everywhere — bars, rings, the header edge. */
+  --color-progress: light-dark(#5a48d6, #8f7dff);
 
-  /* progress + activity green (renamed from the misleading --color-easy) */
-  --color-progress: light-dark(#2fa84f, #39c261);
-  --color-heat-0: light-dark(#ebedf0, #202027);
-  --color-heat-1: light-dark(#c6e6cd, #1c4229);
-  --color-heat-2: light-dark(#8fd19e, #216b39);
-  --color-heat-3: light-dark(#4cb264, #2a9147);
-  --color-heat-4: light-dark(#2fa84f, #39c261);
+  --color-star: light-dark(#b8790a, #f6c452);
+  --color-star-soft: light-dark(#fdf2da, #33260a);
 
-  --color-tip-bg: light-dark(#24242a, #3a3a42);
-  --color-tip-fg: light-dark(#f4f4f6, #f4f4f6);
+  /* ─── Difficulty: text colour + its own tint, used as soft pills ─────── */
+  --color-easy: light-dark(#0d7a49, #4ade80);
+  --color-easy-soft: light-dark(#e0f5ea, #0d2b1d);
+  --color-medium: light-dark(#93650a, #f5bf4a);
+  --color-medium-soft: light-dark(#fbf0d8, #2d2308);
+  --color-hard: light-dark(#c4374f, #fb7185);
+  --color-hard-soft: light-dark(#fde9ed, #331018);
 
-  /* Badges carry white text in both themes, so they need their own darker
-     shades to clear WCAG AA 4.5:1. */
-  --color-badge-easy: light-dark(#26863f, #2b9247);
-  --color-badge-medium: light-dark(#9a6d13, #a4761a);
-  --color-badge-hard: light-dark(#c93b34, #d0453e);
+  /* ─── Activity heat: the accent ramp, so the calendar reads as brand ─── */
+  --color-heat-0: light-dark(#e7e7f0, #16161f);
+  --color-heat-1: light-dark(#d6cffa, #29225c);
+  --color-heat-2: light-dark(#b4a6f5, #453997);
+  --color-heat-3: light-dark(#8b78ee, #6b58dd);
+  --color-heat-4: light-dark(#5a48d6, #a897ff);
 
-  /* ─── Type scale ──────────────────────────────────────────────────────
-     Six semantic steps replacing 12 arbitrary rem values. Deliberately NOT
+  --color-tip-bg: light-dark(#1a1a24, #2c2c3a);
+  --color-tip-fg: #f4f4f8;
+
+  /* ─── Type ──────────────────────────────────────────────────────────────
+     Six semantic steps plus a display step for headline figures. NOT
      overriding --text-xs/sm/base: this ramp sits a notch below Tailwind's,
-     and --text-base must stay exactly 1rem because it is the iOS zoom
-     guard (see --text-field below).                                      */
-  --text-micro: 0.6875rem;      /* 11 */
+     and --text-base must stay exactly 1rem for the iOS zoom guard.       */
+  --text-micro: 0.6875rem; /* 11 */
   --text-micro--line-height: 1rem;
-  --text-caption: 0.75rem;      /* 12 */
+  --text-caption: 0.75rem; /* 12 */
   --text-caption--line-height: 1.0625rem;
-  --text-ui: 0.8125rem;         /* 13 */
+  --text-ui: 0.8125rem; /* 13 */
   --text-ui--line-height: 1.125rem;
-  --text-body: 0.875rem;        /* 14 */
-  --text-body--line-height: 1.25rem;
-  --text-head: 0.9375rem;       /* 15 */
-  --text-head--line-height: 1.3125rem;
-  --text-title: 1.125rem;       /* 18 */
+  --text-body: 0.875rem; /* 14 */
+  --text-body--line-height: 1.3rem;
+  --text-head: 0.9375rem; /* 15 */
+  --text-head--line-height: 1.35rem;
+  --text-title: 1.1875rem; /* 19 */
   --text-title--line-height: 1.5rem;
+  --text-display: 1.75rem; /* 28 */
+  --text-display--line-height: 1;
 
-  /* Fields get their own size so the mobile bump below is one rule instead
-     of `max-[700px]:text-base` repeated across 11 class strings. */
+  /* Fields carry their own size so the mobile bump below is one rule
+     instead of `max-[700px]:text-base` repeated across 11 class strings. */
   --text-field: 0.875rem;
 
-  /* ─── Layout ──────────────────────────────────────────────────────────
-     Three intentional widths replacing five arbitrary ones.             */
-  --container-shell: 78rem;    /* tracker + revision dashboard */
-  --container-reading: 46rem;  /* session steps, results — measured for prose */
-  --container-panel: 30rem;    /* settings, merge, error screen */
+  /* ─── Shape ─────────────────────────────────────────────────────────── */
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  --shadow-panel: 0 1px 2px light-dark(rgb(20 20 28 / 0.05), rgb(0 0 0 / 0.3)),
+    0 10px 30px -14px light-dark(rgb(20 20 28 / 0.18), rgb(0 0 0 / 0.7));
+  --shadow-pop: 0 18px 50px -12px light-dark(rgb(20 20 28 / 0.28), rgb(0 0 0 / 0.8));
+
+  /* ─── Layout ────────────────────────────────────────────────────────── */
+  --container-shell: 74rem;
+  --container-reading: 44rem;
+  --container-panel: 30rem;
 
   /* 768 is also hardcoded in src/breakpoints.ts for the Filters
      matchMedia. The two MUST move together — see the note there. */
@@ -87,11 +113,9 @@
   }
 }
 
-/* ─── Theme switch ────────────────────────────────────────────────────────
-   Three lines, and no JS owns a colour value. `system` is :root's default
-   and follows the OS live for free — that is what `light dark` means, and
-   light-dark() re-resolves when the preference changes.                   */
 @layer base {
+  /* Three lines, and no JS owns a colour value. `system` is :root's default
+     and follows the OS live for free — that is what `light dark` means. */
   :root {
     color-scheme: light dark;
   }
@@ -103,32 +127,50 @@
   }
 
   body {
-    background: var(--color-bg);
+    font-family: var(--font-sans);
+    background-color: var(--color-bg);
+    /* A single soft accent wash anchored to the top of the viewport. Fixed
+       attachment so it stays put while 467 rows scroll past it. */
+    background-image: radial-gradient(
+      900px 420px at 50% -160px,
+      color-mix(in oklab, var(--color-accent) 13%, transparent),
+      transparent 72%
+    );
+    background-attachment: fixed;
+    background-repeat: no-repeat;
     color: var(--color-fg);
-    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
-  /* Keyboard navigation had no visible indicator anywhere before this. */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+  }
+
   :focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
-    border-radius: 3px;
+    border-radius: 4px;
   }
 
-  /* Jump-to-problem highlight -- toggled imperatively via classList, not a
+  /* Jump-to-problem highlight — toggled imperatively via classList, not a
      Tailwind utility, since it fires outside React's render cycle. */
   @keyframes jump-flash {
     0%,
     40% {
       background: var(--color-accent-soft);
+      box-shadow: inset 3px 0 0 var(--color-accent);
     }
     100% {
       background: transparent;
+      box-shadow: inset 3px 0 0 transparent;
     }
   }
   .just-jumped {
-    animation: jump-flash 1.6s ease-out;
+    animation: jump-flash 1.8s ease-out;
   }
   @media (prefers-reduced-motion: reduce) {
     .just-jumped {
@@ -136,15 +178,31 @@
       outline: 2px solid var(--color-focus);
     }
   }
+
+  @keyframes drawer-in {
+    from {
+      transform: translateX(var(--drawer-from, 100%));
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
 }
 
-/* ─── Components ──────────────────────────────────────────────────────────
+/* ═══ Components ═══════════════════════════════════════════════════════════
    @utility rather than TS constants or @apply. A TS constant expands to
-   plain utilities, so cx(BUTTON_CLASS, "px-5") emits two competing px-*
-   and Tailwind's source order decides the winner, not the string order --
-   the footgun tailwind-merge exists to fix, and we are not adding a
-   dependency. Custom utilities sort before single-property ones, so
-   `btn px-5` reliably yields px-5.                                       */
+   plain utilities, so cx(BUTTON, "px-5") emits two competing px-* and
+   Tailwind's source order decides the winner, not the string order — the
+   footgun tailwind-merge exists to fix, and we are not adding a dependency.
+   Custom utilities sort before single-property ones, so `btn px-5` wins. */
 
 @utility btn {
   display: inline-flex;
@@ -153,24 +211,26 @@
   gap: --spacing(1.5);
   font: inherit;
   font-size: var(--text-ui);
-  line-height: var(--text-ui--line-height);
+  line-height: 1;
   font-weight: 500;
-  padding: --spacing(1.5) --spacing(2.5);
+  min-height: --spacing(8);
+  padding: 0 --spacing(3);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
-  background: var(--color-bg);
+  background: var(--color-surface);
   color: var(--color-fg);
   cursor: pointer;
   white-space: nowrap;
   transition:
-    background-color 120ms ease,
-    border-color 120ms ease;
+    background-color 130ms ease,
+    border-color 130ms ease,
+    color 130ms ease;
   &:hover:not(:disabled) {
     background: var(--color-row-hover);
     border-color: var(--color-muted);
   }
   &:disabled {
-    opacity: 0.45;
+    opacity: 0.4;
     cursor: not-allowed;
   }
 }
@@ -180,10 +240,11 @@
   border-color: transparent;
   background: var(--color-accent);
   color: var(--color-accent-fg);
+  font-weight: 600;
   &:hover:not(:disabled) {
     background: var(--color-accent);
     border-color: transparent;
-    filter: brightness(1.08);
+    filter: brightness(1.1);
   }
 }
 
@@ -201,11 +262,43 @@
 
 @utility btn-sm {
   font-size: var(--text-micro);
-  line-height: var(--text-micro--line-height);
-  padding: --spacing(1) --spacing(2);
+  min-height: --spacing(6.5);
+  padding: 0 --spacing(2);
+  gap: --spacing(1);
 }
 
-/* Inline link-styled button. Replaces the invalid `font-inherit` sites --
+/* Square, icon-only. Sized up under a coarse pointer. */
+@utility icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: --spacing(7);
+  height: --spacing(7);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition:
+    background-color 130ms ease,
+    color 130ms ease;
+  &:hover:not(:disabled) {
+    background: var(--color-row-hover);
+    color: var(--color-fg);
+  }
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  @media (pointer: coarse) {
+    width: --spacing(9);
+    height: --spacing(9);
+  }
+}
+
+/* Inline link-styled button. Replaces the invalid `font-inherit` sites —
    that utility does not exist in Tailwind v4, so those buttons were
    silently rendering in the UA button font. */
 @utility btn-link {
@@ -215,11 +308,11 @@
   border: 0;
   background: transparent;
   color: var(--color-accent);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  font-weight: 500;
+  text-underline-offset: 3px;
   cursor: pointer;
   &:hover {
-    color: var(--color-fg);
+    text-decoration: underline;
   }
 }
 
@@ -227,27 +320,35 @@
   width: 100%;
   font: inherit;
   font-size: var(--text-field);
-  padding: --spacing(1.5) --spacing(2);
+  padding: --spacing(2) --spacing(2.5);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
   background: var(--color-bg);
   color: var(--color-fg);
+  transition:
+    border-color 130ms ease,
+    box-shadow 130ms ease;
   &::placeholder {
-    color: var(--color-muted);
+    color: var(--color-faint);
+  }
+  &:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px var(--color-accent-soft);
   }
 }
 
 @utility card {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  background: var(--color-bg);
+  background: var(--color-surface);
 }
 
-/* Slightly recessed surface for nested/secondary panels. */
-@utility card-soft {
+/* Recessed surface for nested panels sitting inside a card. */
+@utility card-inset {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  background: var(--color-sunken);
 }
 
 @utility field-label {
@@ -255,12 +356,73 @@
   font-size: var(--text-micro);
   line-height: var(--text-micro--line-height);
   font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--color-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-faint);
   margin-bottom: --spacing(1);
 }
 
-/* The shared disclosure caret. Six components hand-rolled this pair. */
+/* Soft tinted status pill — difficulty, meta chips, counts. */
+@utility pill {
+  display: inline-flex;
+  align-items: center;
+  gap: --spacing(1);
+  font-size: var(--text-micro);
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: --spacing(1) --spacing(2);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Neutral outlined variant of `pill`, for metadata. */
+@utility chip {
+  display: inline-flex;
+  align-items: center;
+  gap: --spacing(1);
+  font-size: var(--text-micro);
+  line-height: 1;
+  font-weight: 500;
+  padding: --spacing(1) --spacing(2);
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+/* Sidebar / drawer navigation entry. */
+@utility nav-item {
+  display: flex;
+  align-items: center;
+  gap: --spacing(2.5);
+  width: 100%;
+  font: inherit;
+  font-size: var(--text-body);
+  font-weight: 500;
+  padding: --spacing(2) --spacing(2.5);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background-color 130ms ease,
+    color 130ms ease;
+  &:hover {
+    background: var(--color-row-hover);
+    color: var(--color-fg);
+  }
+  &[aria-current="page"] {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    font-weight: 600;
+  }
+}
+
+/* Shared disclosure caret removal. Six components hand-rolled this pair. */
 @utility disclosure {
   list-style: none;
   cursor: pointer;

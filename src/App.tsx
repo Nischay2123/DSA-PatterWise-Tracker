@@ -1,9 +1,11 @@
 import { useState } from "react";
 import questionsData from "../data/questions.json";
 import { Dashboard } from "./components/Dashboard";
+import { Drawer } from "./components/Drawer";
 import { Filters } from "./components/Filters";
-import { ImportExport } from "./components/ImportExport";
+import { Icon } from "./components/Icon";
 import { MergeImport } from "./components/MergeImport";
+import { BrandMark, SidebarContent } from "./components/Sidebar";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { RevisionDashboard } from "./components/revision/Dashboard";
 import { SessionShell } from "./components/revision/SessionShell";
@@ -14,7 +16,6 @@ import { countDone, getState, hasBackupV2, isProblemVisible } from "./store";
 import { useFilterAccordions } from "./useFilterAccordions";
 import { useTheme } from "./useTheme";
 import { useHash } from "./useHash";
-import { cx } from "./cx";
 import type { FilterState, QuestionData } from "./types";
 
 const DATA = questionsData as QuestionData;
@@ -52,7 +53,12 @@ function jumpToProblem(id: string) {
 
 function LoadingScreen() {
   return (
-    <div className="flex items-center justify-center h-screen text-muted text-body">Loading your progress…</div>
+    <div className="grid h-screen place-items-center">
+      <div className="flex flex-col items-center gap-3 text-muted text-body">
+        <BrandMark className="size-11 motion-safe:animate-pulse" />
+        Loading your progress…
+      </div>
+    </div>
   );
 }
 
@@ -62,20 +68,24 @@ function ErrorScreen({ error }: { error: string | null }) {
     if (raw) downloadBackupFile(raw);
   };
   return (
-    <div className="max-w-panel mx-auto mt-20 px-5 text-center">
-      <h1 className="text-title font-semibold mb-2">Couldn't load your progress</h1>
-      <p className="text-body text-muted mb-1">
-        Something went wrong migrating your saved data, so nothing was overwritten. Your original progress is still
-        safe in this browser.
-      </p>
-      {error && <p className="text-caption text-muted mb-4 font-mono break-words">{error}</p>}
-      <button
-        type="button"
-        onClick={exportRaw}
-        className="btn"
-      >
-        Export raw progress as JSON
-      </button>
+    <div className="mx-auto mt-20 max-w-panel px-5">
+      <div className="card p-6 text-center shadow-panel">
+        <span className="mx-auto mb-3 grid size-11 place-items-center rounded-xl bg-hard-soft text-hard">
+          <Icon name="alert" className="size-5" />
+        </span>
+        <h1 className="text-title font-bold mb-2">Couldn't load your progress</h1>
+        <p className="text-body text-muted mb-2">
+          Something went wrong migrating your saved data, so nothing was overwritten. Your original progress is still
+          safe in this browser.
+        </p>
+        {error && (
+          <p className="card-inset mb-4 p-2 font-mono text-caption text-muted break-words">{error}</p>
+        )}
+        <button type="button" onClick={exportRaw} className="btn btn-primary mx-auto">
+          <Icon name="download" className="size-4" />
+          Export raw progress as JSON
+        </button>
+      </div>
     </div>
   );
 }
@@ -86,6 +96,7 @@ export function App() {
   const [backupExists, setBackupExists] = useState(() => hasBackupV2());
   const [hash, navigate] = useHash();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   const overallDone = countDone(ALL_PROBLEMS, store);
   const overallTotal = ALL_PROBLEMS.length;
@@ -136,74 +147,125 @@ export function App() {
     );
   }
 
+  const goto = (h: string) => {
+    setNavOpen(false);
+    navigate(h);
+  };
+
+  const sidebar = (showBrand: boolean) => (
+    <SidebarContent
+      route="tracker"
+      showBrand={showBrand}
+      onNavigate={goto}
+      done={overallDone}
+      total={overallTotal}
+      backupExists={backupExists}
+      onBackupChange={refreshBackup}
+      onOpenSettings={() => {
+        setNavOpen(false);
+        setSettingsOpen(true);
+      }}
+    />
+  );
+
   return (
     <StoreContext.Provider value={{ store, dispatch, v2Store, dispatchV2 }}>
       <FiltersContext.Provider value={{ filters, setFilters }}>
-        {/* Two rows, not three: the progress bar became the header's bottom
-            edge, which frees a whole row on a phone. scroll-mt-* on the rows
-            is tuned to this height -- change one, change the other. */}
-        <header className="sticky top-0 z-20 bg-bg/90 backdrop-blur-sm">
-          <div className="mx-auto w-full max-w-shell px-4 md:px-6">
-            <div className="flex items-center gap-x-3 gap-y-2 py-2.5 flex-wrap">
-              <h1 className="text-title font-semibold tracking-tight m-0">DSA Tracker</h1>
-              <span className="text-caption text-muted tabular-nums" aria-label={`${overallDone} of ${overallTotal} solved`}>
-                {overallDone}
-                <span className="opacity-60">/{overallTotal}</span> · {overallPct}%
+        {/* The whole chrome moved out of the top of the screen and into a
+            persistent left rail. On a phone the rail becomes a drawer and
+            only a slim app bar remains, which is a whole row of vertical
+            space back on the smallest screen. */}
+        <div className="lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
+          <aside className="hidden lg:block sticky top-0 h-screen border-r border-border bg-surface/70 backdrop-blur-xl">
+            {sidebar(true)}
+          </aside>
+
+          <div className="min-w-0">
+            {/* Mobile app bar. Desktop gets no top chrome at all — the rail
+                already carries identity, progress and every action. */}
+            <div className="lg:hidden sticky top-0 z-30 flex items-center gap-2 h-13 px-3 border-b border-border bg-bg/85 backdrop-blur-xl">
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="Open navigation"
+                aria-expanded={navOpen}
+                onClick={() => setNavOpen(true)}
+              >
+                <Icon name="menu" className="size-5" />
+              </button>
+              <BrandMark className="size-7" />
+              <span className="font-display text-body font-bold tracking-tight">DSA Tracker</span>
+              <span className="ml-auto pill bg-accent-soft text-accent tabular-nums">
+                {overallDone}/{overallTotal} · {overallPct}%
               </span>
-              <div className="ml-auto flex items-center gap-1.5">
-                <ImportExport backupExists={backupExists} onBackupChange={refreshBackup} />
-                <button type="button" className="btn" onClick={() => navigate("#/revision")} title="Revision dashboard">
-                  Revision
-                </button>
-                <button
-                  type="button"
-                  className={cx("btn", settingsOpen && "btn-primary")}
-                  aria-expanded={settingsOpen}
-                  onClick={() => setSettingsOpen((o) => !o)}
-                  title="Theme, evaluation provider, API key and completion gate"
-                >
-                  Settings
-                </button>
+            </div>
+
+            <div className="sticky top-13 lg:top-0 z-20 border-b border-border bg-bg/85 backdrop-blur-xl">
+              <div className="mx-auto w-full max-w-shell px-3 md:px-6">
+                <Filters />
+              </div>
+              {/* Overall progress as the toolbar's bottom border: the track IS
+                  the border, so it costs no vertical space at all. */}
+              <div className="h-[2px] w-full bg-border" role="presentation">
+                <div
+                  className="h-full bg-progress transition-[width] duration-500"
+                  style={{ width: `${overallPct}%` }}
+                />
               </div>
             </div>
-            <Filters />
-            {settingsOpen && (
-              <div className="pb-3">
-                <div className="ml-auto w-full max-w-panel">
-                  <SettingsPanel onClose={() => setSettingsOpen(false)} />
-                </div>
+
+            <main className="mx-auto w-full max-w-shell px-3 md:px-6 pt-5 pb-20">
+              <Dashboard allProblems={ALL_PROBLEMS} onContinue={jumpToProblem} />
+
+              <div className="flex items-center gap-2 mt-7 mb-2.5">
+                <h2 className="font-display text-title font-bold m-0">Problems</h2>
+                <span className="chip tabular-nums">{visibleCount} shown</span>
               </div>
-            )}
-          </div>
-          {/* Overall progress as the header's bottom border: the track IS the
-              border, so this costs no vertical space at all. */}
-          <div className="h-[3px] w-full bg-border" role="presentation">
-            <div
-              className="h-full bg-progress transition-[width] duration-300"
-              style={{ width: `${overallPct}%` }}
-            />
-          </div>
-        </header>
 
-        <main className="mx-auto w-full max-w-shell px-4 md:px-6 pt-5 pb-16">
-          <Dashboard allProblems={ALL_PROBLEMS} onContinue={jumpToProblem} />
-          <TopicList key={importNonce} topics={DATA.topics} />
-          {visibleCount === 0 && (
-            <p className="text-body text-muted text-center py-10">
-              No problems match these filters.{" "}
-              <button type="button" className="btn-link" onClick={() => setFilters(DEFAULT_FILTERS)}>
-                Clear filters
-              </button>
-            </p>
-          )}
-        </main>
+              <TopicList key={importNonce} topics={DATA.topics} />
 
-        <footer className="mx-auto w-full max-w-shell px-4 md:px-6 pb-10 text-center text-caption text-muted">
-          <p className="m-0">
-            Progress is saved in this browser only — no account, no sync. Use Export regularly as a backup.
-          </p>
-          <MergeImport onBackupChange={refreshBackup} />
-        </footer>
+              {visibleCount === 0 && (
+                <div className="card grid place-items-center gap-2 py-14 text-center">
+                  <span className="grid size-10 place-items-center rounded-xl bg-sunken text-faint">
+                    <Icon name="search" className="size-5" />
+                  </span>
+                  <p className="text-body text-muted m-0">No problems match these filters.</p>
+                  <button type="button" className="btn btn-sm" onClick={() => setFilters(DEFAULT_FILTERS)}>
+                    <Icon name="x" className="size-3.5" />
+                    Clear filters
+                  </button>
+                </div>
+              )}
+
+              <footer className="mt-10 border-t border-border pt-5 text-center text-caption text-muted">
+                <p className="m-0 flex items-center justify-center gap-1.5">
+                  <Icon name="alert" className="size-3.5 shrink-0" />
+                  Progress is saved in this browser only — no account, no sync. Export regularly as a backup.
+                </p>
+                <MergeImport onBackupChange={refreshBackup} />
+              </footer>
+            </main>
+          </div>
+        </div>
+
+        <Drawer
+          open={navOpen}
+          onClose={() => setNavOpen(false)}
+          side="left"
+          title="DSA Tracker"
+          icon={<Icon name="layers" className="size-4" />}
+        >
+          {sidebar(false)}
+        </Drawer>
+
+        <Drawer
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          title="Settings"
+          icon={<Icon name="settings" className="size-4" />}
+        >
+          <SettingsPanel />
+        </Drawer>
       </FiltersContext.Provider>
     </StoreContext.Provider>
   );
