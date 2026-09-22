@@ -25,6 +25,34 @@ describe("provider probe requests", () => {
     expect(JSON.parse(req.init.body as string).max_tokens).toBe(1);
   });
 
+  it("groq's schema is strict all the way down, gemini's is untouched", () => {
+    const groqBody = JSON.parse(getProvider("groq").buildRequest("k", "m", "p").init.body as string);
+    const schema = groqBody.response_format.json_schema.schema;
+    expect(groqBody.response_format.json_schema.strict).toBe(true);
+
+    // Strict mode rejects any object that allows extras or leaves a property
+    // optional -- including the ones nested inside arrays.
+    const objects: Record<string, unknown>[] = [];
+    (function walk(node: Record<string, unknown>) {
+      if (node.type === "object") objects.push(node);
+      if (node.type === "array") walk(node.items as Record<string, unknown>);
+      for (const value of Object.values((node.properties ?? {}) as Record<string, unknown>)) {
+        walk(value as Record<string, unknown>);
+      }
+    })(schema);
+    expect(objects.length).toBe(3); // root, a fundamental, a question
+    for (const node of objects) {
+      expect(node.additionalProperties).toBe(false);
+      expect(node.required).toEqual(Object.keys(node.properties as object));
+    }
+
+    // Gemini's responseSchema has no additionalProperties in its dialect, so
+    // the derivation must not have mutated the shared schema in place.
+    const geminiBody = JSON.parse(getProvider("gemini").buildRequest("k", "m", "p").init.body as string);
+    expect(geminiBody.generationConfig.responseSchema.additionalProperties).toBeUndefined();
+    expect(geminiBody.generationConfig.responseSchema.required).toEqual(["passed", "score", "perFundamental", "perQuestion"]);
+  });
+
   it("groq pulls text out of the OpenAI-shaped envelope", () => {
     const grok = getProvider("groq");
     expect(grok.extractText({ choices: [{ message: { content: "hi" } }] })).toBe("hi");

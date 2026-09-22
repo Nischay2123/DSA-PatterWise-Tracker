@@ -7,6 +7,8 @@
 
 export type ProviderId = "gemini" | "groq";
 
+type JsonSchema = Record<string, unknown>;
+
 export interface ProviderRequest {
   url: string;
   init: RequestInit;
@@ -33,10 +35,11 @@ function get(obj: unknown, ...path: (string | number)[]): unknown {
   return cur;
 }
 
-// Gemini's structured-output schema. Asking for JSON at the API level rather
-// than only in the prompt is what keeps the happy path from ever needing the
-// fence-stripping fallback in schema.ts.
-const GEMINI_RESPONSE_SCHEMA = {
+// The structured-output schema, asked for at the API level rather than only in
+// the prompt -- that is what keeps the happy path from ever needing the
+// fence-stripping fallback in schema.ts. Gemini takes it as-is; Groq's strict
+// mode needs the tightened form below.
+const RESPONSE_SCHEMA: JsonSchema = {
   type: "object",
   properties: {
     passed: { type: "boolean" },
@@ -75,7 +78,29 @@ const GEMINI_RESPONSE_SCHEMA = {
     recommendedFocus: { type: "array", items: { type: "string" } },
   },
   required: ["passed", "score", "perFundamental", "perQuestion"],
-} as const;
+};
+
+// Groq's strict mode constrains decoding to the schema, so the model cannot
+// emit invalid JSON at all -- but it only accepts a schema where every
+// property is required and every object forbids extras. Derived rather than
+// written out a second time, so the two can't drift. Forcing the cosmetic
+// fields (note, mistakes, feedback) to be present costs nothing: schema.ts
+// already treats them as optional and empty strings are valid.
+function strict(node: JsonSchema): JsonSchema {
+  if (node.type === "array" && isSchema(node.items)) return { ...node, items: strict(node.items) };
+  if (node.type !== "object" || !isSchema(node.properties)) return node;
+  const properties: JsonSchema = {};
+  for (const [key, value] of Object.entries(node.properties)) {
+    properties[key] = isSchema(value) ? strict(value) : value;
+  }
+  return { ...node, properties, additionalProperties: false, required: Object.keys(properties) };
+}
+
+function isSchema(value: unknown): value is JsonSchema {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+const GROQ_RESPONSE_SCHEMA = strict(RESPONSE_SCHEMA);
 
 const gemini: ProviderAdapter = {
   id: "gemini",
@@ -92,7 +117,7 @@ const gemini: ProviderAdapter = {
           generationConfig: {
             temperature: 0, // grading should be as reproducible as the model allows
             responseMimeType: "application/json",
-            responseSchema: GEMINI_RESPONSE_SCHEMA,
+            responseSchema: RESPONSE_SCHEMA,
           },
         }),
       },
@@ -127,6 +152,9 @@ const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 // of the four and supports JSON mode; the other three are a model-field edit
 // away. Free limits are 30 RPM / 1K RPD / 8K TPM, and the 32 KB prompt cap in
 // prompt.ts is ~8K tokens, so only a pathologically long submission can hit TPM.
+// All four also accept strict structured output, which the request below asks
+// for. A model outside that list would 400 on it and surface as UPSTREAM --
+// acceptable, since every model a free key can reach is on it.
 
 const groq: ProviderAdapter = {
   id: "groq",
@@ -141,7 +169,10 @@ const groq: ProviderAdapter = {
         body: JSON.stringify({
           model,
           temperature: 0,
-          response_format: { type: "json_object" },
+          response_format: {
+            type: "json_schema",
+            json_schema: { name: "evaluation", strict: true, schema: GROQ_RESPONSE_SCHEMA },
+          },
           messages: [{ role: "user", content: prompt }],
         }),
       },
