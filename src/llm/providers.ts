@@ -1,12 +1,11 @@
-// Two adapters behind one interface, no framework (plan §9&10). Both were
-// probed live from the browser before this was written: each is reachable
-// cross-origin from a page origin and each returns HTTP 400 with a JSON body
-// for a bad key -- see PHASE_7_REPORT.md §1.
+// Two adapters behind one interface, no framework (plan §9&10). Both are
+// reachable cross-origin from a page origin with the key in a header; a bad
+// key comes back 400 on Gemini and 401 on Groq (see classifyHttp).
 //
 // The key travels in a header for both. Never a query string: a key in a URL
 // lands in history, referrers and logs, which the plan forbids outright.
 
-export type ProviderId = "gemini" | "grok";
+export type ProviderId = "gemini" | "groq";
 
 export interface ProviderRequest {
   url: string;
@@ -81,7 +80,7 @@ const GEMINI_RESPONSE_SCHEMA = {
 const gemini: ProviderAdapter = {
   id: "gemini",
   label: "Google Gemini",
-  defaultModel: "gemini-2.5-flash",
+  defaultModel: "gemini-3.6-flash",
   buildRequest(apiKey, model, prompt) {
     return {
       url: `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
@@ -118,13 +117,16 @@ const gemini: ProviderAdapter = {
   },
 };
 
-const grok: ProviderAdapter = {
-  id: "grok",
-  label: "xAI Grok",
-  defaultModel: "grok-3",
+// OpenAI-compatible, so the envelope handling below is the stock one.
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+
+const groq: ProviderAdapter = {
+  id: "groq",
+  label: "Groq",
+  defaultModel: "llama-3.3-70b-versatile",
   buildRequest(apiKey, model, prompt) {
     return {
-      url: "https://api.x.ai/v1/chat/completions",
+      url: GROQ_URL,
       init: {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
@@ -139,7 +141,7 @@ const grok: ProviderAdapter = {
   },
   buildProbeRequest(apiKey, model) {
     return {
-      url: "https://api.x.ai/v1/chat/completions",
+      url: GROQ_URL,
       init: {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
@@ -153,9 +155,10 @@ const grok: ProviderAdapter = {
   },
 };
 
-export const PROVIDERS: Record<ProviderId, ProviderAdapter> = { gemini, grok };
+export const PROVIDERS: Record<ProviderId, ProviderAdapter> = { gemini, groq };
 
 export function getProvider(id: string): ProviderAdapter {
+  if (id === "grok") return groq; // stores written before xAI was swapped out for Groq
   return PROVIDERS[id as ProviderId] ?? gemini;
 }
 

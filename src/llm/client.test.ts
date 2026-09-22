@@ -66,9 +66,9 @@ describe("evaluate -- key handling", () => {
     expect(await evaluate(OPTS)).toEqual({ ok: false, error: "BAD_KEY" });
   });
 
-  it("maps xAI's real bad-key shape to BAD_KEY", async () => {
-    stubFetch(res(400, JSON.stringify({ code: "invalid-argument", error: "Incorrect API key provided." })));
-    expect(await evaluate({ ...OPTS, provider: "grok" })).toEqual({ ok: false, error: "BAD_KEY" });
+  it("maps an OpenAI-shaped bad-key body to BAD_KEY", async () => {
+    stubFetch(res(400, JSON.stringify({ error: { message: "Incorrect API key provided." } })));
+    expect(await evaluate({ ...OPTS, provider: "groq" })).toEqual({ ok: false, error: "BAD_KEY" });
   });
 
   it("maps 403 (referrer-restricted key) to BAD_KEY", async () => {
@@ -180,8 +180,8 @@ describe("validateKey", () => {
 
 describe("providers", () => {
   it("falls back to the provider default when settings.model is blank", () => {
-    expect(resolveModel("gemini", "")).toBe("gemini-2.5-flash");
-    expect(resolveModel("grok", "  ")).toBe("grok-3");
+    expect(resolveModel("gemini", "")).toBe("gemini-3.6-flash");
+    expect(resolveModel("groq", "  ")).toBe("llama-3.3-70b-versatile");
   });
 
   it("uses an explicitly set model verbatim", () => {
@@ -192,8 +192,8 @@ describe("providers", () => {
     expect(getProvider("nope").id).toBe("gemini");
   });
 
-  it("grok sends the key as a bearer token, not a query param", () => {
-    const req = getProvider("grok").buildRequest("secret", "grok-3", "prompt");
+  it("groq sends the key as a bearer token, not a query param", () => {
+    const req = getProvider("groq").buildRequest("secret", "llama-3.3-70b-versatile", "prompt");
     expect(req.url).not.toContain("secret");
     expect((req.init.headers as Record<string, string>).Authorization).toBe("Bearer secret");
   });

@@ -101,7 +101,7 @@ export function SettingsPanel() {
         <select
           id="settings-provider"
           className="field"
-          value={settings.provider}
+          value={getProvider(settings.provider).id}
           onChange={(e) => dispatchV2({ type: "SET_SETTINGS", patch: { provider: e.target.value as ProviderId } })}
         >
           {Object.values(PROVIDERS).map((p) => (

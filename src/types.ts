@@ -179,7 +179,7 @@ export interface AppSettings {
   // full-syllabus behaviour; absent is read as DEFAULT_GOAL.
   goal?: { minFreq: string; difficulties: string[]; listId?: string };
   theme: string;
-  provider: "gemini" | "grok";
+  provider: "gemini" | "groq";
   model: string;
   apiKey: string;
 }

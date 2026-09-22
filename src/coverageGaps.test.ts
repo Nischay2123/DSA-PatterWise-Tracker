@@ -11,22 +11,22 @@ import type { ProgressStore, RevisionAttempt, Topic, TopicRevision } from "./typ
 
 describe("provider probe requests", () => {
   it("gemini's probe is a minimal generateContent call with the key in a header", () => {
-    const req = getProvider("gemini").buildProbeRequest("k", "gemini-2.5-flash");
-    expect(req.url).toContain("gemini-2.5-flash:generateContent");
+    const req = getProvider("gemini").buildProbeRequest("k", "gemini-3.6-flash");
+    expect(req.url).toContain("gemini-3.6-flash:generateContent");
     expect(req.url).not.toContain("k");
     expect((req.init.headers as Record<string, string>)["x-goog-api-key"]).toBe("k");
     expect(JSON.parse(req.init.body as string).generationConfig.maxOutputTokens).toBe(1);
   });
 
-  it("grok's probe caps tokens and uses a bearer token", () => {
-    const req = getProvider("grok").buildProbeRequest("k", "grok-3");
-    expect(req.url).toBe("https://api.x.ai/v1/chat/completions");
+  it("groq's probe caps tokens and uses a bearer token", () => {
+    const req = getProvider("groq").buildProbeRequest("k", "llama-3.3-70b-versatile");
+    expect(req.url).toBe("https://api.groq.com/openai/v1/chat/completions");
     expect((req.init.headers as Record<string, string>).Authorization).toBe("Bearer k");
     expect(JSON.parse(req.init.body as string).max_tokens).toBe(1);
   });
 
-  it("grok pulls text out of the OpenAI-shaped envelope", () => {
-    const grok = getProvider("grok");
+  it("groq pulls text out of the OpenAI-shaped envelope", () => {
+    const grok = getProvider("groq");
     expect(grok.extractText({ choices: [{ message: { content: "hi" } }] })).toBe("hi");
     expect(grok.extractText({ choices: [] })).toBeNull();
     expect(grok.extractText(null)).toBeNull();

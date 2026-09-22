@@ -981,10 +981,10 @@ describe("the API key never leaves the browser in an export", () => {
   });
 
   it("keeps provider and model, which are not secrets", () => {
-    const v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_SETTINGS", patch: { apiKey: "k", provider: "grok", model: "grok-3" } });
+    const v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_SETTINGS", patch: { apiKey: "k", provider: "groq", model: "llama-3.3-70b-versatile" } });
     const exported = toExportableV2(v2);
-    expect(exported.settings.provider).toBe("grok");
-    expect(exported.settings.model).toBe("grok-3");
+    expect(exported.settings.provider).toBe("groq");
+    expect(exported.settings.model).toBe("llama-3.3-70b-versatile");
   });
 });
 

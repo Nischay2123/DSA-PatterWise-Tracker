@@ -194,7 +194,7 @@ describe("mergeStoresV2 -- attempts and settings", () => {
 
   it("never takes the other device's settings", () => {
     const local = v2Reducer(emptyAppStoreV2(), { type: "SET_SETTINGS", patch: { apiKey: "mine", provider: "gemini" } });
-    const incoming = v2Reducer(emptyAppStoreV2(), { type: "SET_SETTINGS", patch: { apiKey: "theirs", provider: "grok" } });
+    const incoming = v2Reducer(emptyAppStoreV2(), { type: "SET_SETTINGS", patch: { apiKey: "theirs", provider: "groq" } });
     const merged = mergeStoresV2(local, incoming);
     expect(merged.settings.apiKey).toBe("mine");
     expect(merged.settings.provider).toBe("gemini");
