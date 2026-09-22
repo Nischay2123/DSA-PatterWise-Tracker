@@ -19,7 +19,7 @@ describe("provider probe requests", () => {
   });
 
   it("groq's probe caps tokens and uses a bearer token", () => {
-    const req = getProvider("groq").buildProbeRequest("k", "llama-3.3-70b-versatile");
+    const req = getProvider("groq").buildProbeRequest("k", "openai/gpt-oss-120b");
     expect(req.url).toBe("https://api.groq.com/openai/v1/chat/completions");
     expect((req.init.headers as Record<string, string>).Authorization).toBe("Bearer k");
     expect(JSON.parse(req.init.body as string).max_tokens).toBe(1);

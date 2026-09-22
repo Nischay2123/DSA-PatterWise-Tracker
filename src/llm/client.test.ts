@@ -181,7 +181,7 @@ describe("validateKey", () => {
 describe("providers", () => {
   it("falls back to the provider default when settings.model is blank", () => {
     expect(resolveModel("gemini", "")).toBe("gemini-3.6-flash");
-    expect(resolveModel("groq", "  ")).toBe("llama-3.3-70b-versatile");
+    expect(resolveModel("groq", "  ")).toBe("openai/gpt-oss-120b");
   });
 
   it("uses an explicitly set model verbatim", () => {
@@ -193,7 +193,7 @@ describe("providers", () => {
   });
 
   it("groq sends the key as a bearer token, not a query param", () => {
-    const req = getProvider("groq").buildRequest("secret", "llama-3.3-70b-versatile", "prompt");
+    const req = getProvider("groq").buildRequest("secret", "openai/gpt-oss-120b", "prompt");
     expect(req.url).not.toContain("secret");
     expect((req.init.headers as Record<string, string>).Authorization).toBe("Bearer secret");
   });

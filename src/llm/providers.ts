@@ -120,10 +120,18 @@ const gemini: ProviderAdapter = {
 // OpenAI-compatible, so the envelope handling below is the stock one.
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
+// Groq's free plan only serves a handful of chat models -- gpt-oss-120b,
+// gpt-oss-20b, gpt-oss-safeguard-20b and qwen3.8-27b (console.groq.com/docs/
+// rate-limits, Free Plan tab). llama-3.3-70b-versatile and the rest are
+// Developer-plan only, so a free key gets a 4xx on them. 120b is the strongest
+// of the four and supports JSON mode; the other three are a model-field edit
+// away. Free limits are 30 RPM / 1K RPD / 8K TPM, and the 32 KB prompt cap in
+// prompt.ts is ~8K tokens, so only a pathologically long submission can hit TPM.
+
 const groq: ProviderAdapter = {
   id: "groq",
   label: "Groq",
-  defaultModel: "llama-3.3-70b-versatile",
+  defaultModel: "openai/gpt-oss-120b",
   buildRequest(apiKey, model, prompt) {
     return {
       url: GROQ_URL,
