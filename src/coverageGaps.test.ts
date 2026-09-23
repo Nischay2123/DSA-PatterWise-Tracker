@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EVALUATION_SCHEMA as SCHEMA, getProvider } from "./llm/providers";
+import { rowsFor } from "./components/NotesEditor";
 import { capPrompt } from "./llm/prompt";
 import { buildPromptInput } from "./revision/evaluate";
 import { buildTopicRows, isExemptTopic, statusDot, statusLabel } from "./revision/dashboard";
@@ -180,5 +181,16 @@ describe("migration edges", () => {
   it("returns an empty store for null/garbage input", () => {
     expect(migrateV1ToV2(null as never).progress).toEqual({});
     expect(migrateV1ToV2({ version: 1 } as never).progress).toEqual({});
+  });
+});
+
+describe("notes editor sizing", () => {
+  it("opens an editor big enough for what is already written", () => {
+    // The old panel was a fixed rows={2}, which is what made a three-sentence
+    // note unreadable while editing it.
+    expect(rowsFor("")).toBe(3); // never smaller than a usable box
+    expect(rowsFor("a".repeat(180))).toBe(5); // ~58 chars a line, plus room to type
+    expect(rowsFor("one\ntwo\nthree")).toBe(4);
+    expect(rowsFor("a".repeat(5000))).toBe(14); // capped, or the buttons leave the screen
   });
 });
