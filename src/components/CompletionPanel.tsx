@@ -38,7 +38,7 @@ export function CompletionPanel({
   const [grading, setGrading] = useState(false);
   const [verdict, setVerdict] = useState<SolutionVerdict | null>(null);
 
-  const hasEvidence = !!pseudocode.trim() || !!code.trim();
+  const hasEvidence = !!approach.trim() && (!!pseudocode.trim() || !!code.trim());
   const graded = canGradeSolutions(v2Store.settings);
 
   // Flush the current draft explicitly rather than relying solely on blur
@@ -89,7 +89,7 @@ export function CompletionPanel({
           <div className="text-caption text-muted">
             {graded
               ? "Your solution is graded before this is marked done."
-              : "Pseudocode or code is required to mark this done."}
+              : "An approach, plus pseudocode or code, is required to mark this done."}
           </div>
         </div>
       </div>
@@ -175,7 +175,9 @@ export function CompletionPanel({
           Cancel
         </button>
         {!hasEvidence && (
-          <span className="text-caption text-muted">Add pseudocode or code to enable this.</span>
+          <span className="text-caption text-muted">
+            {approach.trim() ? "Add pseudocode or code to enable this." : "Add your approach, plus pseudocode or code, to enable this."}
+          </span>
         )}
       </div>
     </div>

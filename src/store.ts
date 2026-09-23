@@ -599,8 +599,12 @@ export function hasNotes(progress: QuestionProgressV2): boolean {
   return Object.values(progress.notes).some((v) => v.trim().length > 0);
 }
 
+// Approach is required on top of one of pseudocode/code: the approach says
+// what you were trying to do, and without it a correct-looking snippet can't
+// be told apart from one you copied. Either of pseudocode and code is enough
+// -- writing both is not the point.
 export function hasCompletionEvidence(progress: QuestionProgressV2): boolean {
-  return !!progress.pseudocode.trim() || !!progress.code.trim();
+  return !!progress.approach.trim() && (!!progress.pseudocode.trim() || !!progress.code.trim());
 }
 
 // A completion is free of the evidence gate if: the question has ever been

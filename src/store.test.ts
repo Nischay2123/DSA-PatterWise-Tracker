@@ -466,18 +466,33 @@ describe("hasCompletionEvidence", () => {
     expect(hasCompletionEvidence(getV2Progress(emptyAppStoreV2(), "a"))).toBe(false);
   });
 
-  it("is true with non-empty pseudocode alone", () => {
-    const v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_PSEUDOCODE", id: "a", pseudocode: "for i in n: ..." });
+  it("is true with an approach plus pseudocode", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_APPROACH", id: "a", approach: "two pointers from both ends" });
+    v2 = v2Reducer(v2, { type: "SET_PSEUDOCODE", id: "a", pseudocode: "for i in n: ..." });
     expect(hasCompletionEvidence(v2.progress.a)).toBe(true);
   });
 
-  it("is true with non-empty code alone", () => {
-    const v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_CODE", id: "a", code: "def f(): pass" });
+  it("is true with an approach plus code -- either one, never both", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_APPROACH", id: "a", approach: "two pointers from both ends" });
+    v2 = v2Reducer(v2, { type: "SET_CODE", id: "a", code: "def f(): pass" });
     expect(hasCompletionEvidence(v2.progress.a)).toBe(true);
+  });
+
+  it("is false with pseudocode or code but no approach", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_PSEUDOCODE", id: "a", pseudocode: "for i in n: ..." });
+    expect(hasCompletionEvidence(v2.progress.a)).toBe(false);
+    v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_CODE", id: "a", code: "def f(): pass" });
+    expect(hasCompletionEvidence(v2.progress.a)).toBe(false);
+  });
+
+  it("is false with an approach but nothing to show for it", () => {
+    const v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_APPROACH", id: "a", approach: "two pointers" });
+    expect(hasCompletionEvidence(v2.progress.a)).toBe(false);
   });
 
   it("whitespace-only evidence does not count", () => {
-    const v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_PSEUDOCODE", id: "a", pseudocode: "   " });
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_APPROACH", id: "a", approach: "   " });
+    v2 = v2Reducer(v2, { type: "SET_PSEUDOCODE", id: "a", pseudocode: "   " });
     expect(hasCompletionEvidence(v2.progress.a)).toBe(false);
   });
 });
@@ -488,10 +503,16 @@ describe("canCompleteFreely -- the completion gate", () => {
     expect(canCompleteFreely(progress, settings({ requireEvidence: true }))).toBe(false);
   });
 
-  it("allows it once pseudocode or code is present", () => {
-    let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_PSEUDOCODE", id: "a", pseudocode: "two pointers" });
+  it("still blocks it when only pseudocode or code is present, with no approach", () => {
+    const v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_PSEUDOCODE", id: "a", pseudocode: "two pointers" });
+    expect(canCompleteFreely(v2.progress.a, settings({ requireEvidence: true }))).toBe(false);
+  });
+
+  it("allows it once an approach plus pseudocode or code is present", () => {
+    const withApproach = v2Reducer(emptyAppStoreV2(), { type: "SET_APPROACH", id: "a", approach: "two pointers" });
+    let v2 = v2Reducer(withApproach, { type: "SET_PSEUDOCODE", id: "a", pseudocode: "l=0; r=n-1 ..." });
     expect(canCompleteFreely(v2.progress.a, settings({ requireEvidence: true }))).toBe(true);
-    v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_CODE", id: "a", code: "..." });
+    v2 = v2Reducer(withApproach, { type: "SET_CODE", id: "a", code: "..." });
     expect(canCompleteFreely(v2.progress.a, settings({ requireEvidence: true }))).toBe(true);
   });
 
@@ -511,7 +532,8 @@ describe("canCompleteFreely -- the completion gate", () => {
 
 describe("completionGateVersion stamping on real completion", () => {
   it("stamps CURRENT_COMPLETION_GATE_VERSION when a genuinely new completion has evidence", () => {
-    let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_PSEUDOCODE", id: "a", pseudocode: "two pointers" });
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_APPROACH", id: "a", approach: "two pointers" });
+    v2 = v2Reducer(v2, { type: "SET_PSEUDOCODE", id: "a", pseudocode: "l=0; r=n-1 ..." });
     v2 = patchV2FromV1(v2, v1StoreOf("a", { done: true, completedAt: "2026-01-01" }));
     expect(v2.progress.a.completionGateVersion).toBe(CURRENT_COMPLETION_GATE_VERSION);
   });
@@ -527,7 +549,8 @@ describe("completionGateVersion stamping on real completion", () => {
   });
 
   it("re-completing after an uncheck stays null even with evidence present -- re-checks are exempt, not re-verified", () => {
-    let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_PSEUDOCODE", id: "a", pseudocode: "two pointers" });
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_APPROACH", id: "a", approach: "two pointers" });
+    v2 = v2Reducer(v2, { type: "SET_PSEUDOCODE", id: "a", pseudocode: "l=0; r=n-1 ..." });
     v2 = patchV2FromV1(v2, v1StoreOf("a", { done: true, completedAt: "2026-01-01" })); // gated pass
     expect(v2.progress.a.completionGateVersion).toBe(CURRENT_COMPLETION_GATE_VERSION);
     v2 = patchV2FromV1(v2, v1StoreOf("a", { done: false, completedAt: null })); // uncheck
