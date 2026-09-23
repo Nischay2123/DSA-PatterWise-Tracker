@@ -46,7 +46,7 @@ export interface PromptInput {
 // Delimiters are the whole defense, so a user answer that itself contains the
 // delimiter would break out of its own block. Neutralise it in the content
 // rather than trusting that nobody will ever type five dashes.
-function fenced(label: string, content: string): string {
+export function fenced(label: string, content: string): string {
   const safe = (content || "(left blank)").replaceAll(FENCE, "- - - - -");
   return `${FENCE}BEGIN ${label}${FENCE}\n${safe}\n${FENCE}END ${label}${FENCE}`;
 }

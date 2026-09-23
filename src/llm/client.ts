@@ -1,5 +1,5 @@
 import type { EvaluationResult } from "../types";
-import { getProvider, resolveModel } from "./providers";
+import { EVALUATION_SCHEMA, getProvider, resolveModel, type JsonSchema } from "./providers";
 import { capPrompt } from "./prompt";
 import { extractJson, parseEvaluation } from "./schema";
 
@@ -87,12 +87,16 @@ export interface EvaluateOptions {
   prompt: string;
 }
 
-export async function evaluate(opts: EvaluateOptions): Promise<LlmResult<EvaluationResult>> {
+// One prompt in, one JSON value out, with the provider constrained to
+// `schema`. Everything above the envelope -- timeout, retry, error codes,
+// fence-stripping -- is shared by every JSON call the app makes, so callers
+// only bring a schema and a validator.
+export async function requestJson(opts: EvaluateOptions, schema: JsonSchema): Promise<LlmResult<unknown>> {
   if (!opts.apiKey.trim()) return { ok: false, error: "NO_KEY" };
 
   const adapter = getProvider(opts.provider);
   const model = resolveModel(opts.provider, opts.model);
-  const sent = await send(adapter.buildRequest(opts.apiKey, model, capPrompt(opts.prompt)));
+  const sent = await send(adapter.buildRequest(opts.apiKey, model, capPrompt(opts.prompt), schema));
   if (!sent.ok) return sent;
 
   let envelope: unknown;
@@ -105,7 +109,16 @@ export async function evaluate(opts: EvaluateOptions): Promise<LlmResult<Evaluat
   const text = adapter.extractText(envelope);
   if (text === null) return { ok: false, error: "INVALID_RESPONSE" };
 
-  const evaluation = parseEvaluation(extractJson(text));
+  const value = extractJson(text);
+  if (value === null) return { ok: false, error: "INVALID_RESPONSE" };
+  return { ok: true, data: value };
+}
+
+export async function evaluate(opts: EvaluateOptions): Promise<LlmResult<EvaluationResult>> {
+  const result = await requestJson(opts, EVALUATION_SCHEMA);
+  if (!result.ok) return result;
+
+  const evaluation = parseEvaluation(result.data);
   if (!evaluation) return { ok: false, error: "INVALID_RESPONSE" };
   return { ok: true, data: evaluation };
 }

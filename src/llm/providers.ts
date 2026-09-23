@@ -5,9 +5,9 @@
 // The key travels in a header for both. Never a query string: a key in a URL
 // lands in history, referrers and logs, which the plan forbids outright.
 
-export type ProviderId = "gemini" | "groq";
+export type JsonSchema = Record<string, unknown>;
 
-type JsonSchema = Record<string, unknown>;
+export type ProviderId = "gemini" | "groq";
 
 export interface ProviderRequest {
   url: string;
@@ -18,8 +18,10 @@ export interface ProviderAdapter {
   id: ProviderId;
   label: string;
   defaultModel: string;
-  // The grading call.
-  buildRequest(apiKey: string, model: string, prompt: string): ProviderRequest;
+  // A JSON call. `schema` is what the provider is told to constrain the
+  // response to -- the evaluation shape for grading, something else for
+  // anything else.
+  buildRequest(apiKey: string, model: string, prompt: string, schema: JsonSchema): ProviderRequest;
   // The cheapest possible call that proves a key works, for Settings' Validate.
   buildProbeRequest(apiKey: string, model: string): ProviderRequest;
   // Pulls the model's raw text out of the provider's envelope.
@@ -39,7 +41,7 @@ function get(obj: unknown, ...path: (string | number)[]): unknown {
 // the prompt -- that is what keeps the happy path from ever needing the
 // fence-stripping fallback in schema.ts. Gemini takes it as-is; Groq's strict
 // mode needs the tightened form below.
-const RESPONSE_SCHEMA: JsonSchema = {
+export const EVALUATION_SCHEMA: JsonSchema = {
   type: "object",
   properties: {
     passed: { type: "boolean" },
@@ -100,13 +102,13 @@ function isSchema(value: unknown): value is JsonSchema {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
-const GROQ_RESPONSE_SCHEMA = strict(RESPONSE_SCHEMA);
+
 
 const gemini: ProviderAdapter = {
   id: "gemini",
   label: "Google Gemini",
   defaultModel: "gemini-3.6-flash",
-  buildRequest(apiKey, model, prompt) {
+  buildRequest(apiKey, model, prompt, schema) {
     return {
       url: `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
       init: {
@@ -117,7 +119,7 @@ const gemini: ProviderAdapter = {
           generationConfig: {
             temperature: 0, // grading should be as reproducible as the model allows
             responseMimeType: "application/json",
-            responseSchema: RESPONSE_SCHEMA,
+            responseSchema: schema,
           },
         }),
       },
@@ -160,7 +162,7 @@ const groq: ProviderAdapter = {
   id: "groq",
   label: "Groq",
   defaultModel: "openai/gpt-oss-120b",
-  buildRequest(apiKey, model, prompt) {
+  buildRequest(apiKey, model, prompt, schema) {
     return {
       url: GROQ_URL,
       init: {
@@ -171,7 +173,7 @@ const groq: ProviderAdapter = {
           temperature: 0,
           response_format: {
             type: "json_schema",
-            json_schema: { name: "evaluation", strict: true, schema: GROQ_RESPONSE_SCHEMA },
+            json_schema: { name: "response", strict: true, schema: strict(schema) },
           },
           messages: [{ role: "user", content: prompt }],
         }),

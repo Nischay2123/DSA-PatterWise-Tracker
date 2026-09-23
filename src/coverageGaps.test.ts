@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getProvider } from "./llm/providers";
+import { EVALUATION_SCHEMA as SCHEMA, getProvider } from "./llm/providers";
 import { capPrompt } from "./llm/prompt";
 import { buildPromptInput } from "./revision/evaluate";
 import { buildTopicRows, isExemptTopic, statusDot, statusLabel } from "./revision/dashboard";
@@ -26,7 +26,7 @@ describe("provider probe requests", () => {
   });
 
   it("groq's schema is strict all the way down, gemini's is untouched", () => {
-    const groqBody = JSON.parse(getProvider("groq").buildRequest("k", "m", "p").init.body as string);
+    const groqBody = JSON.parse(getProvider("groq").buildRequest("k", "m", "p", SCHEMA).init.body as string);
     const schema = groqBody.response_format.json_schema.schema;
     expect(groqBody.response_format.json_schema.strict).toBe(true);
 
@@ -48,7 +48,7 @@ describe("provider probe requests", () => {
 
     // Gemini's responseSchema has no additionalProperties in its dialect, so
     // the derivation must not have mutated the shared schema in place.
-    const geminiBody = JSON.parse(getProvider("gemini").buildRequest("k", "m", "p").init.body as string);
+    const geminiBody = JSON.parse(getProvider("gemini").buildRequest("k", "m", "p", SCHEMA).init.body as string);
     expect(geminiBody.generationConfig.responseSchema.additionalProperties).toBeUndefined();
     expect(geminiBody.generationConfig.responseSchema.required).toEqual(["passed", "score", "perFundamental", "perQuestion"]);
   });

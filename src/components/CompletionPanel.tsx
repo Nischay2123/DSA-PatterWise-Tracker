@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useStore } from "../context";
 import { getV2Progress } from "../store";
 import { ERROR_MESSAGE } from "../llm/client";
-import { canGradeSolutions, gradeSolution, type SolutionVerdict } from "../llm/gradeSolution";
+import { canGradeSolutions, gradeSolution, type SolutionAttempt, type SolutionVerdict } from "../llm/gradeSolution";
+import { generateNotes, notesToApply } from "../llm/notes";
 import type { Problem } from "../types";
 import { Icon } from "./Icon";
 import { REVISION_CONFIG } from "../config";
@@ -36,6 +37,7 @@ export function CompletionPanel({
   const [pseudocode, setPseudocode] = useState(progress.pseudocode);
   const [code, setCode] = useState(progress.code);
   const [grading, setGrading] = useState(false);
+  const [writingNotes, setWritingNotes] = useState(false);
   const [verdict, setVerdict] = useState<SolutionVerdict | null>(null);
 
   const hasEvidence = !!approach.trim() && (!!pseudocode.trim() || !!code.trim());
@@ -56,14 +58,25 @@ export function CompletionPanel({
     onCompleted();
   };
 
+  // Notes are written for you once the solution is accepted, so the six
+  // fields exist without being typed twice. Only ever into empty fields --
+  // see notesToApply. The mistake list is yours alone and is never touched.
+  const writeNotes = async (attempt: SolutionAttempt) => {
+    setWritingNotes(true);
+    const result = await generateNotes(v2Store.settings, attempt);
+    setWritingNotes(false);
+    if (!result.ok) return; // notes are a bonus, never a reason to hold up a passed solution
+    for (const { field, value } of notesToApply(progress.notes, result.data)) {
+      dispatchV2({ type: "SET_STRUCTURED_NOTE", id: problemId, field, value });
+    }
+  };
+
   const markComplete = async () => {
-    if (!hasEvidence || grading) return;
+    if (!hasEvidence || grading || writingNotes) return;
     persist();
     if (!graded) return finish();
 
-    setGrading(true);
-    setVerdict(null);
-    const result = await gradeSolution(v2Store.settings, {
+    const attempt: SolutionAttempt = {
       questionId: problemId,
       title: problem.question,
       patternName,
@@ -72,10 +85,17 @@ export function CompletionPanel({
       approach,
       pseudocode,
       code,
-    });
+    };
+
+    setGrading(true);
+    setVerdict(null);
+    const result = await gradeSolution(v2Store.settings, attempt);
     setGrading(false);
     setVerdict(result);
-    if (result.kind === "pass") finish();
+    if (result.kind !== "pass") return;
+
+    await writeNotes(attempt);
+    finish();
   };
 
   return (
@@ -88,7 +108,7 @@ export function CompletionPanel({
           <div className="text-body font-bold">Show your work first</div>
           <div className="text-caption text-muted">
             {graded
-              ? "Your solution is graded before this is marked done."
+              ? "Your solution is graded before this is marked done, then your notes are written for you."
               : "An approach, plus pseudocode or code, is required to mark this done."}
           </div>
         </div>
@@ -156,11 +176,17 @@ export function CompletionPanel({
         <button
           type="button"
           onClick={markComplete}
-          disabled={!hasEvidence || grading}
+          disabled={!hasEvidence || grading || writingNotes}
           className="btn btn-primary"
         >
-          <Icon name={grading ? "clock" : "check"} className="size-4" />
-          {grading ? "Grading…" : verdict?.kind === "fail" ? "Check again" : "Mark complete"}
+          <Icon name={grading || writingNotes ? "clock" : "check"} className="size-4" />
+          {grading
+            ? "Grading…"
+            : writingNotes
+              ? "Writing your notes…"
+              : verdict?.kind === "fail"
+                ? "Check again"
+                : "Mark complete"}
         </button>
         {/* A provider that couldn't be reached is not evidence about the
             solution, so the decision goes back to the user rather than the

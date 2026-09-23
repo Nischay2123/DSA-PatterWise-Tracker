@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { evaluate, validateKey } from "./client";
-import { getProvider, resolveModel } from "./providers";
+import { EVALUATION_SCHEMA, getProvider, resolveModel } from "./providers";
 
 // §13's failure cases, plus the plan's §9 client contract: 20s timeout, one
 // retry on 5xx/network, never on 4xx, and codes-not-upstream-text on the way
@@ -193,7 +193,7 @@ describe("providers", () => {
   });
 
   it("groq sends the key as a bearer token, not a query param", () => {
-    const req = getProvider("groq").buildRequest("secret", "openai/gpt-oss-120b", "prompt");
+    const req = getProvider("groq").buildRequest("secret", "openai/gpt-oss-120b", "prompt", EVALUATION_SCHEMA);
     expect(req.url).not.toContain("secret");
     expect((req.init.headers as Record<string, string>).Authorization).toBe("Bearer secret");
   });
