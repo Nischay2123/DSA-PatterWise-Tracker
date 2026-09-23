@@ -25,13 +25,16 @@ export interface PromptQuestion {
   patternName: string;
   difficulty: string;
   approach: string;
-  pseudocode: string;
-  complexity: string;
-  edgeCases: string;
-  // Only the completion gate sends this -- a revision attempt collects
-  // pseudocode, never full code. Omitted rather than blank so a revision
-  // prompt is byte-identical to what it was before the gate existed.
+  // Everything below is omitted when the caller never asked the user for it,
+  // and sent (even blank) when it did. The difference is not cosmetic: a
+  // block that appears and is blank is an unanswered question and scores 0,
+  // while a block that never appears was never asked and must not be
+  // deducted for. A revision attempt asks for pseudocode/complexity/edge
+  // cases and never for code; the completion gate is the other way round.
+  pseudocode?: string;
   code?: string;
+  complexity?: string;
+  edgeCases?: string;
 }
 
 export interface PromptInput {
@@ -66,6 +69,9 @@ export function buildEvaluationPrompt(input: PromptInput): string {
     "  concepts, judged as a whole. Do not award a fixed number of points per listed",
     "  concept, and do not penalise an answer merely for being shorter than the list.",
     "- Flag only genuine conceptual errors or genuine omissions.",
+    "- Grade only the blocks that actually appear below. A section that is absent",
+    "  was never asked for and is not a missing answer: never deduct for it, and",
+    "  do not ask for it in `mistakes` or `note`.",
     "- Every score is an integer 0-5, where 0 is no useful recall and 5 is complete,",
     "  correct recall. An empty answer scores 0.",
     "",
@@ -91,10 +97,14 @@ export function buildEvaluationPrompt(input: PromptInput): string {
         `QUESTION ${i + 1} — questionId: ${q.questionId}`,
         `Problem: ${q.title} (pattern: ${q.patternName}, difficulty: ${q.difficulty})`,
         fenced(`USER APPROACH ${q.questionId}`, q.approach),
-        fenced(`USER PSEUDOCODE ${q.questionId}`, q.pseudocode),
-        ...(q.code === undefined ? [] : [fenced(`USER CODE ${q.questionId}`, q.code)]),
-        fenced(`USER COMPLEXITY ${q.questionId}`, q.complexity),
-        fenced(`USER EDGE CASES ${q.questionId}`, q.edgeCases),
+        ...([
+          ["USER PSEUDOCODE", q.pseudocode],
+          ["USER CODE", q.code],
+          ["USER COMPLEXITY", q.complexity],
+          ["USER EDGE CASES", q.edgeCases],
+        ] as const)
+          .filter(([, content]) => content !== undefined)
+          .map(([label, content]) => fenced(`${label} ${q.questionId}`, content as string)),
       ].join("\n")
     )
     .join("\n\n");

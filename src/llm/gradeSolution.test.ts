@@ -112,7 +112,28 @@ describe("gradeSolution", () => {
     expect(canGradeSolutions({ ...SETTINGS, apiKey: "   " })).toBe(false);
   });
 
-  it("rounds the gate score off the three sub-scores it asked for", () => {
-    expect(gateScore({ correctness: 3, approach: 4, pseudocode: 4 })).toBe(73);
+  it("rounds the gate score off the sub-scores it asked for", () => {
+    expect(gateScore({ correctness: 3, approach: 4, pseudocode: 4 }, { pseudocode: true })).toBe(73);
+    expect(gateScore({ correctness: 3, approach: 4, pseudocode: 0 }, { pseudocode: false })).toBe(70);
+  });
+
+  it("does not mark down a code-only answer for the pseudocode it was told was optional", async () => {
+    // The real 67: correctness 5, approach 5, and a pseudocode 0 for a box
+    // the gate said could be left empty if code was given. (5+5+0)/3*20 = 67,
+    // three points under the pass mark, for a correct solution.
+    stubFetch(graded({ correctness: 5, approach: 5, pseudocode: 0, complexity: 0 }));
+    expect(await gradeSolution(SETTINGS, { ...ATTEMPT, pseudocode: "" })).toMatchObject({ kind: "pass", score: 100 });
+  });
+
+  it("never sends a block the panel did not ask for", async () => {
+    const fetchFn = stubFetch(graded({ correctness: 4, approach: 4, pseudocode: 4, complexity: 4 }));
+    await gradeSolution(SETTINGS, { ...ATTEMPT, pseudocode: "" });
+    const prompt = JSON.parse(fetchFn.mock.calls[0]![1].body as string).contents[0].parts[0].text;
+    // An empty block is an unanswered question and scores 0. These were never
+    // asked, so they must not appear at all.
+    expect(prompt).not.toContain("USER PSEUDOCODE");
+    expect(prompt).not.toContain("USER COMPLEXITY");
+    expect(prompt).not.toContain("USER EDGE CASES");
+    expect(prompt).toContain("USER CODE two-sum");
   });
 });

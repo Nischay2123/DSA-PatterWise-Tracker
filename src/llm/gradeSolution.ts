@@ -43,16 +43,30 @@ export function canGradeSolutions(settings: AppSettings): boolean {
   return !!settings.apiKey.trim();
 }
 
-// The gate's own score, not computeOverallScore's. The completion panel
-// collects approach/pseudocode/code and never asks for complexity, so the
-// blank complexity block would score 0 and drag a correct solution under the
-// pass mark. Averaging only what was actually asked for is the whole
-// difference; the threshold is shared with revisions on purpose.
-export function gateScore(q: { correctness: number; approach: number; pseudocode: number }): number {
-  return Math.round(((q.correctness + q.approach + q.pseudocode) / 3) * 20);
+// The gate's own score, not computeOverallScore's. It averages only the
+// sub-scores for work the panel actually asked for, then scales to 0-100 on
+// the same threshold revisions use.
+//
+// `pseudocode` counts only when pseudocode was submitted. The gate accepts
+// pseudocode OR code, so counting an unwritten pseudocode sub-score marks
+// you down for taking the option you were offered: a flawless code-only
+// answer scored (5 + 5 + 0) / 3 * 20 = 67 and was rejected. Complexity and
+// edge cases are never collected here, so they are never sent and never
+// counted.
+export function gateScore(
+  q: { correctness: number; approach: number; pseudocode: number },
+  submitted: { pseudocode: boolean }
+): number {
+  const parts = [q.correctness, q.approach, ...(submitted.pseudocode ? [q.pseudocode] : [])];
+  return Math.round((parts.reduce((a, b) => a + b, 0) / parts.length) * 20);
 }
 
 export async function gradeSolution(settings: AppSettings, attempt: SolutionAttempt): Promise<SolutionVerdict> {
+  // Sent only when written. An empty block is an unanswered question to the
+  // grader; an absent one is a question that was never asked.
+  const pseudocode = attempt.pseudocode.trim() ? attempt.pseudocode : undefined;
+  const code = attempt.code.trim() ? attempt.code : undefined;
+
   const prompt = buildEvaluationPrompt({
     topicName: attempt.topicName,
     fundamentals: [],
@@ -63,13 +77,9 @@ export async function gradeSolution(settings: AppSettings, attempt: SolutionAtte
         patternName: attempt.patternName,
         difficulty: attempt.difficulty,
         approach: attempt.approach,
-        pseudocode: attempt.pseudocode,
-        code: attempt.code,
-        // Not collected at completion time. Sent blank rather than omitted so
-        // the model still reports a complexity sub-score, which gateScore
-        // then ignores -- see above.
-        complexity: "",
-        edgeCases: "",
+        pseudocode,
+        code,
+        // Not collected at completion time, so not sent at all.
       },
     ],
   });
@@ -87,7 +97,7 @@ export async function gradeSolution(settings: AppSettings, attempt: SolutionAtte
   const graded = result.data.perQuestion.find((q) => q.questionId === attempt.questionId);
   if (!graded) return { kind: "ungraded", error: "INVALID_RESPONSE" };
 
-  const score = gateScore(graded);
+  const score = gateScore(graded, { pseudocode: pseudocode !== undefined });
   const note = graded.note || result.data.feedback;
   if (score >= REVISION_CONFIG.passScore) return { kind: "pass", score, note };
   return { kind: "fail", score, mistakes: graded.mistakes, note };
