@@ -28,6 +28,10 @@ export interface PromptQuestion {
   pseudocode: string;
   complexity: string;
   edgeCases: string;
+  // Only the completion gate sends this -- a revision attempt collects
+  // pseudocode, never full code. Omitted rather than blank so a revision
+  // prompt is byte-identical to what it was before the gate existed.
+  code?: string;
 }
 
 export interface PromptInput {
@@ -88,6 +92,7 @@ export function buildEvaluationPrompt(input: PromptInput): string {
         `Problem: ${q.title} (pattern: ${q.patternName}, difficulty: ${q.difficulty})`,
         fenced(`USER APPROACH ${q.questionId}`, q.approach),
         fenced(`USER PSEUDOCODE ${q.questionId}`, q.pseudocode),
+        ...(q.code === undefined ? [] : [fenced(`USER CODE ${q.questionId}`, q.code)]),
         fenced(`USER COMPLEXITY ${q.questionId}`, q.complexity),
         fenced(`USER EDGE CASES ${q.questionId}`, q.edgeCases),
       ].join("\n")

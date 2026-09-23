@@ -186,7 +186,9 @@ export function QuestionRow({
         <div className="col-start-2 col-span-2 min-w-0">
           {completionPanelOpen && (
             <CompletionPanel
-              problemId={problem.id}
+              problem={problem}
+              topicName={topicName}
+              patternName={patternName}
               onCancel={() => setCompletionPanelOpen(false)}
               onCompleted={() => setCompletionPanelOpen(false)}
             />
