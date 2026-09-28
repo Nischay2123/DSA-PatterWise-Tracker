@@ -521,6 +521,54 @@ describe("canCompleteFreely -- the completion gate", () => {
     expect(canCompleteFreely(progress, settings({ requireEvidence: false }))).toBe(true);
   });
 
+  // Regression: text in the boxes used to BE the gate, so the act of
+  // attempting disabled the grader. Each of these ticked instantly on the
+  // next click, with no panel and no grading.
+  describe("with a provider that can actually grade", () => {
+    const graded = settings({ requireEvidence: true, apiKey: "a-real-key" });
+
+    function withDraft(approach: string, field: "pseudocode" | "code", value: string) {
+      let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_APPROACH", id: "a", approach });
+      v2 = v2Reducer(v2, field === "code"
+        ? { type: "SET_CODE", id: "a", code: value }
+        : { type: "SET_PSEUDOCODE", id: "a", pseudocode: value });
+      return v2.progress.a;
+    }
+
+    it("A. keeps the gate shut after a graded fail left the draft behind", () => {
+      const progress = withDraft("sort then scan", "code", "return 42; // wrong");
+      expect(hasCompletionEvidence(progress)).toBe(true); // the draft really is saved
+      expect(progress.firstCompletedAt).toBeNull(); // grading rejected it
+      expect(canCompleteFreely(progress, graded)).toBe(false);
+    });
+
+    it("B. keeps it shut when the panel was opened, typed into, and abandoned", () => {
+      expect(canCompleteFreely(withDraft("x", "pseudocode", "y"), graded)).toBe(false);
+    });
+
+    it("C. keeps it shut for text typed straight into SolutionEditor, which never opens the panel", () => {
+      // Same three fields, written from the always-visible details section.
+      expect(canCompleteFreely(withDraft("a", "code", "b"), graded)).toBe(false);
+    });
+
+    it("still exempts a question that has genuinely been completed once", () => {
+      let v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf("a", { done: true, completedAt: "2020-01-01" }));
+      v2 = patchV2FromV1(v2, v1StoreOf("a", { done: false, completedAt: null }));
+      expect(canCompleteFreely(v2.progress.a, graded)).toBe(true);
+    });
+
+    it("still honours requireEvidence:false", () => {
+      const progress = withDraft("x", "code", "y");
+      expect(canCompleteFreely(progress, settings({ requireEvidence: false, apiKey: "a-real-key" }))).toBe(true);
+    });
+
+    it("falls back to the presence rule the moment the key goes away", () => {
+      const progress = withDraft("x", "code", "y");
+      expect(canCompleteFreely(progress, graded)).toBe(false);
+      expect(canCompleteFreely(progress, settings({ requireEvidence: true, apiKey: "   " }))).toBe(true);
+    });
+  });
+
   it("a grandfathered/already-once-completed question is never re-gated, even with zero evidence", () => {
     let v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf("a", { done: true, completedAt: "2020-01-01" }));
     v2 = patchV2FromV1(v2, v1StoreOf("a", { done: false, completedAt: null })); // unchecked

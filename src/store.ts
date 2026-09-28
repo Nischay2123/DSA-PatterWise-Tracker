@@ -2,6 +2,7 @@ import idMapRaw from "../data/idMap.json";
 import { REVISION_CONFIG } from "./config";
 import { isValidAppStoreV2, liftV1Entry } from "./persistence/migrate";
 import { scoreEvaluation } from "./revision/evaluate";
+import { canGradeSolutions } from "./llm/gradeSolution";
 import { matchesGoal } from "./revision/goal";
 import type { Goal } from "./revision/goal";
 import { recordAttemptOutcome, scheduleInitial } from "./revision/scheduler";
@@ -623,7 +624,29 @@ export function isGatingActive(settings: AppSettings): boolean {
 }
 
 export function canCompleteFreely(progress: QuestionProgressV2, settings: AppSettings): boolean {
-  return progress.firstCompletedAt !== null || !settings.requireEvidence || hasCompletionEvidence(progress);
+  // Already completed once -- grandfathered, "editable but not re-gated".
+  if (progress.firstCompletedAt !== null) return true;
+  // The friction release valve.
+  if (!settings.requireEvidence) return true;
+  // When a provider CAN grade, having text in the boxes is not permission to
+  // skip being graded by it.
+  //
+  // This used to end at `|| hasCompletionEvidence(progress)`, which predates
+  // solution grading and was never revisited when grading landed. The panel
+  // persists your draft on every blur, and again before it calls the grader,
+  // so that a failed grade never eats your work -- with the result that the
+  // act of ATTEMPTING satisfied the gate. A graded fail, an abandoned panel,
+  // or even typing into the always-visible SolutionEditor all left evidence
+  // behind, and the next click on the checkbox took this free path: no panel,
+  // no grading, ticked.
+  //
+  // So while grading is possible the gate stays shut until a completion has
+  // actually happened. Nothing is lost by re-opening the panel -- it pre-fills
+  // from the same saved draft.
+  if (canGradeSolutions(settings)) return false;
+  // No key: nothing can grade, so presence is the only rule available and
+  // stays exactly as it was.
+  return hasCompletionEvidence(progress);
 }
 
 export function patchV2FromV1(v2: AppStoreV2, v1: ProgressStore): AppStoreV2 {
