@@ -146,7 +146,7 @@ function emptyProgress() {
     starredAt: null,
     firstCompletedAt: null,
     lastCompletedAt: null,
-    completionGateVersion: null,
+    completionGateVersion: null, gradedAt: null,
     approach: "",
     pseudocode: "",
     code: "",

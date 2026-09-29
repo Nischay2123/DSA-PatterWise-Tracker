@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useStore } from "../context";
-import { getV2Progress } from "../store";
+import { getV2Progress, todayISO } from "../store";
 import { ERROR_MESSAGE } from "../llm/client";
 import { canGradeSolutions, gradeSolution, type SolutionAttempt, type SolutionVerdict } from "../llm/gradeSolution";
 import { generateNotes, notesToApply } from "../llm/notes";
@@ -94,6 +94,10 @@ export function CompletionPanel({
     setVerdict(result);
     if (result.kind !== "pass") return;
 
+    // The one place this is ever recorded. canCompleteFreely reads it on
+    // every later check, so an uncheck/re-check of a graded question stays
+    // free while one that was never graded is sent back here.
+    dispatchV2({ type: "MARK_GRADED", id: problemId, at: todayISO() });
     await writeNotes(attempt);
     finish();
   };

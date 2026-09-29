@@ -15,7 +15,7 @@ function progress(patch: Partial<QuestionProgressV2> = {}): QuestionProgressV2 {
     starredAt: null,
     firstCompletedAt: null,
     lastCompletedAt: null,
-    completionGateVersion: null,
+    completionGateVersion: null, gradedAt: null,
     approach: "",
     pseudocode: "",
     code: "",

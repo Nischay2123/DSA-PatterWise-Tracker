@@ -37,6 +37,8 @@ export function liftV1Entry(v1: ProblemState): QuestionProgressV2 {
     // Every migrated entry predates Phase 3's completion-evidence gate by
     // definition -- grandfathered, not subject to it.
     completionGateVersion: null,
+    // Nothing migrated was ever graded; grading postdates every v1 entry.
+    gradedAt: null,
     approach: "",
     pseudocode: "",
     code: "",

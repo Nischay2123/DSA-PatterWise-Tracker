@@ -436,6 +436,9 @@ function mergeProgressEntry(a: QuestionProgressV2, b: QuestionProgressV2): Quest
     // A gate-verified completion stays verified; null means "ungated", so a
     // non-null on either side is the more specific fact.
     completionGateVersion: a.completionGateVersion ?? b.completionGateVersion,
+    // Having been graded is a historical fact like the first completion: if
+    // either device saw a pass, it happened, and the earliest date is when.
+    gradedAt: earlierDate(a.gradedAt ?? null, b.gradedAt ?? null),
     approach: mergeNotes(a.approach, b.approach),
     pseudocode: mergeNotes(a.pseudocode, b.pseudocode),
     code: mergeNotes(a.code, b.code),
@@ -624,29 +627,42 @@ export function isGatingActive(settings: AppSettings): boolean {
 }
 
 export function canCompleteFreely(progress: QuestionProgressV2, settings: AppSettings): boolean {
-  // Already completed once -- grandfathered, "editable but not re-gated".
-  if (progress.firstCompletedAt !== null) return true;
-  // The friction release valve.
+  // The friction release valve, and the only unconditional exit.
   if (!settings.requireEvidence) return true;
-  // When a provider CAN grade, having text in the boxes is not permission to
-  // skip being graded by it.
+
+  // No key: nothing can grade, so presence is the only rule available, and a
+  // question completed once before stays grandfathered -- "editable but not
+  // re-gated". Unchanged behaviour.
+  if (!canGradeSolutions(settings)) {
+    return progress.firstCompletedAt !== null || hasCompletionEvidence(progress);
+  }
+
+  // A key IS configured, so the gate's question is the only one worth asking:
+  // has a grader ever accepted THIS solution?
   //
-  // This used to end at `|| hasCompletionEvidence(progress)`, which predates
-  // solution grading and was never revisited when grading landed. The panel
-  // persists your draft on every blur, and again before it calls the grader,
-  // so that a failed grade never eats your work -- with the result that the
-  // act of ATTEMPTING satisfied the gate. A graded fail, an abandoned panel,
-  // or even typing into the always-visible SolutionEditor all left evidence
-  // behind, and the next click on the checkbox took this free path: no panel,
-  // no grading, ticked.
+  // Two things used to answer it wrongly, and both let a question be ticked
+  // with no grading at all:
   //
-  // So while grading is possible the gate stays shut until a completion has
-  // actually happened. Nothing is lost by re-opening the panel -- it pre-fills
-  // from the same saved draft.
-  if (canGradeSolutions(settings)) return false;
-  // No key: nothing can grade, so presence is the only rule available and
-  // stays exactly as it was.
-  return hasCompletionEvidence(progress);
+  //   Text in the boxes. The panel saves your draft on every blur, and again
+  //   before it calls the grader, so a failed grade never eats your work --
+  //   with the result that the act of ATTEMPTING satisfied a presence check.
+  //   Typing straight into the always-visible SolutionEditor did it too.
+  //
+  //   Having been completed before. A question ticked years ago, or ticked
+  //   while no key was configured, carried firstCompletedAt forever after, so
+  //   unchecking it and checking it again walked straight past the grader.
+  //   That is the bug this clause replaces: a past tick says nothing about
+  //   whether the work was ever checked.
+  //
+  // gradedAt is set in exactly one place -- a grader returning a pass -- so
+  // it cannot be satisfied by typing, by abandoning the panel, by "mark done
+  // anyway" when the provider was unreachable, or by toggling the checkbox.
+  // Once earned it persists, so re-checking a graded question stays free and
+  // never re-bills the API.
+  //
+  // Nothing is lost by being sent back to the panel: it pre-fills from the
+  // same saved solution, so passing again is one click.
+  return !!progress.gradedAt;
 }
 
 export function patchV2FromV1(v2: AppStoreV2, v1: ProgressStore): AppStoreV2 {
@@ -661,7 +677,14 @@ export function patchV2FromV1(v2: AppStoreV2, v1: ProgressStore): AppStoreV2 {
     // completed before -- grandfathered/re-checks are exempt) AND has real
     // evidence recorded at the moment of completion. Everything else --
     // grandfathered, requireEvidence off, re-checks -- stays ungated (0).
-    const gateSatisfied = justCompleted && base.firstCompletedAt === null && hasCompletionEvidence(base);
+    // ...and one that satisfied the gate AS IT STOOD: evidence, plus a
+    // grader's pass whenever a grader was available. Without the second half
+    // this stamped "gate-verified" on completions that were never graded.
+    const gateSatisfied =
+      justCompleted &&
+      base.firstCompletedAt === null &&
+      hasCompletionEvidence(base) &&
+      (!canGradeSolutions(v2.settings) || !!base.gradedAt);
     progress[id] = {
       ...base,
       completed: state.done,
@@ -755,6 +778,8 @@ export function v2Reducer(v2: AppStoreV2, action: V2Action): AppStoreV2 {
       return patchV2Progress(v2, action.id, { pseudocode: action.pseudocode });
     case "SET_CODE":
       return patchV2Progress(v2, action.id, { code: action.code });
+    case "MARK_GRADED":
+      return patchV2Progress(v2, action.id, { gradedAt: action.at });
     case "SET_STRUCTURED_NOTE": {
       const existing = getV2Progress(v2, action.id);
       return patchV2Progress(v2, action.id, { notes: { ...existing.notes, [action.field]: action.value } });

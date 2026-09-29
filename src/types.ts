@@ -77,6 +77,12 @@ export interface QuestionProgressV2 {
   // or completed before Phase 3's gate exists). Once Phase 3 ships a real gate,
   // a positive integer records which gate version's evidence rule was satisfied.
   completionGateVersion: number | null;
+  // When this question's own solution was last graded and PASSED. Null means
+  // no grader has ever accepted it -- including for a question completed
+  // before grading existed, or ticked while no API key was configured.
+  // Completion is not evidence of grading, which is why this is its own fact
+  // rather than something derived from firstCompletedAt.
+  gradedAt: string | null;
   approach: string;
   pseudocode: string;
   code: string;
@@ -212,6 +218,9 @@ export type V2Action =
   | { type: "SET_PSEUDOCODE"; id: string; pseudocode: string }
   | { type: "SET_CODE"; id: string; code: string }
   | { type: "SET_STRUCTURED_NOTE"; id: string; field: StructuredNoteField; value: string }
+  // Recorded only where a grader actually returned a pass -- never on
+  // "mark done anyway", and never inferred from a completion.
+  | { type: "MARK_GRADED"; id: string; at: string }
   | { type: "ADD_MISTAKE"; id: string; mistake: { at: string; what: string; remember: string } }
   | { type: "REMOVE_MISTAKE"; id: string; at: string }
   // Wholesale replace, for importing/restoring a complete v2 export or backup --

@@ -114,7 +114,7 @@ describe("earlierDate / v1 merge date invariants", () => {
 describe("mergeStoresV2 tie-breaks", () => {
   const prog = (patch: Partial<QuestionProgressV2> = {}): QuestionProgressV2 => ({
     completed: false, starred: false, starredAt: null, firstCompletedAt: null, lastCompletedAt: null,
-    completionGateVersion: null, approach: "", pseudocode: "", code: "",
+    completionGateVersion: null, gradedAt: null, approach: "", pseudocode: "", code: "",
     notes: { legacy: "", approach: "", keyInsight: "", commonMistake: "", complexity: "", edgeCases: "", reminder: "" },
     mistakes: [], revisionStats: { count: 0, lastRevisedAt: null, lastScore: null, lastConfidence: null },
     ...patch,

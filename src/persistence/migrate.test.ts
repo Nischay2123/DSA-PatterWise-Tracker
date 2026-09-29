@@ -44,6 +44,7 @@ describe("migrateV1ToV2", () => {
       firstCompletedAt: "2026-01-10",
       lastCompletedAt: "2026-01-10",
       completionGateVersion: null,
+      gradedAt: null,
       approach: "",
       pseudocode: "",
       code: "",

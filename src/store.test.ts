@@ -551,10 +551,28 @@ describe("canCompleteFreely -- the completion gate", () => {
       expect(canCompleteFreely(withDraft("a", "code", "b"), graded)).toBe(false);
     });
 
-    it("still exempts a question that has genuinely been completed once", () => {
+    it("D. re-gates a question completed before, but never graded -- uncheck/re-check was the last way past", () => {
       let v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf("a", { done: true, completedAt: "2020-01-01" }));
-      v2 = patchV2FromV1(v2, v1StoreOf("a", { done: false, completedAt: null }));
+      v2 = patchV2FromV1(v2, v1StoreOf("a", { done: false, completedAt: null })); // unchecked
+      expect(v2.progress.a.firstCompletedAt).toBe("2020-01-01"); // it really was completed once
+      expect(v2.progress.a.gradedAt).toBeNull(); // but no grader ever saw it
+      expect(canCompleteFreely(v2.progress.a, graded)).toBe(false);
+    });
+
+    it("exempts it once a grader has actually passed it, and keeps exempting it after an uncheck", () => {
+      let v2 = v2Reducer(emptyAppStoreV2(), { type: "MARK_GRADED", id: "a", at: "2026-03-01" });
       expect(canCompleteFreely(v2.progress.a, graded)).toBe(true);
+      v2 = patchV2FromV1(v2, v1StoreOf("a", { done: true, completedAt: "2026-03-01" }));
+      v2 = patchV2FromV1(v2, v1StoreOf("a", { done: false, completedAt: null }));
+      expect(canCompleteFreely(v2.progress.a, graded)).toBe(true); // never re-bills the API
+    });
+
+    it("a completion recorded without grading -- \"mark done anyway\" -- does not count as graded", () => {
+      let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_APPROACH", id: "a", approach: "x" });
+      v2 = v2Reducer(v2, { type: "SET_CODE", id: "a", code: "y" });
+      v2 = patchV2FromV1(v2, v1StoreOf("a", { done: true, completedAt: "2026-03-01" }));
+      v2 = patchV2FromV1(v2, v1StoreOf("a", { done: false, completedAt: null }));
+      expect(canCompleteFreely(v2.progress.a, graded)).toBe(false);
     });
 
     it("still honours requireEvidence:false", () => {
@@ -569,6 +587,8 @@ describe("canCompleteFreely -- the completion gate", () => {
     });
   });
 
+  // Still true with NO key configured: nothing can grade, so the presence
+  // rule and its grandfathering are all that is available.
   it("a grandfathered/already-once-completed question is never re-gated, even with zero evidence", () => {
     let v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf("a", { done: true, completedAt: "2020-01-01" }));
     v2 = patchV2FromV1(v2, v1StoreOf("a", { done: false, completedAt: null })); // unchecked
