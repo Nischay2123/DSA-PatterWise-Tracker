@@ -62,27 +62,27 @@ function Switch({
 export function SettingsPanel() {
   const { v2Store, dispatchV2 } = useStore();
   const { settings } = v2Store;
-  const [keyDraft, setKeyDraft] = useState(settings.apiKey);
   const [probe, setProbe] = useState<ProbeState>({ kind: "idle" });
 
   const provider = getProvider(settings.provider);
 
-  const saveKey = () => {
-    dispatchV2({ type: "SET_SETTINGS", patch: { apiKey: keyDraft.trim() } });
-    setProbe({ kind: "idle" });
-  };
-
-  const clearKey = () => {
-    setKeyDraft("");
-    dispatchV2({ type: "SET_SETTINGS", patch: { apiKey: "" } });
+  // The key is stored, not drafted. It used to live in local state and save
+  // on blur, which meant closing this drawer with Escape -- the drawer
+  // unmounts, and React fires no blur on unmount -- threw the key away
+  // without a word. The field looked filled the whole time, so "my key is
+  // added" and "no key is configured" were both true at once, and every
+  // grading feature silently stayed off. Every other field here already
+  // dispatches on change; this one now does too, and saves are debounced
+  // 400ms in db.ts, so a keystroke costs nothing.
+  const setKey = (value: string) => {
+    dispatchV2({ type: "SET_SETTINGS", patch: { apiKey: value } });
     setProbe({ kind: "idle" });
   };
 
   // One cheap call so a bad key is reported here and now, rather than at the
   // end of a revision (plan §9 key lifecycle, step 3).
   const runValidate = async () => {
-    const key = keyDraft.trim();
-    dispatchV2({ type: "SET_SETTINGS", patch: { apiKey: key } });
+    const key = settings.apiKey.trim();
     setProbe({ kind: "checking" });
     const result = await validateKey(key, settings.provider, settings.model);
     setProbe(result.ok ? { kind: "ok" } : { kind: "error", message: ERROR_MESSAGE[result.error] });
@@ -132,24 +132,42 @@ export function SettingsPanel() {
           id="settings-key"
           type="password"
           className="field"
-          value={keyDraft}
+          value={settings.apiKey}
           autoComplete="off"
           spellCheck={false}
           placeholder="Paste your key"
-          onChange={(e) => setKeyDraft(e.target.value)}
-          onBlur={saveKey}
+          onChange={(e) => setKey(e.target.value)}
+          onBlur={(e) => e.target.value !== e.target.value.trim() && setKey(e.target.value.trim())}
         />
+        {/* The field is the store, so this says what the rest of the app
+            actually sees -- not what was typed into a draft. */}
+        <p className="text-micro mt-1.5 mb-0 flex items-center gap-1.5">
+          {settings.apiKey.trim() ? (
+            <>
+              <Icon name="check" className="size-3.5 shrink-0 text-easy" />
+              <span className="text-muted">Key saved. Solutions and revisions are graded.</span>
+            </>
+          ) : (
+            <>
+              <Icon name="alert" className="size-3.5 shrink-0 text-medium" />
+              <span className="text-muted">
+                No key saved — nothing can be graded, so marking a question done only checks that the fields
+                aren&apos;t empty.
+              </span>
+            </>
+          )}
+        </p>
         <div className="flex gap-2 mt-2 flex-wrap">
           <button
             type="button"
             className="btn btn-sm"
             onClick={runValidate}
-            disabled={!keyDraft.trim() || probe.kind === "checking"}
+            disabled={!settings.apiKey.trim() || probe.kind === "checking"}
           >
             <Icon name="check" className="size-3.5" />
             {probe.kind === "checking" ? "Checking…" : "Validate"}
           </button>
-          <button type="button" className="btn btn-sm btn-quiet" onClick={clearKey} disabled={!settings.apiKey && !keyDraft}>
+          <button type="button" className="btn btn-sm btn-quiet" onClick={() => setKey("")} disabled={!settings.apiKey}>
             <Icon name="trash" className="size-3.5" />
             Clear key
           </button>

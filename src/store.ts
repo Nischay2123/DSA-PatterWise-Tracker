@@ -630,12 +630,16 @@ export function canCompleteFreely(progress: QuestionProgressV2, settings: AppSet
   // The friction release valve, and the only unconditional exit.
   if (!settings.requireEvidence) return true;
 
-  // No key: nothing can grade, so presence is the only rule available, and a
-  // question completed once before stays grandfathered -- "editable but not
-  // re-gated". Unchanged behaviour.
-  if (!canGradeSolutions(settings)) {
-    return progress.firstCompletedAt !== null || hasCompletionEvidence(progress);
-  }
+  // No key: nothing can grade, so presence is the only rule available.
+  //
+  // This used to read `firstCompletedAt !== null || hasCompletionEvidence`.
+  // The first half was grandfathering -- "completed once, never re-gated" --
+  // and it made a single past tick a permanent exemption, so a question could
+  // be unchecked and re-checked any number of times with nothing in the
+  // fields at all. A rule that stops applying the moment it is first
+  // satisfied is not a rule. Every completion, first or fiftieth, now has to
+  // satisfy whatever gate is in force at the time.
+  if (!canGradeSolutions(settings)) return hasCompletionEvidence(progress);
 
   // A key IS configured, so the gate's question is the only one worth asking:
   // has a grader ever accepted THIS solution?

@@ -587,14 +587,27 @@ describe("canCompleteFreely -- the completion gate", () => {
     });
   });
 
-  // Still true with NO key configured: nothing can grade, so the presence
-  // rule and its grandfathering are all that is available.
-  it("a grandfathered/already-once-completed question is never re-gated, even with zero evidence", () => {
+  // There is no grandfathering left on either path. A past tick was a
+  // permanent exemption: uncheck, re-check, repeat, with empty fields.
+  it("re-gates an already-once-completed question with zero evidence, even with no key", () => {
     let v2 = patchV2FromV1(emptyAppStoreV2(), v1StoreOf("a", { done: true, completedAt: "2020-01-01" }));
     v2 = patchV2FromV1(v2, v1StoreOf("a", { done: false, completedAt: null })); // unchecked
     expect(v2.progress.a.firstCompletedAt).toBe("2020-01-01"); // still on record
     expect(hasCompletionEvidence(v2.progress.a)).toBe(false);
-    expect(canCompleteFreely(v2.progress.a, settings({ requireEvidence: true }))).toBe(true);
+    expect(canCompleteFreely(v2.progress.a, settings({ requireEvidence: true }))).toBe(false);
+  });
+
+  it("no rule survives being satisfied once -- un/re-checking is gated every single time", () => {
+    const noKey = settings({ requireEvidence: true });
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "SET_APPROACH", id: "a", approach: "two pointers" });
+    v2 = v2Reducer(v2, { type: "SET_CODE", id: "a", code: "l=0; r=n-1" });
+    v2 = patchV2FromV1(v2, v1StoreOf("a", { done: true, completedAt: "2026-01-01" }));
+    v2 = patchV2FromV1(v2, v1StoreOf("a", { done: false, completedAt: null }));
+    // The solution is still saved, so the presence rule is still met.
+    expect(canCompleteFreely(v2.progress.a, noKey)).toBe(true);
+    // Clear it and the exemption goes with it, past completion or not.
+    v2 = v2Reducer(v2, { type: "SET_APPROACH", id: "a", approach: "" });
+    expect(canCompleteFreely(v2.progress.a, noKey)).toBe(false);
   });
 });
 
