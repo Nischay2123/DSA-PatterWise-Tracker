@@ -1,9 +1,13 @@
 import { useState } from "react";
 import { useStore } from "../context";
-import { getV2Progress } from "../store";
+import { getV2Progress, hasCompletionEvidence } from "../store";
 import { cx } from "../cx";
+import { ERROR_MESSAGE } from "../llm/client";
+import { canGradeSolutions, type SolutionAttempt } from "../llm/gradeSolution";
+import { generateNotes, NOTE_FIELDS, notesToApply } from "../llm/notes";
 import { Icon } from "./Icon";
-import type { StructuredNoteField } from "../types";
+import type { LlmErrorCode } from "../llm/client";
+import type { Problem, StructuredNoteField } from "../types";
 
 // These notes are written once and read months later, usually in the ten
 // seconds before deciding "do I still know this?". So the panel reads first
@@ -50,14 +54,65 @@ function Heading({ label, action }: { label: string; action: React.ReactNode }) 
   );
 }
 
-export function NotesEditor({ problemId }: { problemId: string }) {
+export function NotesEditor({
+  problem,
+  topicName,
+  patternName,
+}: {
+  problem: Problem;
+  topicName: string;
+  patternName: string;
+}) {
+  const problemId = problem.id;
   const { v2Store, dispatchV2 } = useStore();
   const progress = getV2Progress(v2Store, problemId);
   const [editing, setEditing] = useState<StructuredNoteField | null>(null);
+  const [writing, setWriting] = useState(false);
+  const [error, setError] = useState<LlmErrorCode | "NO_CHANGE" | null>(null);
 
   const save = (field: StructuredNoteField, value: string) => {
     dispatchV2({ type: "SET_STRUCTURED_NOTE", id: problemId, field, value });
     setEditing(null);
+  };
+
+  // CompletionPanel writes these automatically, but only on the one path
+  // where a solution passes grading. A question that was ticked before
+  // grading existed, ticked without an API key, or whose notes call failed
+  // (notes never hold up a passed solution) ends up done with the six fields
+  // empty and no way back to them. This is that way back.
+  //
+  // The saved solution is what the notes are written from, so the button
+  // only exists once there is one -- there is nothing to ground notes in
+  // otherwise. notesToApply still fills only empty fields, so anything
+  // already written, by an earlier run or by hand, survives untouched.
+  const canWrite = hasCompletionEvidence(progress);
+  const missing = NOTE_FIELDS.filter((f) => !progress.notes[f].trim()).length;
+  const keyed = canGradeSolutions(v2Store.settings);
+
+  const writeNotes = async () => {
+    if (writing || !canWrite || !keyed) return;
+    setWriting(true);
+    setError(null);
+    const attempt: SolutionAttempt = {
+      questionId: problemId,
+      title: problem.question,
+      patternName,
+      difficulty: problem.difficulty,
+      topicName,
+      approach: progress.approach,
+      pseudocode: progress.pseudocode,
+      code: progress.code,
+    };
+    const result = await generateNotes(v2Store.settings, attempt);
+    setWriting(false);
+    if (!result.ok) return setError(result.error);
+    const toApply = notesToApply(progress.notes, result.data);
+    // Every field already had something in it, so nothing was written --
+    // silence here reads as a broken button.
+    if (toApply.length === 0) return setError("NO_CHANGE");
+    for (const { field, value } of toApply) {
+      dispatchV2({ type: "SET_STRUCTURED_NOTE", id: problemId, field, value });
+    }
   };
 
   return (
@@ -65,7 +120,33 @@ export function NotesEditor({ problemId }: { problemId: string }) {
       <div className="flex items-center gap-1.5 mb-2.5">
         <Icon name="book" className="size-3.5 text-faint" />
         <span className="text-ui font-bold">Notes</span>
+        {/* Hidden once every field is filled: notesToApply would write
+            nothing, so the button would only ever report doing nothing. */}
+        {canWrite && missing > 0 && (
+          <button
+            type="button"
+            onClick={writeNotes}
+            disabled={writing || !keyed}
+            title={
+              keyed
+                ? "Write the empty fields from your saved solution"
+                : "Add an API key in Settings to write notes"
+            }
+            className="btn btn-quiet btn-sm ml-auto"
+          >
+            <Icon name={writing ? "clock" : "sparkle"} className="size-3.5" />
+            {writing ? "Writing…" : missing === NOTE_FIELDS.length ? "Write these for me" : "Fill the empty ones"}
+          </button>
+        )}
       </div>
+
+      {error && (
+        <p className="text-caption text-muted mt-0 mb-3">
+          {error === "NO_CHANGE"
+            ? "Every field already has something in it — nothing was overwritten."
+            : ERROR_MESSAGE[error]}
+        </p>
+      )}
 
       {progress.notes.legacy.trim() && (
         <div className="card-inset p-3 mb-4">

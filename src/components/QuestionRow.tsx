@@ -210,7 +210,7 @@ export function QuestionRow({
               </div>
             )}
             <SolutionEditor problemId={problem.id} />
-            <NotesEditor problemId={problem.id} />
+            <NotesEditor problem={problem} topicName={topicName} patternName={patternName} />
             <MistakeList problemId={problem.id} />
           </div>
         </div>
