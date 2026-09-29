@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useFilters, useStore } from "../context";
+import { problemLink } from "../links";
 import { isDefaultGoal, matchesGoal, resolveGoal } from "../revision/goal";
 import { canCompleteFreely, getState, getV2Progress, hasNotes, isProblemVisible } from "../store";
 import { cx } from "../cx";
@@ -34,6 +35,7 @@ export function QuestionRow({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [completionPanelOpen, setCompletionPanelOpen] = useState(false);
   const state = getState(store, problem.id);
+  const link = problemLink(problem);
   const progress = getV2Progress(v2Store, problem.id);
   const goal = resolveGoal(v2Store.settings);
   const visible = isProblemVisible(problem, state, filters, { topicName, patternName, goal });
@@ -128,13 +130,13 @@ export function QuestionRow({
         >
           {problem.difficulty[0]}
         </span>
-        {problem.link ? (
+        {link ? (
           <a
             className={cx(
               "text-body min-w-0 decoration-accent/40 underline-offset-2 hover:underline hover:text-accent",
               state.done ? "line-through text-faint hover:text-faint" : "text-fg"
             )}
-            href={problem.link}
+            href={link}
             target="_blank"
             rel="noopener"
           >

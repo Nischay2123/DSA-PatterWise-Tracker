@@ -1,4 +1,5 @@
 import { useStore } from "../../context";
+import { problemLink } from "../../links";
 import { getV2Progress } from "../../store";
 import { cx } from "../../cx";
 import { Icon } from "../Icon";
@@ -59,6 +60,7 @@ export function RecallStep({
         const problem = problemById.get(q.questionId);
         const progress = getV2Progress(v2Store, q.questionId);
         const recalled = isQuestionRecalled(q);
+        const link = problem ? problemLink(problem) : null;
         return (
           <div key={q.questionId} className="card p-4 mb-3">
             <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -67,9 +69,9 @@ export function RecallStep({
                   {problem.difficulty}
                 </span>
               )}
-              {problem?.link ? (
+              {link ? (
                 <a
-                  href={problem.link}
+                  href={link}
                   target="_blank"
                   rel="noopener"
                   className="text-body font-semibold text-fg hover:text-accent hover:underline underline-offset-2 inline-flex items-center gap-1"
