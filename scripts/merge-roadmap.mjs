@@ -292,6 +292,20 @@ b75.absent = b75.absent.filter(title => {
 b75.note = `The canonical Blind 75. ${b75.ids.length} of the 75 are in this tracker` +
   (b75.absent.length ? `; the other ${b75.absent.length} are listed in \`absent\`.` : '.') +
   ' Ids are never invented to pad the list.';
+
+// Goal lists, one per source. `a2z` is exactly the sheet (not his A2Z tags), so the default revision
+// scope counts the same problems it did before the merge.
+const SOURCE_LISTS = {
+  a2z: ['Striver A2Z', 'The original Striver A2Z sheet this tracker was built from.', q => q.id in sheet],
+  nc150: ['NeetCode 150', 'Every NeetCode 150 problem.', q => q.sources?.includes('NC150')],
+  nc250: ['NeetCode 250', 'Every NeetCode 250 problem.', q => q.sources?.includes('NC250')],
+  lc150: ['LeetCode Top 150', 'Every LeetCode Top Interview 150 problem.', q => q.sources?.includes('LC150')],
+  lc75: ['LeetCode 75', 'Every LeetCode 75 problem.', q => q.sources?.includes('LC75')],
+};
+for (const [id, [label, note, has]] of Object.entries(SOURCE_LISTS)) {
+  const ids = all.filter(has).map(q => q.id);
+  lists[id] = { label, note, total: ids.length, ids, absent: [] };
+}
 fs.writeFileSync(LISTS, JSON.stringify(lists, null, 2) + '\n');
 
 console.log(`enriched ${enriched}, added ${added}, skipped ${skipped.length} A2Z-only: ${skipped.join(', ')}`);

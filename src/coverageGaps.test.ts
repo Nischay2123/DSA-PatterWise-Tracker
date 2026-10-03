@@ -4,6 +4,7 @@ import { rowsFor } from "./components/NotesEditor";
 import { capPrompt } from "./llm/prompt";
 import { buildPromptInput } from "./revision/evaluate";
 import { buildTopicRows, isExemptTopic, statusDot, statusLabel } from "./revision/dashboard";
+import { FULL_GOAL } from "./revision/goal";
 import { emptyAppStoreV2, liftV1Entry, migrateV1ToV2 } from "./persistence/migrate";
 import type { ProgressStore, RevisionAttempt, Topic, TopicRevision } from "./types";
 
@@ -123,7 +124,7 @@ describe("dashboard status edges", () => {
     activeSessionId: null, history: [], weakConcepts: {}, ...p,
   });
   const rowWith = (r: TopicRevision, ids = ["a1", "a2"]) =>
-    buildTopicRows([topic], done(ids), { ...emptyAppStoreV2(), revision: { arrays: r } }, NOW)[0];
+    buildTopicRows([topic], done(ids), { ...emptyAppStoreV2(), settings: { ...emptyAppStoreV2().settings, goal: FULL_GOAL }, revision: { arrays: r } }, NOW)[0];
 
   it("marks an in-progress session amber", () => {
     const row = rowWith(rev({ activeSessionId: "s1" }));

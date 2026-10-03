@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { emptyAppStoreV2 } from "../persistence/migrate";
 import { buildTopicRows, countDashboard, statusDot, statusLabel } from "./dashboard";
+import { FULL_GOAL } from "./goal";
 import { computeQuestionWeight } from "./selection";
 import type { SelectionCandidate } from "./selection";
 import type { AppStoreV2, ProgressStore, Topic, TopicRevision } from "../types";
@@ -50,8 +51,10 @@ function revision(patch: Partial<TopicRevision> = {}): TopicRevision {
   };
 }
 
+// FULL_GOAL: these fixtures are not A2Z sheet ids, which the default goal would scope out.
 function v2With(revisionMap: Record<string, TopicRevision>): AppStoreV2 {
-  return { ...emptyAppStoreV2(), revision: revisionMap };
+  const v2 = emptyAppStoreV2();
+  return { ...v2, settings: { ...v2.settings, goal: FULL_GOAL }, revision: revisionMap };
 }
 
 const NOW = new Date("2026-06-15T12:00:00.000Z");
@@ -60,7 +63,7 @@ const ALL_DONE = storeWithDone(["a1", "a2", "a3", "a4"]);
 
 describe("buildTopicRows", () => {
   it("omits exempt topics entirely (plan §5)", () => {
-    const rows = buildTopicRows([topic("fundamentals", ["f1"]), ...TOPICS], ALL_DONE, emptyAppStoreV2(), NOW);
+    const rows = buildTopicRows([topic("fundamentals", ["f1"]), ...TOPICS], ALL_DONE, v2With({}), NOW);
     expect(rows.map((r) => r.topicId)).toEqual(["arrays"]);
   });
 
@@ -91,7 +94,7 @@ describe("buildTopicRows", () => {
   });
 
   it("handles a topic with no revision record at all", () => {
-    const [row] = buildTopicRows(TOPICS, storeWithDone([]), emptyAppStoreV2(), NOW);
+    const [row] = buildTopicRows(TOPICS, storeWithDone([]), v2With({}), NOW);
     expect(row.state).toBe("NOT_STARTED");
     expect(row.daysUntilDue).toBeNull();
     expect(row.lastScore).toBeNull();
@@ -137,7 +140,7 @@ describe("countDashboard", () => {
   });
 
   it("counts an ungraded topic as neither strong nor weak", () => {
-    const rows = buildTopicRows(TOPICS, ALL_DONE, emptyAppStoreV2(), NOW);
+    const rows = buildTopicRows(TOPICS, ALL_DONE, v2With({}), NOW);
     const counts = countDashboard(rows);
     expect(counts.strong).toBe(0);
     expect(counts.weak).toBe(0);
@@ -166,7 +169,7 @@ describe("statusDot / statusLabel", () => {
   });
 
   it("describes an untouched topic plainly", () => {
-    const row = buildTopicRows(TOPICS, storeWithDone([]), emptyAppStoreV2(), NOW)[0];
+    const row = buildTopicRows(TOPICS, storeWithDone([]), v2With({}), NOW)[0];
     expect(statusDot(row)).toBe("⚪");
     expect(statusLabel(row)).toBe("Not started");
   });

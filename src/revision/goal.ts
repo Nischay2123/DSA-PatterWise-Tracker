@@ -73,7 +73,14 @@ export interface Goal {
   listId?: string;
 }
 
-export const DEFAULT_GOAL: Goal = { minFreq: "All", difficulties: [...ALL_DIFFICULTIES] };
+/** Every problem in the tracker, including the NeetCode / LeetCode additions. */
+export const FULL_GOAL: Goal = { minFreq: "All", difficulties: [...ALL_DIFFICULTIES] };
+
+// The goal when none was chosen: the original A2Z sheet. The NeetCode / LeetCode
+// questions merged in later are tracked, but only count toward revision once a
+// wider goal is picked -- otherwise adding them would have pushed topics already
+// in revision (or mastered) back below the completion threshold.
+export const DEFAULT_GOAL: Goal = { ...FULL_GOAL, listId: "a2z" };
 
 // A topic with fewer goal problems than this is dropped from revision
 // entirely rather than scheduled against a handful.
@@ -105,7 +112,7 @@ export function goalScoped<T extends Problem>(problems: T[], goal: Goal): T[] {
 }
 
 // Settings arrive from IndexedDB and from imported backup files, so this
-// never trusts the shape it is handed. Absent goal => today's behaviour.
+// never trusts the shape it is handed. Absent goal => the A2Z default.
 export function resolveGoal(settings: Pick<AppSettings, "goal"> | undefined | null): Goal {
   const raw = settings?.goal;
   if (!raw || typeof raw !== "object") return DEFAULT_GOAL;
@@ -167,8 +174,8 @@ export const GOAL_PRESETS: GoalPreset[] = [
   {
     id: "full",
     label: "Full syllabus",
-    description: "Every problem. Revision unlocks at 75% of a whole topic.",
-    goal: DEFAULT_GOAL,
+    description: "Every problem, including the NeetCode and LeetCode lists. Revision unlocks at 75% of a whole topic.",
+    goal: FULL_GOAL,
   },
   {
     id: "no-hard",
@@ -177,11 +184,23 @@ export const GOAL_PRESETS: GoalPreset[] = [
     goal: { minFreq: "All", difficulties: ["Easy", "Medium"] },
   },
   {
+    id: "a2z",
+    label: "Striver A2Z",
+    description: "The original sheet. The default, so revision counts what it always did.",
+    goal: DEFAULT_GOAL,
+  },
+  {
+    id: "nc250",
+    label: "NeetCode 250",
+    description: "The NeetCode 250 list.",
+    goal: { ...FULL_GOAL, listId: "nc250" },
+  },
+  {
     // Kept as `sprint` -- the id is persisted in settings, so renaming it
     // would silently reset anyone already on this goal.
     id: "sprint",
     label: "Most asked",
-    description: "The 143 the sheet marks High or Very High. Unlocks revision about three times sooner.",
+    description: "Everything marked High or Very High interview frequency.",
     goal: { minFreq: "High", difficulties: [...ALL_DIFFICULTIES] },
   },
   {
@@ -191,10 +210,28 @@ export const GOAL_PRESETS: GoalPreset[] = [
     goal: { minFreq: "All", difficulties: ["Hard"] },
   },
   {
+    id: "lc150",
+    label: "LeetCode Top 150",
+    description: "LeetCode's Top Interview 150.",
+    goal: { ...FULL_GOAL, listId: "lc150" },
+  },
+  {
+    id: "nc150",
+    label: "NeetCode 150",
+    description: "The NeetCode 150 list.",
+    goal: { ...FULL_GOAL, listId: "nc150" },
+  },
+  {
     id: "blind75",
     label: "Blind 75",
-    description: "The classic 75-problem list. 51 of them are in this sheet; the rest simply aren't.",
-    goal: { minFreq: "All", difficulties: [...ALL_DIFFICULTIES], listId: "blind75" },
+    description: "The classic 75-problem list.",
+    goal: { ...FULL_GOAL, listId: "blind75" },
+  },
+  {
+    id: "lc75",
+    label: "LeetCode 75",
+    description: "LeetCode 75, the study plan.",
+    goal: { ...FULL_GOAL, listId: "lc75" },
   },
 ];
 
@@ -227,8 +264,7 @@ export function summarizeGoal(topics: Topic[], goal: Goal, store?: ProgressStore
 
   for (const topic of topics) {
     // Exempt topics are excluded because this describes REVISION scope, and
-    // revision never touches them. That is also why this total (422) is
-    // smaller than the tracker's headline count (467).
+    // revision never touches them, which is why this is smaller than the tracker's headline count.
     if (isExemptTopic(topic.id)) continue;
     const inScope = goalScoped(topic.patterns.flatMap((p) => p.problems), goal);
     problems += inScope.length;

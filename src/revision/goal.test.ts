@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import idRegistry from "../../data/idRegistry.json";
 import questionsData from "../../data/questions.json";
 import { emptyAppStoreV2 } from "../persistence/migrate";
 import { buildTopicRows, canReviseManually, problemsUntilRevisable } from "./dashboard";
@@ -6,6 +7,7 @@ import { REVISION_CONFIG } from "../config";
 import {
   ALL_DIFFICULTIES,
   DEFAULT_GOAL,
+  FULL_GOAL,
   GOAL_MIN_TOPIC_PROBLEMS,
   GOAL_PRESETS,
   getCuratedList,
@@ -40,7 +42,7 @@ function problem(over: Partial<Problem> = {}): Problem {
   };
 }
 
-const goal = (over: Partial<Goal> = {}): Goal => ({ ...DEFAULT_GOAL, ...over });
+const goal = (over: Partial<Goal> = {}): Goal => ({ ...FULL_GOAL, ...over });
 
 describe("matchesGoal -- frequency is a floor, not an equality test", () => {
   it("admits everything at or above the floor", () => {
@@ -56,8 +58,8 @@ describe("matchesGoal -- frequency is a floor, not an equality test", () => {
   });
 
   it('admits every frequency, including unknown values, at the "All" floor', () => {
-    expect(matchesGoal(problem({ interviewFreq: "Low" }), DEFAULT_GOAL)).toBe(true);
-    expect(matchesGoal(problem({ interviewFreq: "nonsense" }), DEFAULT_GOAL)).toBe(true);
+    expect(matchesGoal(problem({ interviewFreq: "Low" }), FULL_GOAL)).toBe(true);
+    expect(matchesGoal(problem({ interviewFreq: "nonsense" }), FULL_GOAL)).toBe(true);
   });
 
   it("treats an unrecognised frequency as below any real floor rather than letting it through", () => {
@@ -104,8 +106,8 @@ describe("isTopicOutOfGoalScope -- only a goal that NARROWS can disqualify a top
   const twoProblems = [problem({ id: "a" }), problem({ id: "b" })];
 
   it("never drops a topic under the default goal, however small it is", () => {
-    expect(isTopicOutOfGoalScope(twoProblems, DEFAULT_GOAL)).toBe(false);
-    expect(isTopicOutOfGoalScope([problem({ id: "a" })], DEFAULT_GOAL)).toBe(false);
+    expect(isTopicOutOfGoalScope(twoProblems, FULL_GOAL)).toBe(false);
+    expect(isTopicOutOfGoalScope([problem({ id: "a" })], FULL_GOAL)).toBe(false);
   });
 
   it("leaves a small topic alone when the goal happens to keep all of it", () => {
@@ -140,8 +142,8 @@ describe("presets", () => {
   });
 
   it("treats difficulty order as irrelevant when comparing goals", () => {
-    expect(sameGoal(goal({ difficulties: ["Hard", "Easy", "Medium"] }), DEFAULT_GOAL)).toBe(true);
-    expect(isDefaultGoal(goal({ difficulties: ["Hard", "Easy", "Medium"] }))).toBe(true);
+    expect(sameGoal(goal({ difficulties: ["Hard", "Easy", "Medium"] }), FULL_GOAL)).toBe(true);
+    expect(isDefaultGoal({ ...DEFAULT_GOAL, difficulties: ["Hard", "Easy", "Medium"] })).toBe(true);
   });
 
   it("does not treat a narrower goal as the default", () => {
@@ -154,32 +156,40 @@ describe("presets", () => {
 // so a future edit to questions.json that changes them fails here loudly
 // rather than silently shifting what a preset means.
 describe("against the real dataset", () => {
-  it("leaves all 467 problems in scope under the default goal", () => {
-    expect(goalScoped(ALL, DEFAULT_GOAL)).toHaveLength(ALL.length);
-    expect(ALL.length).toBe(467);
+  it("scopes the default goal to exactly the 467-problem A2Z sheet, and Full syllabus to all 649", () => {
+    expect(ALL.length).toBe(649);
+    expect(goalScoped(ALL, FULL_GOAL)).toHaveLength(649);
+    const sheet = Object.keys(idRegistry).sort();
+    expect(goalScoped(ALL, DEFAULT_GOAL).map((p) => p.id).sort()).toEqual(sheet);
+    expect(sheet).toHaveLength(467);
   });
 
-  it("scopes the interview sprint to the 143 High-and-above problems", () => {
+  it("scopes the interview sprint to the 239 High-and-above problems", () => {
     const sprint = GOAL_PRESETS.find((p) => p.id === "sprint")!.goal;
-    expect(goalScoped(ALL, sprint)).toHaveLength(143);
+    expect(goalScoped(ALL, sprint)).toHaveLength(239);
   });
 
-  it("drops exactly the five topics the sprint thins below the floor", () => {
+  it("drops exactly the three topics the sprint thins below the floor", () => {
     const sprint = GOAL_PRESETS.find((p) => p.id === "sprint")!.goal;
     const scope = summarizeGoal(DATA.topics, sprint);
-    expect(scope.problems).toBe(143);
-    expect(scope.names.sort()).toEqual(["Advanced Strings", "Bit Manipulation", "Recursion", "Sorting", "Tries"]);
-    expect(scope.topicsInScope).toBe(12);
+    expect(scope.problems).toBe(239);
+    expect(scope.names.sort()).toEqual(["Advanced Strings", "Recursion", "Sorting"]);
+    expect(scope.topicsInScope).toBe(14);
   });
 
   // One row per preset, so a change to questions.json that shifts what a
   // preset means fails loudly here instead of quietly changing the product.
   it.each([
-    ["full", 422, 17, 0],
-    ["no-hard", 288, 16, 1],
-    ["sprint", 143, 12, 5],
-    ["hard-only", 134, 13, 4],
-    ["blind75", 51, 7, 10],
+    ["full", 604, 17, 0],
+    ["no-hard", 450, 16, 1],
+    ["a2z", 422, 17, 0],
+    ["nc250", 249, 14, 3],
+    ["sprint", 239, 14, 3],
+    ["hard-only", 154, 13, 4],
+    ["lc150", 149, 14, 3],
+    ["nc150", 149, 14, 3],
+    ["blind75", 75, 10, 7],
+    ["lc75", 75, 11, 6],
   ])("scopes the %s preset to %i problems across %i topics", (id, problems, topicsInScope, dropped) => {
     const preset = GOAL_PRESETS.find((p) => p.id === id)!;
     const scope = summarizeGoal(DATA.topics, preset.goal);
@@ -203,7 +213,7 @@ describe("against the real dataset", () => {
   it("counts the full syllabus as every non-exempt topic, with none dropped", () => {
     const scope = summarizeGoal(DATA.topics, DEFAULT_GOAL);
     expect(scope.topicsDropped).toBe(0);
-    // 18 topics minus the exempt `fundamentals`.
+    // 18 topics minus the exempt `fundamentals`; the A2Z default is the old 422.
     expect(scope.topicsInScope).toBe(17);
     expect(scope.problems).toBe(422);
   });
@@ -243,22 +253,26 @@ describe("a goal unlocks revision sooner -- the reason this exists", () => {
     return buildTopicRows([arrays], store, v2WithGoal(goal))[0];
   }
 
-  it("needs 39 of 51 to unlock Arrays on the full syllabus", () => {
-    expect(arraysProblems).toHaveLength(51);
-    const under = storeWith(arraysProblems.slice(0, 38).map((p) => p.id));
+  it("needs 39 of the sheet's 51 to unlock Arrays under the default goal, as before the merge", () => {
+    const sheetIds = goalScoped(arraysProblems, DEFAULT_GOAL).map((p) => p.id);
+    expect(arraysProblems).toHaveLength(98);
+    expect(sheetIds).toHaveLength(51);
+    const under = storeWith(sheetIds.slice(0, 38));
     expect(rowFor(under, null).state).toBe("IN_PROGRESS");
-    const at = storeWith(arraysProblems.slice(0, 39).map((p) => p.id));
+    const at = storeWith(sheetIds.slice(0, 39));
     expect(rowFor(at, null).state).toBe("REVISION_DUE");
+    // The questions merged in later do not dilute it.
+    expect(rowFor(storeWith(sheetIds.slice(0, 39)), FULL_GOAL).state).toBe("IN_PROGRESS");
   });
 
-  it("needs only 13 of 17 to unlock Arrays on the interview sprint", () => {
+  it("needs only 30 of 39 to unlock Arrays on the interview sprint", () => {
     const goalIds = goalScoped(arraysProblems, SPRINT).map((p) => p.id);
-    expect(goalIds).toHaveLength(17);
+    expect(goalIds).toHaveLength(39);
 
-    const under = storeWith(goalIds.slice(0, 12));
+    const under = storeWith(goalIds.slice(0, 29));
     expect(rowFor(under, SPRINT).state).toBe("IN_PROGRESS");
 
-    const at = storeWith(goalIds.slice(0, 13));
+    const at = storeWith(goalIds.slice(0, 30));
     expect(rowFor(at, SPRINT).state).toBe("REVISION_DUE");
     // ...and that exact same progress is nowhere near enough on the full
     // syllabus, which is the whole difference the goal makes.
@@ -275,7 +289,7 @@ describe("a goal unlocks revision sooner -- the reason this exists", () => {
   it("omits the topics the sprint thins below the floor from the dashboard entirely", () => {
     const rows = buildTopicRows(DATA.topics, storeWith([]), v2WithGoal(SPRINT));
     const names = rows.map((r) => r.name);
-    expect(names).toHaveLength(12);
+    expect(names).toHaveLength(14);
     expect(names).not.toContain("Recursion");
     expect(names).toContain("Arrays");
   });
@@ -296,8 +310,8 @@ describe("curated lists -- a set of problems, not a predicate", () => {
   });
 
   it("accounts for all 75 -- what is present plus what is recorded absent", () => {
-    expect(list.ids).toHaveLength(51);
-    expect(list.absent).toHaveLength(24);
+    expect(list.ids).toHaveLength(75);
+    expect(list.absent).toHaveLength(0);
     expect(list.ids.length + list.absent.length).toBe(list.total);
   });
 
@@ -314,7 +328,7 @@ describe("curated lists -- a set of problems, not a predicate", () => {
     // A list is exhaustive by definition; narrowing it further would shrink
     // a set whose whole point is being fixed and known.
     const narrowed = { ...blind, minFreq: "Very High" as const, difficulties: ["Hard" as const] };
-    expect(goalScoped(ALL, narrowed)).toHaveLength(51);
+    expect(goalScoped(ALL, narrowed)).toHaveLength(75);
   });
 
   it("falls back to the predicate when the list id is unknown", () => {
