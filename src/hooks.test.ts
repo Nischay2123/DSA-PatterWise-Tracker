@@ -110,6 +110,15 @@ describe("useFilterAccordions", () => {
     expect(a.open).toBe(true);
   });
 
+  it("opens groups when only the source or due-for-review filter changes", () => {
+    for (const patch of [{ source: "NC150" }, { dueOnly: true }]) {
+      const [a] = build([[{ hidden: false }]]);
+      const { rerender } = renderHook(({ f }) => useFilterAccordions(f), { initialProps: { f: filters() } });
+      rerender({ f: filters(patch) });
+      expect(a.open).toBe(true);
+    }
+  });
+
   it("does not re-snapshot on every keystroke while a filter stays active", () => {
     const [a] = build([[{ hidden: false }]]);
     const { rerender } = renderHook(({ f }) => useFilterAccordions(f), { initialProps: { f: filters() } });

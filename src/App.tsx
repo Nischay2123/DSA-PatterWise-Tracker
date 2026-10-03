@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import questionsData from "../data/questions.json";
 import { Dashboard } from "./components/Dashboard";
 import { Drawer } from "./components/Drawer";
@@ -14,7 +14,8 @@ import { NotesPanel } from "./components/NotesPanel";
 import { FiltersContext, StoreContext, useProgressStore } from "./context";
 import { downloadBackupFile } from "./persistence/backup";
 import { goalScoped, isDefaultGoal, resolveGoal } from "./revision/goal";
-import { countDone, getState, hasBackupV2, isProblemVisible } from "./store";
+import { dueIds } from "./revision/questionReview";
+import { countDone, getState, hasBackupV2, isProblemVisible, todayISO } from "./store";
 import { useFilterAccordions } from "./useFilterAccordions";
 import { useTheme } from "./useTheme";
 import { useHash } from "./useHash";
@@ -114,9 +115,16 @@ export function App() {
   const overallTotal = goalProblems.length;
   const overallPct = overallTotal ? Math.round((overallDone / overallTotal) * 100) : 0;
 
+  const due = dueIds(v2Store, todayISO());
   const visibleCount = ALL_PROBLEMS_WITH_CONTEXT.filter(({ problem, topicName, patternName }) =>
-    isProblemVisible(problem, getState(store, problem.id), filters, { topicName, patternName, goal })
+    isProblemVisible(problem, getState(store, problem.id), filters, { topicName, patternName, goal, due })
   ).length;
+
+  // Per-question reviews due today, in the tab title so they're visible from
+  // another tab.
+  useEffect(() => {
+    document.title = due.size ? `(${due.size}) DSA Tracker` : "DSA Tracker";
+  }, [due.size]);
 
   const refreshBackup = () => setBackupExists(hasBackupV2());
 
@@ -159,25 +167,24 @@ export function App() {
     );
   }
 
-  // Notes route
-  if (/^#\/notes/.test(hash)) {
-    return (
-      <StoreContext.Provider value={{ store, dispatch, v2Store, dispatchV2 }}>
-        <NotesPanel topics={DATA.topics} />
-      </StoreContext.Provider>
-    );
-  }
+  const notesMatch = /^#\/notes(?:\/(.+))?$/.exec(hash);
 
   const goto = (h: string) => {
     setNavOpen(false);
     navigate(h);
   };
 
-  const currentRoute: "tracker" | "revision" | "notes" = /^#\/revision/.test(hash) ? "revision" : /^#\/notes/.test(hash) ? "notes" : "tracker";
+  const showDue = () => {
+    setFilters({ ...DEFAULT_FILTERS, dueOnly: true });
+    goto("#/tracker");
+    requestAnimationFrame(() => document.getElementById("problems")?.scrollIntoView({ behavior: "smooth" }));
+  };
 
   const sidebar = (showBrand: boolean) => (
     <SidebarContent
-      route={currentRoute}
+      route={notesMatch ? "notes" : "tracker"}
+      dueCount={due.size}
+      onShowDue={showDue}
       showBrand={showBrand}
       onNavigate={goto}
       done={overallDone}
@@ -223,6 +230,12 @@ export function App() {
               </span>
             </div>
 
+            {notesMatch ? (
+              <main className="mx-auto w-full max-w-shell px-3 md:px-6 pt-5 pb-20">
+                <NotesPanel noteId={notesMatch[1] && decodeURIComponent(notesMatch[1])} onNavigate={goto} />
+              </main>
+            ) : (
+            <>
             <div className="sticky top-13 lg:top-0 z-20 border-b border-border bg-bg/85 backdrop-blur-xl">
               <div className="mx-auto w-full max-w-shell px-3 md:px-6">
                 <Filters />
@@ -238,9 +251,24 @@ export function App() {
             </div>
 
             <main className="mx-auto w-full max-w-shell px-3 md:px-6 pt-5 pb-20">
-              <Dashboard allProblems={ALL_PROBLEMS} goalProblems={goalProblems} topics={DATA.topics} onContinue={jumpToProblem} />
+              {due.size > 0 && !filters.dueOnly && (
+                <div className="card mb-3 flex items-center gap-3 flex-wrap px-4 py-3 border-accent-line bg-accent-soft">
+                  <Icon name="bell" className="size-4 text-accent shrink-0" />
+                  <p className="text-body m-0 min-w-0 flex-1">
+                    <b>
+                      {due.size} question{due.size === 1 ? "" : "s"}
+                    </b>{" "}
+                    due for review. Re-solve each without looking at your old code, then say how it went.
+                  </p>
+                  <button type="button" className="btn btn-primary btn-sm" onClick={showDue}>
+                    Review now
+                    <Icon name="arrowRight" className="size-3.5" />
+                  </button>
+                </div>
+              )}
+              <Dashboard allProblems={ALL_PROBLEMS} topics={DATA.topics} onContinue={jumpToProblem} />
 
-              <div className="flex items-center gap-2 mt-7 mb-2.5">
+              <div id="problems" className="flex items-center gap-2 mt-7 mb-2.5 scroll-mt-32">
                 <h2 className="font-display text-title font-bold m-0">Problems</h2>
                 <span className="chip tabular-nums">{visibleCount} shown</span>
               </div>
@@ -268,6 +296,8 @@ export function App() {
                 <MergeImport onBackupChange={refreshBackup} />
               </footer>
             </main>
+            </>
+            )}
           </div>
         </div>
 

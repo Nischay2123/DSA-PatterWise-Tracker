@@ -16,6 +16,8 @@ export function useFilterAccordions(filters: FilterState) {
       filters.freq,
       filters.hideCompleted,
       filters.reviseOnly,
+      filters.source,
+      filters.dueOnly,
     ].join(" ");
     const changed = sig !== lastSig.current;
     lastSig.current = sig;

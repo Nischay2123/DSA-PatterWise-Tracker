@@ -36,3 +36,10 @@ export function useTheme(theme: string | null): void {
     }
   }, [theme]);
 }
+
+// For renderers that take a theme name rather than CSS (mermaid): what is
+// actually on screen, resolving "system" through the OS preference.
+export function isDarkNow(): boolean {
+  const forced = document.documentElement.dataset.theme;
+  return forced ? forced === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+}

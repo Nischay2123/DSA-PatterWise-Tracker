@@ -4,8 +4,9 @@ import { getV2Progress, todayISO } from "../store";
 import { ERROR_MESSAGE } from "../llm/client";
 import { canGradeSolutions, gradeSolution, type SolutionAttempt, type SolutionVerdict } from "../llm/gradeSolution";
 import { generateNotes, notesToApply } from "../llm/notes";
-import type { Problem } from "../types";
+import type { Problem, ReviewOutcome } from "../types";
 import { Icon } from "./Icon";
+import { ReviewOutcomeButtons } from "./ReviewOutcome";
 import { REVISION_CONFIG } from "../config";
 
 // Shown only when a completion is actually gated (never-yet-completed, and
@@ -39,6 +40,7 @@ export function CompletionPanel({
   const [grading, setGrading] = useState(false);
   const [writingNotes, setWritingNotes] = useState(false);
   const [verdict, setVerdict] = useState<SolutionVerdict | null>(null);
+  const [outcome, setOutcome] = useState<ReviewOutcome>("clean");
 
   const hasEvidence = !!approach.trim() && (!!pseudocode.trim() || !!code.trim());
   const graded = canGradeSolutions(v2Store.settings);
@@ -54,6 +56,9 @@ export function CompletionPanel({
 
   const finish = () => {
     persist();
+    // Before the tick, so the completion picks up this outcome rather than
+    // recording a clean solve (see patchV2FromV1).
+    dispatchV2({ type: "RECORD_SOLVE", id: problemId, outcome, at: todayISO() });
     dispatch({ type: "TOGGLE_DONE", id: problemId, done: true });
     onCompleted();
   };
@@ -149,6 +154,10 @@ export function CompletionPanel({
             rows={4}
           />
         </div>
+      </div>
+
+      <div className="mt-3">
+        <ReviewOutcomeButtons label="How did it go?" value={outcome} onPick={setOutcome} />
       </div>
 
       {verdict?.kind === "fail" && (

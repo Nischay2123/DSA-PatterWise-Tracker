@@ -3,9 +3,10 @@ import { REVISION_CONFIG } from "./config";
 import { isValidAppStoreV2, liftV1Entry } from "./persistence/migrate";
 import { scoreEvaluation } from "./revision/evaluate";
 import { canGradeSolutions } from "./llm/gradeSolution";
-import { matchesGoal } from "./revision/goal";
+import { isDefaultGoal, isExemptTopic, matchesGoal } from "./revision/goal";
 import type { Goal } from "./revision/goal";
 import { recordAttemptOutcome, scheduleInitial } from "./revision/scheduler";
+import { applyReview, mergeReview, scheduleSolve } from "./revision/questionReview";
 import type {
   AppSettings,
   AppStoreV2,
@@ -40,64 +41,44 @@ export function countDone(problems: { id: string }[], store: ProgressStore): num
   return problems.reduce((n, p) => n + (getState(store, p.id).done ? 1 : 0), 0);
 }
 
-// --- Topic prerequisites & progression ------------------------------------
-
-// Check if a topic's prerequisites are satisfied (enough questions solved)
-export function areTopicPrereqsMet(topic: Topic, allTopics: Topic[], store: ProgressStore): boolean {
-  if (!topic.prereqs || topic.prereqs.length === 0) return true;
-  const PREREQ_THRESHOLD = 0.75; // Same as REVISION_CONFIG.completionThreshold
-  
-  for (const prereqId of topic.prereqs) {
-    const prereqTopic = allTopics.find(t => t.id === prereqId);
-    if (!prereqTopic) continue;
-    const prereqProblems = prereqTopic.patterns.flatMap(p => p.problems);
-    const prereqDone = countDone(prereqProblems, store);
-    const prereqTotal = prereqProblems.length;
-    if (prereqTotal === 0) continue;
-    if (prereqDone / prereqTotal < PREREQ_THRESHOLD) return false;
+// --- Topic prerequisites ----------------------------------------------------
+// The roadmap's build-up order: a topic counts as done for its dependants at
+// the same share revision unlocks at, measured over the goal scope. Exempt
+// topics (Fundamentals) are never in the way.
+export function doneTopics(topics: Topic[], store: ProgressStore, goal: Goal): Set<string> {
+  const done = new Set<string>();
+  for (const t of topics) {
+    const scoped = t.patterns.flatMap((p) => p.problems).filter((p) => matchesGoal(p, goal));
+    const ok =
+      isExemptTopic(t.id) || !scoped.length || countDone(scoped, store) / scoped.length >= REVISION_CONFIG.completionThreshold;
+    if (ok) done.add(t.id);
   }
-  return true;
+  return done;
 }
 
-// Get all problems for a topic
-export function getTopicProblems(topic: Topic): Problem[] {
-  return topic.patterns.flatMap(p => p.problems);
+export interface Prereqs {
+  done: Set<string>;
+  names: Record<string, string>;
 }
 
-// Check if a question is locked due to unmet prerequisites
-export function isQuestionLocked(problem: Problem, allTopics: Topic[], store: ProgressStore): boolean {
-  if (!problem.needs || problem.needs.length === 0) return false;
-  for (const needId of problem.needs) {
-    const needTopic = allTopics.find(t => t.id === needId);
-    if (!needTopic) continue;
-    if (!areTopicPrereqsMet(needTopic, allTopics, store)) return true;
-  }
-  return false;
+export function unmetPrereqs(ids: string[] | undefined, done: Set<string>): string[] {
+  return (ids ?? []).filter((id) => !done.has(id));
 }
 
-// Find the next unsolved question whose prerequisites are met
-export function findNextUp(
-  topics: Topic[],
-  store: ProgressStore,
-  filters: FilterState,
-  goal: Goal
-): Problem | null {
-  // Flatten all problems in topic order
-  const allProblems = topics.flatMap(t => t.patterns.flatMap(p => p.problems));
-  
-  for (const problem of allProblems) {
-    const state = getState(store, problem.id);
-    if (state.done) continue;
-    
-    // Check if visible under current filters
-    if (!isProblemVisible(problem, state, filters, { topicName: "", patternName: "", goal })) continue;
-    
-    // Check if prerequisites are met
-    if (isQuestionLocked(problem, topics, store)) continue;
-    
-    return problem;
-  }
-  return null;
+// First unsolved problem the list is showing whose topic and own needs are
+// all done -- or, if nothing is unlocked, simply the first unsolved one.
+export function findNextUp(topics: Topic[], store: ProgressStore, filters: FilterState, goal: Goal): Problem | null {
+  const done = doneTopics(topics, store, goal);
+  let fallback: Problem | null = null;
+  for (const t of topics)
+    for (const pat of t.patterns)
+      for (const p of pat.problems) {
+        const state = getState(store, p.id);
+        if (state.done || !isProblemVisible(p, state, filters, { topicName: t.name, patternName: pat.name, goal })) continue;
+        if (!unmetPrereqs(t.prereqs, done).length && !unmetPrereqs(p.needs, done).length) return p;
+        fallback ??= p;
+      }
+  return fallback;
 }
 
 export function remapIds(problems: Record<string, ProblemState>, idMap: Record<string, string>) {
@@ -230,6 +211,8 @@ export interface VisibilityContext {
   // The active goal. Only read when filters.goalOnly is on, so callers that
   // never offer that toggle can leave it out.
   goal?: Goal;
+  // Ids with a per-question review due. Only read when filters.dueOnly is on.
+  due?: Set<string>;
 }
 
 export function isProblemVisible(
@@ -250,11 +233,22 @@ export function isProblemVisible(
   const matchesCompleted = !filters.hideCompleted || !state.done;
   const matchesRevise = !filters.reviseOnly || state.revise;
   const matchesSource = !filters.source || (problem.sources ?? []).includes(filters.source);
+  const matchesDue = !filters.dueOnly || !!context.due?.has(problem.id);
   // No goal on the context means nothing to narrow to -- the toggle cannot
-  // hide every row just because a caller forgot to pass one.
-  const matchesGoalFilter = !filters.goalOnly || !context.goal || matchesGoal(problem, context.goal);
+  // hide every row just because a caller forgot to pass one. The default goal
+  // narrows revision only, never the list.
+  const matchesGoalFilter =
+    !filters.goalOnly || !context.goal || isDefaultGoal(context.goal) || matchesGoal(problem, context.goal);
   return (
-    matchesText && matchesDiff && matchesImportance && matchesFreq && matchesCompleted && matchesRevise && matchesSource && matchesGoalFilter
+    matchesText &&
+    matchesDiff &&
+    matchesImportance &&
+    matchesFreq &&
+    matchesCompleted &&
+    matchesRevise &&
+    matchesSource &&
+    matchesDue &&
+    matchesGoalFilter
   );
 }
 
@@ -265,7 +259,8 @@ export function areFiltersActive(filters: FilterState): boolean {
     filters.importance !== "All" ||
     filters.freq !== "All" ||
     filters.reviseOnly ||
-    !!filters.source
+    !!filters.source ||
+    !!filters.dueOnly
   );
 }
 
@@ -520,6 +515,7 @@ function mergeProgressEntry(a: QuestionProgressV2, b: QuestionProgressV2): Quest
       lastScore: richer.revisionStats.lastScore,
       lastConfidence: richer.revisionStats.lastConfidence,
     },
+    ...(completed && { review: mergeReview(a.review, b.review) }),
   };
 }
 
@@ -739,6 +735,17 @@ export function patchV2FromV1(v2: AppStoreV2, v1: ProgressStore): AppStoreV2 {
     // unrelated dispatch re-patching this id (already done, or still not
     // done) must never disturb what's already recorded for it.
     const justCompleted = state.done && !base.completed;
+    // A tick made today starts the review ladder (unless RECORD_SOLVE already
+    // did, with the real outcome); un-completing ends it. Checked against the
+    // raw entry, since a never-touched question is lifted already completed.
+    // Completions carried in by an import keep their old dates and stay
+    // unscheduled, like everything solved before reviews existed.
+    const ticked = state.done && !v2.progress[id]?.completed && state.completedAt === todayISO();
+    const review = ticked
+      ? (base.review ?? scheduleSolve("clean", todayISO()))
+      : state.done
+        ? base.review
+        : undefined;
     // A gate-verified completion is one that's genuinely new (never
     // completed before -- grandfathered/re-checks are exempt) AND has real
     // evidence recorded at the moment of completion. Everything else --
@@ -766,6 +773,8 @@ export function patchV2FromV1(v2: AppStoreV2, v1: ProgressStore): AppStoreV2 {
       completionGateVersion: justCompleted ? (gateSatisfied ? CURRENT_COMPLETION_GATE_VERSION : null) : base.completionGateVersion,
       notes: { ...base.notes, legacy: state.notes },
     };
+    if (review) progress[id].review = review;
+    else delete progress[id].review;
   }
   return { ...v2, progress };
 }
@@ -846,6 +855,12 @@ export function v2Reducer(v2: AppStoreV2, action: V2Action): AppStoreV2 {
       return patchV2Progress(v2, action.id, { code: action.code });
     case "MARK_GRADED":
       return patchV2Progress(v2, action.id, { gradedAt: action.at });
+    case "RECORD_SOLVE":
+      return patchV2Progress(v2, action.id, { review: scheduleSolve(action.outcome, action.at) });
+    case "RECORD_REVIEW":
+      return patchV2Progress(v2, action.id, {
+        review: applyReview(getV2Progress(v2, action.id).review, action.outcome, action.at),
+      });
     case "SET_STRUCTURED_NOTE": {
       const existing = getV2Progress(v2, action.id);
       return patchV2Progress(v2, action.id, { notes: { ...existing.notes, [action.field]: action.value } });

@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { useFilters, useStore } from "../context";
-import { problemLink } from "../links";
+import { SOURCES } from "../config";
+import { problemLink, siteLabel } from "../links";
 import { isDefaultGoal, matchesGoal, resolveGoal } from "../revision/goal";
-import { canCompleteFreely, getState, getV2Progress, hasNotes, isProblemVisible } from "../store";
+import { daysUntil, dueIds, isMastered } from "../revision/questionReview";
+import { canCompleteFreely, getState, getV2Progress, hasNotes, isProblemVisible, todayISO } from "../store";
 import { cx } from "../cx";
 import { CompletionPanel } from "./CompletionPanel";
 import { Icon, type IconName } from "./Icon";
 import { MistakeList } from "./MistakeList";
 import { NotesEditor } from "./NotesEditor";
+import { ReviewOutcomeButtons } from "./ReviewOutcome";
 import { SolutionEditor } from "./SolutionEditor";
 import type { Problem } from "../types";
 
@@ -19,36 +22,36 @@ export const DIFFICULTY_PILL = {
   Hard: "bg-hard-soft text-hard",
 } as const;
 
-// Source chip colors
-const SOURCE_PILL: Record<string, string> = {
-  A2Z: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  NC150: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
-  NC250: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
-  B75: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
-  LC150: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
-  LC75: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
-};
-
 export function QuestionRow({
   problem,
   topicName,
   patternName,
   gated,
+  lockedBy = [],
 }: {
   problem: Problem;
   topicName: string;
   patternName: string;
   gated: boolean;
+  /** Names of the unfinished topics this problem builds on. */
+  lockedBy?: string[];
 }) {
-  const { store, dispatch, v2Store } = useStore();
+  const { store, dispatch, v2Store, dispatchV2 } = useStore();
   const { filters } = useFilters();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [completionPanelOpen, setCompletionPanelOpen] = useState(false);
+  // "solve" right after a free tick, "review" from the due pill.
+  const [asking, setAsking] = useState<"solve" | "review" | null>(null);
   const state = getState(store, problem.id);
   const link = problemLink(problem);
+  const links = [...(link ? [[siteLabel(link), link]] : []), ...Object.entries(problem.alt ?? {})];
   const progress = getV2Progress(v2Store, problem.id);
   const goal = resolveGoal(v2Store.settings);
-  const visible = isProblemVisible(problem, state, filters, { topicName, patternName, goal });
+  const today = todayISO();
+  const due = dueIds(v2Store, today);
+  const visible = isProblemVisible(problem, state, filters, { topicName, patternName, goal, due });
+  const review = state.done ? progress.review : undefined;
+  const reviewDue = due.has(problem.id);
   // Marks the rows that count toward the goal -- but only while the list is
   // showing everything. With the list already scoped to the goal, every
   // visible row would carry one, which says nothing.
@@ -58,10 +61,6 @@ export function QuestionRow({
   // everything else on an already-done question, stays free.
   const checkboxBlocked = gated && !state.done;
 
-  // Check if question is locked due to unmet prerequisites
-  // We need access to all topics - for now we'll check via the problem's needs
-  const isLocked = problem.needs && problem.needs.length > 0;
-
   // Was one dot-joined string in muted 11px. Chips give each fact an edge so
   // the eye can pick out "Importance: High" without reading the whole line.
   const meta: { icon: IconName; text: string }[] = [];
@@ -70,6 +69,8 @@ export function QuestionRow({
   if (problem.importance) meta.push({ icon: "target", text: `Importance: ${problem.importance}` });
   if (problem.interviewFreq) meta.push({ icon: "flame", text: `Interview freq: ${problem.interviewFreq}` });
   if (problem.originalStep) meta.push({ icon: "book", text: problem.originalStep });
+  if (review?.dueAt) meta.push({ icon: "bell", text: `Next review ${review.dueAt}` });
+  if (isMastered(review)) meta.push({ icon: "check", text: "Review ladder mastered" });
 
   const handleCheckboxChange = (checked: boolean) => {
     if (!checked) {
@@ -79,6 +80,8 @@ export function QuestionRow({
     }
     if (canCompleteFreely(progress, v2Store.settings)) {
       dispatch({ type: "TOGGLE_DONE", id: problem.id, done: true });
+      // Recorded as a clean solve; this is the chance to say otherwise.
+      setAsking("solve");
     } else {
       setCompletionPanelOpen(true);
     }
@@ -96,7 +99,7 @@ export function QuestionRow({
         "rounded-lg py-2 pr-2.5 pl-2 -mx-1 scroll-mt-32 transition-colors border-l-2",
         inGoal ? "border-accent" : "border-transparent",
         "hover:bg-row-hover",
-        (detailsOpen || completionPanelOpen) && "bg-row-hover",
+        (detailsOpen || completionPanelOpen || asking) && "bg-row-hover",
         !visible && "hidden"
       )}
       data-id={problem.id}
@@ -144,32 +147,6 @@ export function QuestionRow({
         >
           {problem.difficulty[0]}
         </span>
-        {/* Source tags */}
-        {problem.sources && problem.sources.length > 0 && (
-          <span className="flex items-center gap-1">
-            {problem.sources.map((src) => (
-              <span
-                key={src}
-                className={cx("pill leading-none px-1.5 shrink-0 font-medium text-[10px]", SOURCE_PILL[src] || "bg-sunken text-faint")}
-                title={src}
-              >
-                {src}
-              </span>
-            ))}
-          </span>
-        )}
-        {/* Lock indicator for prerequisites */}
-        {isLocked && (
-          <span className="pill leading-none px-1.5 shrink-0 font-medium text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" title="Prerequisites not met">
-            <Icon name="lock" className="size-2.5" />
-          </span>
-        )}
-        {/* Premium badge */}
-        {problem.premium && (
-          <span className="pill leading-none px-1.5 shrink-0 font-medium text-[10px] bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" title="LeetCode Premium">
-            <Icon name="star" className="size-2.5" filled />
-          </span>
-        )}
         {link ? (
           <a
             className={cx(
@@ -187,11 +164,88 @@ export function QuestionRow({
             {problem.question}
           </span>
         )}
+        {/* Multi-site practice links: only when there is more than the title's own. */}
+        {links.length > 1 && (
+          <span className="flex items-center gap-1.5 text-micro">
+            {links.map(([label, url]) => (
+              <a key={url} href={url} target="_blank" rel="noopener" className="text-faint hover:text-accent">
+                {label}
+              </a>
+            ))}
+          </span>
+        )}
+        {problem.premium && (
+          <span className="pill leading-none px-1.5 text-micro bg-star-soft text-star" title="LeetCode Premium">
+            Premium
+          </span>
+        )}
+        {problem.sources?.map((src) => (
+          <span
+            key={src}
+            className="pill leading-none px-1.5 text-micro font-medium bg-sunken text-faint"
+            title={SOURCES[src as keyof typeof SOURCES] ?? src}
+          >
+            {src}
+          </span>
+        ))}
+        {!state.done &&
+          lockedBy.map((name) => (
+            <span
+              key={name}
+              className="pill leading-none px-1.5 text-micro bg-medium-soft text-medium"
+              title={`Builds on ${name}, which isn't finished yet`}
+            >
+              <Icon name="lock" className="size-2.5" />
+              {name}
+            </span>
+          ))}
+        {reviewDue ? (
+          <button
+            type="button"
+            className="pill leading-none px-1.5 text-micro bg-accent-soft text-accent cursor-pointer"
+            title="Re-solve it without looking at your old code, then say how it went"
+            aria-expanded={asking === "review"}
+            onClick={() => setAsking((a) => (a === "review" ? null : "review"))}
+          >
+            <Icon name="bell" className="size-2.5" />
+            Review due
+          </button>
+        ) : (
+          review && (
+            <span className="text-micro text-faint" title={review.dueAt ? `Next review ${review.dueAt}` : "Mastered"}>
+              {review.dueAt ? `review in ${daysUntil(review.dueAt, today)}d` : "mastered"}
+            </span>
+          )
+        )}
       </div>
 
       {/* Actions stay put instead of wrapping: the star and the expander are
           in the same place on every one of 467 rows. */}
       <div className="flex items-center gap-0.5 justify-self-end">
+        {problem.video && (
+          <a
+            className="icon-btn size-7 text-faint hover:text-accent max-sm:hidden"
+            href={problem.video}
+            target="_blank"
+            rel="noopener"
+            title="Video solution"
+            aria-label={`Video solution for ${problem.question}`}
+          >
+            <Icon name="play" className="size-3.5" />
+          </a>
+        )}
+        {problem.article && (
+          <a
+            className="icon-btn size-7 text-faint hover:text-accent max-sm:hidden"
+            href={problem.article}
+            target="_blank"
+            rel="noopener"
+            title="Article"
+            aria-label={`Article for ${problem.question}`}
+          >
+            <Icon name="book" className="size-3.5" />
+          </a>
+        )}
         {notesIndicator && (
           <span className="size-1.5 rounded-full bg-accent mr-1" title="Has saved notes" aria-hidden="true" />
         )}
@@ -224,8 +278,23 @@ export function QuestionRow({
 
       {/* Only occupies a grid row when something is actually open -- an
           always-rendered wrapper would add gap-y to every one of 467 rows. */}
-      {(completionPanelOpen || detailsOpen) && (
+      {(completionPanelOpen || detailsOpen || asking) && (
         <div className="col-start-2 col-span-2 min-w-0">
+          {asking && (
+            <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+              <ReviewOutcomeButtons
+                label={asking === "solve" ? "How did the solve go?" : "How did the review go?"}
+                value={asking === "solve" ? progress.review?.log.at(-1)?.outcome : undefined}
+                onPick={(outcome) => {
+                  dispatchV2({ type: asking === "solve" ? "RECORD_SOLVE" : "RECORD_REVIEW", id: problem.id, outcome, at: today });
+                  setAsking(null);
+                }}
+              />
+              <button type="button" className="icon-btn size-6" aria-label="Dismiss" onClick={() => setAsking(null)}>
+                <Icon name="x" className="size-3.5" />
+              </button>
+            </div>
+          )}
           {completionPanelOpen && (
             <CompletionPanel
               problem={problem}
@@ -239,7 +308,7 @@ export function QuestionRow({
               are uncontrolled (defaultValue), so unmounting would discard an
               unblurred draft. */}
           <div className={cx("mt-2 border-l-2 border-accent-line pl-3.5", detailsOpen ? "block" : "hidden")}>
-            {meta.length > 0 && (
+            {(meta.length > 0 || problem.video || problem.article) && (
               <div className="flex flex-wrap gap-1.5 mb-3">
                 {meta.map((m) => (
                   <span key={m.text} className="chip">
@@ -247,53 +316,27 @@ export function QuestionRow({
                     {m.text}
                   </span>
                 ))}
-              </div>
-            )}
-            {/* Video & Article links */}
-            {(problem.video || problem.article) && (
-              <div className="flex flex-wrap gap-2 mb-3">
+                {/* On phones these are the only way to the links: the row's icons are hidden there. */}
                 {problem.video && (
-                  <a
-                    href={problem.video}
-                    target="_blank"
-                    rel="noopener"
-                    className="chip"
-                    title="Video solution"
-                  >
+                  <a className="chip hover:text-accent" href={problem.video} target="_blank" rel="noopener">
                     <Icon name="play" className="size-3" />
                     Video
                   </a>
                 )}
                 {problem.article && (
-                  <a
-                    href={problem.article}
-                    target="_blank"
-                    rel="noopener"
-                    className="chip"
-                    title="Article/explanation"
-                  >
+                  <a className="chip hover:text-accent" href={problem.article} target="_blank" rel="noopener">
                     <Icon name="book" className="size-3" />
                     Article
                   </a>
                 )}
               </div>
             )}
-            {/* Alternative platform links */}
-            {problem.alt && Object.keys(problem.alt).length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {Object.entries(problem.alt).map(([label, url]) => (
-                  <a
-                    key={label}
-                    href={url}
-                    target="_blank"
-                    rel="noopener"
-                    className="chip"
-                    title={label}
-                  >
-                    <Icon name="external" className="size-3" />
-                    {label}
-                  </a>
-                ))}
+            {state.done && !reviewDue && (
+              <div className="mb-3">
+                <ReviewOutcomeButtons
+                  label={review ? "Reviewed it early?" : "Start spaced reviews:"}
+                  onPick={(outcome) => dispatchV2({ type: "RECORD_REVIEW", id: problem.id, outcome, at: today })}
+                />
               </div>
             )}
             <SolutionEditor problemId={problem.id} />

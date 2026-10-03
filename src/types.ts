@@ -9,20 +9,16 @@ export interface Problem {
   estMinutes: string;
   importance: string;
   interviewFreq: string;
-  // --- New fields from puneetkhatri99/DSA_Tracker ---
-  /** Source tags: A2Z, NC150, NC250, B75, LC150, LC75 */
+  // From puneetkhatri99/DSA_Tracker's roadmap, via scripts/merge-roadmap.mjs.
+  /** Keys of SOURCES in config.ts: the lists this problem is on. */
   sources?: string[];
-  /** Prerequisite topic IDs that must be completed first */
+  /** Topic ids, besides its own topic's prereqs, this problem builds on. */
   needs?: string[];
-  /** Group within the pattern (e.g., "Basic maths", "Star patterns") */
-  group?: string;
-  /** Video solution URL */
   video?: string;
-  /** Article/explanation URL */
   article?: string;
-  /** Alternative platform links (e.g., GFG, TUF, LC Premium) */
+  /** Extra practice links by site label (LC, GFG, TUF...). */
   alt?: Record<string, string>;
-  /** Whether this is a LeetCode Premium problem */
+  /** LeetCode Premium only. */
   premium?: boolean;
 }
 
@@ -36,12 +32,10 @@ export interface Topic {
   id: string;
   name: string;
   patterns: Pattern[];
-  /** Prerequisite topic IDs that must be completed first */
+  /** Topic ids to finish first (scripts/merge-roadmap.mjs). */
   prereqs?: string[];
-  /** Optional: path to pattern notes (Markdown + Mermaid) */
-  note?: string;
-  /** Whether this topic is optional (not required for progression) */
-  optional?: boolean;
+  /** Ids of the pattern notes for this topic (src/notes.ts). */
+  notes?: string[];
 }
 
 export interface QuestionData {
@@ -72,8 +66,10 @@ export interface FilterState {
   // Show only the problems the active revision goal counts. Optional so a
   // FilterState built before this existed still type-checks as one.
   goalOnly?: boolean;
-  // Filter by source (A2Z, NC150, NC250, B75, LC150, LC75)
+  // One of the SOURCES keys in config.ts; empty or absent = every source.
   source?: string;
+  // Only questions with a per-question review due.
+  dueOnly?: boolean;
 }
 
 export interface HeatmapDay {
@@ -125,6 +121,21 @@ export interface QuestionProgressV2 {
     lastScore: number | null;
     lastConfidence: "strong" | "partial" | "forgot" | null;
   };
+  // Per-question spaced repetition. Absent for a question that is not done,
+  // or was solved before this existed. Optional so older stores and backups
+  // still load as-is.
+  review?: QuestionReview;
+}
+
+// How a solve or a per-question review went.
+export type ReviewOutcome = "clean" | "hint" | "solution";
+
+export interface QuestionReview {
+  /** Index into QUESTION_REVIEW_DAYS of the interval being waited out. */
+  step: number;
+  /** Next review date; null once mastered. */
+  dueAt: string | null;
+  log: { at: string; kind: "solve" | "review"; outcome: ReviewOutcome }[];
 }
 
 export interface TopicRevision {
@@ -244,6 +255,10 @@ export type V2Action =
   // Recorded only where a grader actually returned a pass -- never on
   // "mark done anyway", and never inferred from a completion.
   | { type: "MARK_GRADED"; id: string; at: string }
+  // Sent just BEFORE the completion itself, so patchV2FromV1 finds the
+  // schedule already there and keeps it instead of recording a clean solve.
+  | { type: "RECORD_SOLVE"; id: string; outcome: ReviewOutcome; at: string }
+  | { type: "RECORD_REVIEW"; id: string; outcome: ReviewOutcome; at: string }
   | { type: "ADD_MISTAKE"; id: string; mistake: { at: string; what: string; remember: string } }
   | { type: "REMOVE_MISTAKE"; id: string; at: string }
   // Wholesale replace, for importing/restoring a complete v2 export or backup --

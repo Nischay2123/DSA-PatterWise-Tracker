@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 //
 // Inline SVG rather than an icon package: 20 paths is a smaller diff than a
 // dependency, and it means no runtime font/sprite fetch.
-const PATHS: Record<string, ReactNode> = {
+const PATHS = {
   check: <path d="M4.5 12.5 9.5 17.5 19.5 6.5" />,
   star: (
     <path d="M12 3.6l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
@@ -154,7 +154,20 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M14.5 3.5a3 3 0 0 1 2.9 2.2A3 3 0 0 1 19.6 9a3 3 0 0 1-.3 4.2 3.2 3.2 0 0 1-1.3 5.4 3 3 0 0 1-5.5 1.6" />
     </>
   ),
-};
+  lock: (
+    <>
+      <rect x="5" y="10.5" width="14" height="10" rx="2" />
+      <path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3" />
+    </>
+  ),
+  play: <path d="M8 5.5v13l10.5-6.5z" />,
+  bell: (
+    <>
+      <path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z" />
+      <path d="M10 20.5a2 2 0 0 0 4 0" />
+    </>
+  ),
+} satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof PATHS;
 

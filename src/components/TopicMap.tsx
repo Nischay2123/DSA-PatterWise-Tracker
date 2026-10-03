@@ -1,105 +1,74 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "../context";
-import { areTopicPrereqsMet, countDone, getTopicProblems } from "../store";
-import { Icon } from "./Icon";
+import { isExemptTopic, resolveGoal } from "../revision/goal";
+import { countDone, doneTopics } from "../store";
 import type { Topic } from "../types";
+import { Icon } from "./Icon";
+import { isDarkNow } from "../useTheme";
 
+// The roadmap's prerequisite graph, as a mermaid flowchart. Mermaid is a
+// large chunk, so it is only imported once the panel is first opened.
 export function TopicMap({ topics }: { topics: Topic[] }) {
-  const { store } = useStore();
-  const [svg, setSvg] = useState<string>("");
-  const [error, setError] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const renderedRef = useRef(false);
+  const { store, v2Store } = useStore();
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState(false);
+  const host = useRef<HTMLDivElement>(null);
+  const goal = resolveGoal(v2Store.settings);
+  const goalKey = JSON.stringify(goal);
 
   useEffect(() => {
-    if (renderedRef.current) return;
-    renderedRef.current = true;
-
-    // Dynamic import mermaid only when needed
-    import("mermaid").then((mod) => {
-      const mermaid = mod.default;
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: "base",
-        themeVariables: {
-          primaryColor: "var(--accent)",
-          primaryTextColor: "var(--text)",
-          primaryBorderColor: "var(--accent)",
-          lineColor: "var(--border)",
-          secondaryColor: "var(--panel)",
-          tertiaryColor: "var(--bg)",
-        },
+    if (!open) return;
+    let cancelled = false;
+    const done = doneTopics(topics, store, goal);
+    const n = (id: string) => id.replace(/-/g, "_");
+    const lines = ["flowchart LR"];
+    for (const t of topics) {
+      const problems = t.patterns.flatMap((p) => p.problems);
+      const solved = countDone(problems, store);
+      // Green means finished; an exempt topic never blocks anything, but isn't that.
+      const cls = done.has(t.id) && !isExemptTopic(t.id) ? "done" : solved ? "wip" : "todo";
+      lines.push(`  ${n(t.id)}["${t.name.replace(/"/g, "'")}<br/>${solved}/${problems.length}"]:::${cls}`);
+      for (const p of t.prereqs ?? []) lines.push(`  ${n(p)} --> ${n(t.id)}`);
+    }
+    lines.push(
+      "  classDef done fill:#0d7a49,stroke:#0d7a49,color:#fff",
+      "  classDef wip fill:#f5bf4a,stroke:#93650a,color:#14141c",
+      "  classDef todo fill:transparent"
+    );
+    import("mermaid")
+      .then(async ({ default: mermaid }) => {
+        mermaid.initialize({ startOnLoad: false, theme: isDarkNow() ? "dark" : "default" });
+        const { svg } = await mermaid.render(`topic-map-${Date.now()}`, lines.join("\n"));
+        if (!cancelled && host.current) host.current.innerHTML = svg;
+      })
+      .catch((e: unknown) => {
+        console.warn("topic map", e);
+        if (!cancelled) setError(true);
       });
-
-      const n = (id: string) => id.replace(/-/g, "_");
-      const lines = ["flowchart LR"];
-
-      for (const topic of topics) {
-        const problems = getTopicProblems(topic);
-        const done = countDone(problems, store);
-        const total = problems.length;
-        const pct = total ? Math.round((done / total) * 100) : 0;
-        areTopicPrereqsMet(topic, topics, store); // Check prereqs for potential future use
-
-        let className = "todo";
-        if (done === total && total > 0) className = "done";
-        else if (done > 0) className = "wip";
-
-        const label = `${topic.name}<br/>${done}/${total} (${pct}%)`;
-        lines.push(`  ${n(topic.id)}["${label}"]:::${className}`);
-
-        if (topic.prereqs) {
-          for (const p of topic.prereqs) {
-            lines.push(`  ${n(p)} --> ${n(topic.id)}`);
-          }
-        }
-      }
-
-      lines.push(
-        '  classDef done fill:var(--ok),stroke:var(--ok),color:#fff',
-        '  classDef wip fill:var(--medium),stroke:var(--medium),color:#fff',
-        '  classDef todo fill:var(--panel),stroke:var(--border),color:var(--text)'
-      );
-
-      mermaid
-        .render("topic-map-" + Date.now(), lines.join("\n"))
-        .then(({ svg: svgContent }: { svg: string }) => {
-          setSvg(svgContent);
-        })
-        .catch((e: unknown) => {
-          console.warn("Topic map render error:", e);
-          setError("Failed to render topic map");
-        });
-    });
-  }, [topics, store]);
+    return () => {
+      cancelled = true;
+    };
+    // goalKey, not goal: resolveGoal builds a new object every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, topics, store, goalKey]);
 
   return (
-    <div className="card overflow-hidden">
-      <div className="p-3 border-b border-border flex items-center justify-between">
-        <h3 className="font-display text-head font-bold m-0">Topic Map</h3>
-        <span className="text-caption text-muted">Prerequisite flow →</span>
-      </div>
-      <div
-        ref={containerRef}
-        className="p-3 overflow-x-auto"
-        style={{ minHeight: 200 }}
-      >
-        {error && (
-          <div className="flex items-center justify-center h-full text-muted">
-            <Icon name="alert" className="size-5 mr-2" />
-            {error}
+    <details className="group/map card mb-3 overflow-hidden" onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary className="disclosure flex items-center gap-2 py-3 px-4 hover:bg-row-hover">
+        <Icon name="layers" className="size-4 text-accent shrink-0" />
+        <span className="font-display text-head font-bold">Topic map</span>
+        <span className="text-caption text-muted max-sm:hidden">what to finish before what</span>
+        <Icon name="chevronDown" className="size-4 text-faint ml-auto transition-transform group-open/map:rotate-180" />
+      </summary>
+      <div className="border-t border-border p-3 overflow-x-auto">
+        {error ? (
+          <p className="text-caption text-muted m-0">The topic map couldn't be drawn.</p>
+        ) : (
+          <div ref={host} className="min-h-24 text-caption text-muted [&_svg]:max-w-none">
+            Drawing…
           </div>
         )}
-        {!error && !svg && (
-          <div className="flex items-center justify-center h-full text-muted">
-            <Icon name="loader" className="size-5 mr-2 animate-spin" />
-            Loading topic map…
-          </div>
-        )}
-        {svg && <div dangerouslySetInnerHTML={{ __html: svg }} />}
       </div>
-    </div>
+    </details>
   );
 }

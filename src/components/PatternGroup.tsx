@@ -1,5 +1,7 @@
 import { useFilters, useStore } from "../context";
-import { countDone, getState, isProblemVisible } from "../store";
+import { countDone, getState, isProblemVisible, todayISO, unmetPrereqs } from "../store";
+import type { Prereqs } from "../store";
+import { dueIds } from "../revision/questionReview";
 import { cx } from "../cx";
 import { goalScoped, isDefaultGoal, resolveGoal } from "../revision/goal";
 import type { Pattern } from "../types";
@@ -11,16 +13,18 @@ export function PatternGroup({
   pattern,
   topicName,
   gated,
+  prereqs,
 }: {
   pattern: Pattern;
   topicName: string;
   gated: boolean;
+  prereqs: Prereqs;
 }) {
   const { store, v2Store } = useStore();
   const { filters } = useFilters();
 
   const goal = resolveGoal(v2Store.settings);
-  const context = { topicName, patternName: pattern.name, goal };
+  const context = { topicName, patternName: pattern.name, goal, due: dueIds(v2Store, todayISO()) };
   const anyVisible = pattern.problems.some((p) => isProblemVisible(p, getState(store, p.id), filters, context));
   // Display only -- nothing derives from this count. It follows the list so
   // the chip never contradicts the rows underneath it.
@@ -58,7 +62,14 @@ export function PatternGroup({
       <div className="ml-[7px] border-l border-border pl-3 pb-2 pt-0.5">
         <FundamentalsPanel patternId={pattern.id} />
         {pattern.problems.map((p) => (
-          <QuestionRow key={p.id} problem={p} topicName={topicName} patternName={pattern.name} gated={gated} />
+          <QuestionRow
+            key={p.id}
+            problem={p}
+            topicName={topicName}
+            patternName={pattern.name}
+            gated={gated}
+            lockedBy={unmetPrereqs(p.needs, prereqs.done).map((id) => prereqs.names[id])}
+          />
         ))}
       </div>
     </details>

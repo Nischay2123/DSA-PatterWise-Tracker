@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { MOBILE_QUERY } from "../breakpoints";
+import { SOURCES } from "../config";
 import { useFilters, useStore } from "../context";
 import { GOAL_PRESETS, goalPresetId, isDefaultGoal, resolveGoal } from "../revision/goal";
 import { cx } from "../cx";
@@ -16,13 +17,8 @@ const DIFFICULTY_ACTIVE: Record<string, string> = {
 
 const SOURCE_OPTIONS = [
   { value: "", label: "Source: All" },
-  { value: "A2Z", label: "Source: Striver A2Z" },
-  { value: "NC150", label: "Source: NeetCode 150" },
-  { value: "NC250", label: "Source: NeetCode 250" },
-  { value: "B75", label: "Source: Blind 75" },
-  { value: "LC150", label: "Source: LeetCode Top 150" },
-  { value: "LC75", label: "Source: LeetCode 75" },
-] as { value: string; label: string }[];
+  ...Object.entries(SOURCES).map(([value, name]) => ({ value, label: `Source: ${name}` })),
+];
 
 // A native <select> with its own chevron and no UA arrow, so it matches the
 // segmented control beside it instead of looking like a stray form control.
@@ -123,6 +119,8 @@ export function Filters() {
     (filters.freq !== "All" ? 1 : 0) +
     (filters.hideCompleted ? 1 : 0) +
     (filters.reviseOnly ? 1 : 0) +
+    (filters.source ? 1 : 0) +
+    (filters.dueOnly ? 1 : 0) +
     (goalActive && !filters.goalOnly ? 1 : 0);
 
   return (
@@ -238,6 +236,13 @@ export function Filters() {
             icon="star"
           >
             Starred only
+          </Toggle>
+          <Toggle
+            on={!!filters.dueOnly}
+            onToggle={() => setFilters((f) => ({ ...f, dueOnly: !f.dueOnly }))}
+            icon="bell"
+          >
+            Due for review
           </Toggle>
         </div>
       </details>

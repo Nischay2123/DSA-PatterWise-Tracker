@@ -2,7 +2,10 @@ import { REVISION_CONFIG } from "../config";
 import { useFilters, useStore } from "../context";
 import { goalScoped, isDefaultGoal, isTopicOutOfGoalScope, resolveGoal } from "../revision/goal";
 import { deriveState, isTopicGated } from "../revision/stateMachine";
-import { areTopicPrereqsMet, countDone, getState, getTopicRevision, isGatingActive, isProblemVisible } from "../store";
+import { countDone, doneTopics, getState, getTopicRevision, isGatingActive, isProblemVisible, todayISO, unmetPrereqs } from "../store";
+import type { Prereqs } from "../store";
+import { dueIds } from "../revision/questionReview";
+import { NOTES_BY_ID } from "../notes";
 import { cx } from "../cx";
 import type { Topic } from "../types";
 import { Icon } from "./Icon";
@@ -67,18 +70,21 @@ function ReviseNow({ topic, remaining }: { topic: Topic; remaining: number }) {
   );
 }
 
-function TopicItem({ topic, index, allTopics }: { topic: Topic; index: number; allTopics: Topic[] }) {
+function TopicItem({ topic, index, prereqs }: { topic: Topic; index: number; prereqs: Prereqs }) {
   const { store, v2Store } = useStore();
   const { filters } = useFilters();
 
   const goal = resolveGoal(v2Store.settings);
   const allProblems = topic.patterns.flatMap((p) => p.problems);
   const anyVisible = allProblems.some((p) =>
-    isProblemVisible(p, getState(store, p.id), filters, { topicName: topic.name, patternName: "", goal })
+    isProblemVisible(p, getState(store, p.id), filters, {
+      topicName: topic.name,
+      patternName: "",
+      goal,
+      due: dueIds(v2Store, todayISO()),
+    })
   );
-
-  // Check if topic prerequisites are met
-  const prereqsMet = areTopicPrereqsMet(topic, allTopics, store);
+  const lockedBy = unmetPrereqs(topic.prereqs, prereqs.done);
 
   // "Exempt" here means revision ignores this topic entirely -- either it is
   // on the permanent exempt list, or the goal thinned it below the floor.
@@ -90,11 +96,11 @@ function TopicItem({ topic, index, allTopics }: { topic: Topic; index: number; a
 
   // TWO different percentages, and conflating them is a bug waiting to
   // happen. This one feeds the state machine, so it is measured against
-  // whatever revision governs this topic and NEVER against what the list
-  // happens to be showing -- a view toggle must not move a topic in or out
-  // of REVISION_DUE.
-  const governedByGoal = !isExempt && !isDefaultGoal(goal);
-  const scored = governedByGoal ? inGoal : allProblems;
+  // whatever revision governs this topic -- the goal, which by default is the
+  // A2Z sheet -- and NEVER against what the list happens to be showing: a
+  // view toggle must not move a topic in or out of REVISION_DUE. Same scope
+  // as buildTopicRows in revision/dashboard.ts.
+  const scored = isExempt ? allProblems : inGoal;
   const scoredDone = countDone(scored, store);
   const revisionPct = scored.length ? scoredDone / scored.length : 0;
   const revisionState = deriveState(getTopicRevision(v2Store, topic.id), revisionPct, isExempt);
@@ -139,10 +145,13 @@ function TopicItem({ topic, index, allTopics }: { topic: Topic; index: number; a
           {complete ? <Icon name="check" className="size-3.5" /> : index + 1}
         </span>
         <span className="font-display text-head font-bold tracking-tight min-w-0 truncate">{topic.name}</span>
-        {!prereqsMet && topic.prereqs && topic.prereqs.length > 0 && (
-          <span className="pill bg-amber-soft text-amber shrink-0" title="Prerequisites not met">
-            <Icon name="lock" className="size-3" />
-            <span className="max-sm:hidden">Locked</span>
+        {lockedBy.length > 0 && (
+          <span
+            className="pill bg-medium-soft text-medium shrink-0"
+            title={`Finish first: ${lockedBy.map((id) => prereqs.names[id]).join(", ")}`}
+          >
+            <Icon name="lock" className="size-3 shrink-0" />
+            <span className="max-sm:hidden max-w-40 truncate">after {lockedBy.map((id) => prereqs.names[id]).join(", ")}</span>
           </span>
         )}
         {gated && (
@@ -173,9 +182,20 @@ function TopicItem({ topic, index, allTopics }: { topic: Topic; index: number; a
           />
         )
       )}
+      {!!topic.notes?.length && (
+        <div className="flex items-center gap-1.5 flex-wrap px-3.5 pt-2.5 text-caption text-muted">
+          <Icon name="book" className="size-3.5 shrink-0" />
+          Pattern notes:
+          {topic.notes.map((id) => (
+            <a key={id} href={`#/notes/${id}`} className="chip py-0.5 hover:text-accent hover:border-accent-line">
+              {NOTES_BY_ID[id]?.title ?? id}
+            </a>
+          ))}
+        </div>
+      )}
       <div className="py-1.5">
         {topic.patterns.map((p) => (
-          <PatternGroup key={p.id} pattern={p} topicName={topic.name} gated={gated} />
+          <PatternGroup key={p.id} pattern={p} topicName={topic.name} gated={gated} prereqs={prereqs} />
         ))}
       </div>
     </details>
@@ -183,10 +203,16 @@ function TopicItem({ topic, index, allTopics }: { topic: Topic; index: number; a
 }
 
 export function TopicList({ topics }: { topics: Topic[] }) {
+  const { store, v2Store } = useStore();
+  // Once per render for the whole list, not per row.
+  const prereqs: Prereqs = {
+    done: doneTopics(topics, store, resolveGoal(v2Store.settings)),
+    names: Object.fromEntries(topics.map((t) => [t.id, t.name])),
+  };
   return (
     <div>
       {topics.map((t, i) => (
-        <TopicItem key={t.id} topic={t} index={i} allTopics={topics} />
+        <TopicItem key={t.id} topic={t} index={i} prereqs={prereqs} />
       ))}
     </div>
   );

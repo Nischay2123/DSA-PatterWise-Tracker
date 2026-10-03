@@ -16,3 +16,15 @@ const GFG = gfgLinks as Record<string, string>;
 export function problemLink(problem: Problem): string | null {
   return problem.link ?? GFG[problem.id] ?? null;
 }
+
+const SITES: [string, string][] = [
+  ["leetcode.com", "LC"],
+  ["geeksforgeeks.org", "GFG"],
+  ["takeuforward.org", "TUF"],
+  ["lintcode.com", "LintCode"],
+];
+
+/** Short label for a practice link's site. */
+export function siteLabel(url: string): string {
+  return SITES.find(([host]) => url.includes(host))?.[1] ?? "Link";
+}

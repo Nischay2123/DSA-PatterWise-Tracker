@@ -430,3 +430,141 @@
     display: none;
   }
 }
+
+/* Rendered Markdown notes (NotesPanel). Scoped to .md so nothing leaks. */
+@layer components {
+  .md {
+    color: var(--color-fg);
+    font-size: var(--text-body);
+    line-height: 1.65;
+    & > :first-child {
+      margin-top: 0;
+    }
+    & h1,
+    & h2,
+    & h3,
+    & h4 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      line-height: 1.25;
+      margin: 1.6em 0 0.5em;
+    }
+    & h1 {
+      font-size: 1.6rem;
+    }
+    & h2 {
+      font-size: 1.25rem;
+      padding-bottom: 0.3em;
+      border-bottom: 1px solid var(--color-border);
+    }
+    & h3 {
+      font-size: 1.05rem;
+    }
+    & p,
+    & ul,
+    & ol,
+    & table,
+    & blockquote,
+    & pre {
+      margin: 0 0 1em;
+    }
+    & ul,
+    & ol {
+      padding-left: 1.4em;
+    }
+    & ul {
+      list-style: disc;
+    }
+    & ol {
+      list-style: decimal;
+    }
+    & li + li {
+      margin-top: 0.25em;
+    }
+    & a {
+      color: var(--color-accent);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    & strong {
+      font-weight: 650;
+    }
+    & blockquote {
+      border-left: 3px solid var(--color-accent-line);
+      padding-left: 1em;
+      color: var(--color-muted);
+    }
+    & :not(pre) > code {
+      font-family: var(--font-mono);
+      font-size: 0.88em;
+      padding: 0.1em 0.35em;
+      border-radius: 0.3rem;
+      background: var(--color-sunken);
+    }
+    & pre {
+      overflow-x: auto;
+      padding: 0.9em 1em;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-border);
+      background: var(--color-sunken);
+      font-family: var(--font-mono);
+      font-size: var(--text-caption);
+      line-height: 1.55;
+    }
+    & pre.mermaid {
+      background: transparent;
+      border: 0;
+      text-align: center;
+      font-family: inherit;
+    }
+    & table {
+      display: block;
+      overflow-x: auto;
+      border-collapse: collapse;
+    }
+    & th,
+    & td {
+      border: 1px solid var(--color-border);
+      padding: 0.4em 0.7em;
+      text-align: left;
+      vertical-align: top;
+    }
+    & th {
+      background: var(--color-sunken);
+      font-weight: 600;
+    }
+    & hr {
+      border: 0;
+      border-top: 1px solid var(--color-border);
+      margin: 1.5em 0;
+    }
+  }
+
+  /* highlight.js tokens, from the same palette as everything else. */
+  .hljs-keyword,
+  .hljs-literal,
+  .hljs-built_in {
+    color: var(--color-accent);
+  }
+  .hljs-string {
+    color: var(--color-easy);
+  }
+  .hljs-number {
+    color: var(--color-medium);
+  }
+  .hljs-comment {
+    color: var(--color-faint);
+    font-style: italic;
+  }
+  .hljs-title,
+  .hljs-title.function_ {
+    color: var(--color-hard);
+  }
+  .hljs-type,
+  .hljs-title.class_ {
+    color: var(--color-star);
+  }
+  .hljs-meta {
+    color: var(--color-muted);
+  }
+}

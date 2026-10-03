@@ -20,6 +20,10 @@ export const REVISION_CONFIG = {
   exemptTopics: ["fundamentals"], // never scheduled, never gated, omitted from every dashboard count
 } as const;
 
+// Per-question spaced repetition (src/revision/questionReview.ts): days until
+// each review after a solve. Past the last one the question is mastered.
+export const QUESTION_REVIEW_DAYS = [1, 3, 7, 15, 30, 60] as const;
+
 // Source tags from puneetkhatri99/DSA_Tracker (Striver A2Z + NeetCode + Blind 75 + LeetCode lists)
 export const SOURCES = {
   A2Z: "Striver A2Z",

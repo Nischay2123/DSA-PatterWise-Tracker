@@ -1,13 +1,11 @@
 import { useRef, useState } from "react";
-import { useStore } from "../context";
-import { useFilters } from "../context";
+import { useFilters, useStore } from "../context";
 import { resolveGoal } from "../revision/goal";
 import {
   buildHeatmapMonths,
   buildHeatmapStats,
   computeStreak,
   earliestYearOffset,
-  findNextUnsolved,
   findNextUp,
   getHeatmapRange,
   todayISO,
@@ -23,13 +21,10 @@ import { cx } from "../cx";
 
 export function Dashboard({
   allProblems,
-  goalProblems,
   topics,
   onContinue,
 }: {
   allProblems: Problem[];
-  /** The goal scope. Equal to allProblems under the default goal. */
-  goalProblems: Problem[];
   topics: Topic[];
   onContinue: (id: string) => void;
 }) {
@@ -52,11 +47,9 @@ export function Dashboard({
   const streak = computeStreak(doneByDate);
   const todayCount = doneByDate.get(todayISO()) || 0;
   const goal = resolveGoal(v2Store.settings);
-  // Points at the next unsolved problem IN THE GOAL, so "Continue" sends you
-  // somewhere that counts toward what you actually set out to do.
-  const next = findNextUnsolved(goalProblems, store) ?? findNextUnsolved(allProblems, store);
-  // Next Up: first unsolved with prerequisites met
-  const nextUp = findNextUp(topics, store, filters, goal);
+  // The next problem the list is showing whose prerequisite topics are done,
+  // so "Continue" respects the source filter and the roadmap's build-up order.
+  const next = findNextUp(topics, store, filters, goal);
   const maxOffset = Math.max(earliestYearOffset(store), 1);
 
   return (
@@ -72,7 +65,9 @@ export function Dashboard({
           {next ? (
             <>
               <div className="min-w-0 flex-1">
-                <div className="field-label mb-0.5">Up next</div>
+                <div className="field-label mb-0.5" title="The first unsolved problem shown whose prerequisite topics are done">
+                  Up next
+                </div>
                 <div className="flex items-center gap-1.5 min-w-0">
                   <span className={cx("pill px-1.5 shrink-0 font-bold", DIFFICULTY_PILL[next.difficulty])}>
                     {next.difficulty[0]}
@@ -100,38 +95,7 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* Next Up & Topic Map */}
-      <div className="grid gap-3 mb-3 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-        <div className="card p-4 flex items-center gap-3.5 bg-linear-to-br from-amber-soft to-surface">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber text-amber-fg shadow-panel">
-            <Icon name="zap" className="size-5" />
-          </span>
-          {nextUp ? (
-            <>
-              <div className="min-w-0 flex-1">
-                <div className="field-label mb-0.5">Next up (prereqs met)</div>
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className={cx("pill px-1.5 shrink-0 font-bold", DIFFICULTY_PILL[nextUp.difficulty])}>
-                    {nextUp.difficulty[0]}
-                  </span>
-                  <span className="text-body font-semibold truncate">{nextUp.question}</span>
-                </div>
-              </div>
-              <button className="btn btn-primary shrink-0" onClick={() => onContinue(nextUp.id)}>
-                <span className="max-sm:hidden">Go</span>
-                <Icon name="arrowRight" className="size-4" />
-              </button>
-            </>
-          ) : (
-            <div className="min-w-0">
-              <div className="field-label mb-0.5">Next up (prereqs met)</div>
-              <div className="text-body font-semibold text-muted">All available problems solved!</div>
-            </div>
-          )}
-        </div>
-
-        <TopicMap topics={topics} />
-      </div>
+      <TopicMap topics={topics} />
 
       <div className="card p-4">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-3">

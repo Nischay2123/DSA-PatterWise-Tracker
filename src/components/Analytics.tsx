@@ -1,3 +1,4 @@
+import { SOURCES } from "../config";
 import { useStore } from "../context";
 import { breakdownBy, getState } from "../store";
 import type { Problem } from "../types";
@@ -16,6 +17,15 @@ export function Analytics({ allProblems }: { allProblems: Problem[] }) {
     { title: "Difficulty", icon: "target", rows: breakdownBy(allProblems, (p) => p.difficulty, DIFFICULTY_ORDER, store) },
     { title: "Importance", icon: "flame", rows: breakdownBy(allProblems, (p) => p.importance, IMPORTANCE_ORDER, store) },
     { title: "Interview frequency", icon: "clock", rows: breakdownBy(allProblems, (p) => p.interviewFreq, FREQ_ORDER, store) },
+    // A problem is on several lists at once, so this is not a breakdownBy.
+    {
+      title: "Source",
+      icon: "layers",
+      rows: Object.entries(SOURCES).map(([key, name]) => {
+        const on = allProblems.filter((p) => p.sources?.includes(key));
+        return { label: name, done: on.filter((p) => getState(store, p.id).done).length, total: on.length };
+      }),
+    },
   ] as const;
 
   return (
@@ -37,7 +47,7 @@ export function Analytics({ allProblems }: { allProblems: Problem[] }) {
             </div>
             {sec.rows.map((r) => (
               <div className="flex items-center gap-2.5 my-2 text-caption" key={r.label}>
-                <span className="w-20 shrink-0 text-muted">{r.label}</span>
+                <span className="w-28 shrink-0 truncate text-muted" title={r.label}>{r.label}</span>
                 <ProgressBar done={r.done} total={r.total} mini />
                 <span className="w-12 shrink-0 text-right text-muted tabular-nums">{`${r.done}/${r.total}`}</span>
               </div>

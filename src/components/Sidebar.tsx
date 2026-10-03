@@ -69,9 +69,14 @@ export function SidebarContent({
   backupExists,
   onBackupChange,
   onOpenSettings,
+  dueCount = 0,
+  onShowDue,
   showBrand = true,
 }: {
   route: "tracker" | "revision" | "notes";
+  /** Per-question reviews due today. */
+  dueCount?: number;
+  onShowDue?: () => void;
   onNavigate: (hash: string) => void;
   done: number;
   total: number;
@@ -139,6 +144,13 @@ export function SidebarContent({
           <Icon name="repeat" className="size-4" />
           Revision
         </button>
+        {dueCount > 0 && onShowDue && (
+          <button type="button" className="nav-item" onClick={onShowDue} title="Show the questions due for review">
+            <Icon name="bell" className="size-4" />
+            Reviews due
+            <span className="ml-auto pill bg-accent text-accent-fg tabular-nums">{dueCount}</span>
+          </button>
+        )}
         <button
           type="button"
           className="nav-item"
