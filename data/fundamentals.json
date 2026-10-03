@@ -7222,6 +7222,81 @@
           ]
         }
       ]
+    },
+    "backtracking__permutations": {
+      "patternName": "Permutations",
+      "topicId": "backtracking",
+      "concepts": [
+        {
+          "id": "backtracking__permutations__c1",
+          "prompt": "What signal tells you a problem wants permutations rather than combinations or subsets, and how many results should you expect?",
+          "expectedConcepts": [
+            "order matters: [1,2] and [2,1] are different answers",
+            "every result uses all n elements exactly once",
+            "n! results for n distinct elements"
+          ],
+          "criticality": "core",
+          "tags": [
+            "recognition",
+            "applicability"
+          ]
+        },
+        {
+          "id": "backtracking__permutations__c2",
+          "prompt": "Describe the used[]-array backtracking template for permutations. What does each level of recursion decide, and what must be undone on the way back?",
+          "expectedConcepts": [
+            "each level picks which unused element goes in the next position",
+            "mark used[i] and append before recursing",
+            "unmark used[i] and remove the last element after returning",
+            "base case: the current path has length n"
+          ],
+          "criticality": "core",
+          "tags": [
+            "technique",
+            "invariant"
+          ]
+        },
+        {
+          "id": "backtracking__permutations__c3",
+          "prompt": "How do you generate only unique permutations when the input has duplicates (Permutations II)?",
+          "expectedConcepts": [
+            "sort the input first so equal values sit next to each other",
+            "skip nums[i] if it equals nums[i-1] and nums[i-1] is not currently used",
+            "this fixes the relative order of equal values, so each distinct arrangement is built once"
+          ],
+          "criticality": "core",
+          "tags": [
+            "pitfall",
+            "variants"
+          ]
+        },
+        {
+          "id": "backtracking__permutations__c4",
+          "prompt": "What is the time complexity of generating all permutations of n elements, and why can no algorithm do asymptotically better?",
+          "expectedConcepts": [
+            "O(n * n!) time: n! leaves, each copied in O(n)",
+            "the output itself has n! lists of length n, so just writing it costs that much",
+            "O(n) extra space for recursion depth and the used array, excluding the output"
+          ],
+          "criticality": "core",
+          "tags": [
+            "complexity"
+          ]
+        },
+        {
+          "id": "backtracking__permutations__c5",
+          "prompt": "When should you NOT enumerate permutations, even though the question mentions arrangements or orderings?",
+          "expectedConcepts": [
+            "when only a count is needed: use n!/(k1!k2!...) or DP, not enumeration",
+            "when only the next or k-th arrangement is needed: use next-permutation or factorial-number-system indexing",
+            "n beyond ~10 makes n! infeasible"
+          ],
+          "criticality": "supporting",
+          "tags": [
+            "non-applicability"
+          ]
+        }
+      ]
     }
   }
 }

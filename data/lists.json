@@ -1,7 +1,7 @@
 {
   "blind75": {
     "label": "Blind 75",
-    "note": "The canonical Blind 75. 51 of the 75 exist in this sheet; the other 24 are listed in `absent` and are simply not part of it -- ids are never invented to pad the list.",
+    "note": "The canonical Blind 75. 75 of the 75 are in this tracker. Ids are never invented to pad the list.",
     "total": 75,
     "ids": [
       "arrays__hashing__two-sum",
@@ -54,33 +54,32 @@
       "dp__lis-pattern__longest-increasing-subsequence",
       "dp__string-dp__longest-common-subsequence",
       "backtracking__constraint-problems__word-break",
-      "graphs__connected-components__connected-components"
+      "graphs__connected-components__connected-components",
+      "arrays__hashing__find-missing-number",
+      "arrays__hashing__contains-duplicate",
+      "arrays__prefix-sum__product-of-array-except-self",
+      "arrays__two-pointers__container-with-most-water",
+      "arrays__intervals__meeting-rooms",
+      "strings__anagram-frequency__group-anagrams",
+      "strings__string-parsing__encode-and-decode-strings",
+      "linked-list__fast-slow__reorder-list",
+      "linked-list__merge__merge-two-sorted-lists",
+      "bit-manipulation__bit-basics__count-the-number-of-set-bits",
+      "bit-manipulation__bit-basics__counting-bits",
+      "bit-manipulation__bit-basics__reverse-bits",
+      "bit-manipulation__bit-basics__sum-of-two-integers",
+      "greedy__activity-selection__meeting-rooms-ii",
+      "trees__tree-properties__invert-binary-tree",
+      "trees__tree-properties__subtree-of-another-tree",
+      "graphs__dfs__clone-graph",
+      "graphs__dfs__pacific-atlantic-water-flow",
+      "graphs__union-find__graph-valid-tree",
+      "dp__1d-dp__decode-ways",
+      "dp__string-dp__palindromic-substrings",
+      "tries__trie-string-applications__design-add-and-search-words-data-structure",
+      "tries__trie-string-applications__word-search-ii",
+      "dp__knapsack__combination-sum-iv"
     ],
-    "absent": [
-      "Add and Search Word",
-      "Clone Graph",
-      "Combination Sum IV",
-      "Container With Most Water",
-      "Contains Duplicate",
-      "Counting Bits",
-      "Decode Ways",
-      "Encode and Decode Strings",
-      "Graph Valid Tree",
-      "Group Anagrams",
-      "Invert Binary Tree",
-      "Meeting Rooms",
-      "Meeting Rooms II",
-      "Merge Two Sorted Lists",
-      "Missing Number",
-      "Number of 1 Bits",
-      "Pacific Atlantic Water Flow",
-      "Palindromic Substrings",
-      "Product of Array Except Self",
-      "Reorder List",
-      "Reverse Bits",
-      "Subtree of Another Tree",
-      "Sum of Two Integers",
-      "Word Search II"
-    ]
+    "absent": []
   }
 }
