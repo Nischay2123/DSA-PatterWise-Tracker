@@ -629,7 +629,7 @@ export function summarizeMergeV2(local: AppStoreV2, merged: AppStoreV2): MergeSu
 }
 
 function textOf(p: QuestionProgressV2): string {
-  return [p.approach, p.pseudocode, p.code, ...Object.values(p.notes)].join(" ");
+  return [p.approach, p.pseudocode, p.code, ...Object.values(p.notes)].join("\u0000");
 }
 
 // --- v2 (IndexedDB) adapter -------------------------------------------------

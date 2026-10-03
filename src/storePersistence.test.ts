@@ -60,7 +60,12 @@ describe("saveStore / loadStore", () => {
 
   it("warns once, rather than failing silently, when the browser blocks writes", () => {
     const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
-    vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+    // Spy where setItem actually lives. Which localStorage the test gets varies
+    // by Node version and pool, and on a jsdom Storage defining an own
+    // "setItem" just stores an item by that name, so an instance spy never fires.
+    let owner: object = localStorage;
+    while (!Object.prototype.hasOwnProperty.call(owner, "setItem")) owner = Object.getPrototypeOf(owner);
+    vi.spyOn(owner as Storage, "setItem").mockImplementation(() => {
       throw new Error("QuotaExceededError");
     });
     saveStore(v1({ a: state() }));

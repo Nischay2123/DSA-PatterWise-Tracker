@@ -77,6 +77,9 @@ describe("fundamentals coverage", () => {
 
 describe("a coverage gap does not stop the app from loading", () => {
   it("imports and only logs, so the UI still mounts", async () => {
+    // The static import above already loaded ./session; without this, a run
+    // that orders this test first gets that cached copy and the mocks never apply.
+    vi.resetModules();
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.doMock("../../data/questions.json", () => ({ default: ONE_TOPIC }));
     vi.doMock("../../data/fundamentals.json", () => ({
