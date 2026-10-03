@@ -38,7 +38,6 @@ const DEFAULT_FILTERS: FilterState = {
   // list, the counts and the topic rows immediately. Inert under the default
   // goal, which matches every problem.
   goalOnly: true,
-  source: "",
 };
 
 function prefersReducedMotion(): boolean {

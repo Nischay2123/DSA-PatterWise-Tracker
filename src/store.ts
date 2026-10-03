@@ -238,7 +238,9 @@ export function isProblemVisible(
   const matchesFreq = filters.freq === "All" || problem.interviewFreq === filters.freq;
   const matchesCompleted = !filters.hideCompleted || !state.done;
   const matchesRevise = !filters.reviseOnly || state.revise;
-  const matchesSource = !filters.source || (problem.sources ?? []).includes(filters.source);
+  const matchesSolved = !filters.solvedOnly || state.done;
+  // Problem ids are `${patternId}__${slug}`, for the sheet and the merged-in questions alike.
+  const matchesPattern = !filters.pattern || problem.id.startsWith(`${filters.pattern}__`);
   const matchesDue = !filters.dueOnly || !!context.due?.has(problem.id);
   // No goal on the context means nothing to narrow to -- the toggle cannot
   // hide every row just because a caller forgot to pass one. The default goal
@@ -252,7 +254,8 @@ export function isProblemVisible(
     matchesFreq &&
     matchesCompleted &&
     matchesRevise &&
-    matchesSource &&
+    matchesSolved &&
+    matchesPattern &&
     matchesDue &&
     matchesGoalFilter
   );
@@ -265,7 +268,8 @@ export function areFiltersActive(filters: FilterState): boolean {
     filters.importance !== "All" ||
     filters.freq !== "All" ||
     filters.reviseOnly ||
-    !!filters.source ||
+    !!filters.pattern ||
+    !!filters.solvedOnly ||
     !!filters.dueOnly
   );
 }

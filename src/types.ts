@@ -66,9 +66,11 @@ export interface FilterState {
   // Show only the problems the active revision goal counts. Optional so a
   // FilterState built before this existed still type-checks as one.
   goalOnly?: boolean;
-  // One of the SOURCES keys in config.ts; empty or absent = every source.
-  source?: string;
-  // Only questions with a per-question review due.
+  // A pattern id; empty or absent = every pattern.
+  pattern?: string;
+  // The Status filter is one choice among these flags: to do (hideCompleted),
+  // solved, starred (reviseOnly) or due for review.
+  solvedOnly?: boolean;
   dueOnly?: boolean;
 }
 

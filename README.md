@@ -6,7 +6,7 @@ A single-page tracker for the Striver A2Z DSA sheet plus NeetCode 150/250, Blind
 
 ## What it does
 
-**Tracking.** 649 problems across 18 topics and 106 patterns, collapsible at both levels. Mark done, star for revision, keep six structured notes per problem plus your own list of mistakes. Search by name, topic or pattern; filter by difficulty, importance, interview frequency and source list, show starred or due-for-review only, or hide what is already done. Each row carries its source tags, extra practice links (LC / GFG / TUF), video and article links and a Premium tag. GitHub-style activity heatmap with day streak and year navigation, and a "Continue →" button that jumps to the next unsolved problem whose prerequisite topics are done.
+**Tracking.** 649 problems across 18 topics and 106 patterns, collapsible at both levels. Mark done, star for revision, keep six structured notes per problem plus your own list of mistakes. Search by name, topic or pattern; filter by difficulty, pattern, status (to do, solved, starred, due for review), importance and interview frequency. The pattern, importance and frequency options come from the sheet chosen in Settings. Each row carries its source tags, extra practice links (LC / GFG / TUF), video and article links and a Premium tag. GitHub-style activity heatmap with day streak and year navigation, and a "Continue →" button that jumps to the next unsolved problem whose prerequisite topics are done.
 
 **Roadmap.** Topics have prerequisites and some problems build on other topics; unfinished ones show as 🔒 chips, and a collapsible topic map draws the whole graph. Markdown notes — a pattern note per topic, plus Java and Java-core notes — render with highlighted code and mermaid diagrams under Notes.
 

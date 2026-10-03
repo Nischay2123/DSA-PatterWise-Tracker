@@ -62,9 +62,14 @@ describe("list visibility", () => {
     );
   });
 
-  it("filters by source and by due review", () => {
-    expect(isProblemVisible(added, undone, filters({ source: "A2Z" }), ctx)).toBe(false);
-    expect(isProblemVisible(added, undone, filters({ source: added.sources![0] }), ctx)).toBe(true);
+  it("filters by pattern and by status", () => {
+    const own = DATA.topics.flatMap((t) => t.patterns).find((p) => p.problems.includes(added))!;
+    expect(isProblemVisible(added, undone, filters({ pattern: own.id }), ctx)).toBe(true);
+    expect(isProblemVisible(added, undone, filters({ pattern: "arrays__hashing-not-this" }), ctx)).toBe(false);
+    // A pattern id that is a prefix of another must not match its neighbour.
+    expect(isProblemVisible(problem("dp__1d-dp__x"), undone, filters({ pattern: "dp__1d" }), ctx)).toBe(false);
+    expect(isProblemVisible(added, undone, filters({ solvedOnly: true }), ctx)).toBe(false);
+    expect(isProblemVisible(added, { ...undone, done: true }, filters({ solvedOnly: true }), ctx)).toBe(true);
     expect(isProblemVisible(added, undone, filters({ dueOnly: true }), ctx)).toBe(false);
     expect(isProblemVisible(added, undone, filters({ dueOnly: true }), { ...ctx, due: new Set([added.id]) })).toBe(true);
   });

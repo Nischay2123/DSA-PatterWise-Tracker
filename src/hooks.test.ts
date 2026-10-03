@@ -110,8 +110,8 @@ describe("useFilterAccordions", () => {
     expect(a.open).toBe(true);
   });
 
-  it("opens groups when only the source or due-for-review filter changes", () => {
-    for (const patch of [{ source: "NC150" }, { dueOnly: true }]) {
+  it("opens groups when only the pattern or status filter changes", () => {
+    for (const patch of [{ pattern: "arrays__hashing" }, { solvedOnly: true }, { dueOnly: true }]) {
       const [a] = build([[{ hidden: false }]]);
       const { rerender } = renderHook(({ f }) => useFilterAccordions(f), { initialProps: { f: filters() } });
       rerender({ f: filters(patch) });
