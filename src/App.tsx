@@ -13,7 +13,7 @@ import { TopicList } from "./components/TopicList";
 import { NotesPanel } from "./components/NotesPanel";
 import { FiltersContext, StoreContext, useProgressStore } from "./context";
 import { downloadBackupFile } from "./persistence/backup";
-import { goalScoped, isDefaultGoal, resolveGoal } from "./revision/goal";
+import { goalScoped, isFullGoal, resolveGoal } from "./revision/goal";
 import { dueIds } from "./revision/questionReview";
 import { countDone, getState, hasBackupV2, isProblemVisible, todayISO } from "./store";
 import { useFilterAccordions } from "./useFilterAccordions";
@@ -106,16 +106,17 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
 
-  // The headline figure tracks the goal, so "34/143" replaces "34/467" the
-  // moment a goal is set -- that reframing is most of the point of the
-  // feature. Default goal matches everything, so nothing changes by default.
+  // Everything on the page -- headline figure, list, breakdown, due reviews --
+  // follows the sheet chosen in Settings. Only Full syllabus keeps all 649.
   const goal = resolveGoal(v2Store.settings);
-  const goalProblems = isDefaultGoal(goal) ? ALL_PROBLEMS : goalScoped(ALL_PROBLEMS, goal);
+  const goalProblems = isFullGoal(goal) ? ALL_PROBLEMS : goalScoped(ALL_PROBLEMS, goal);
   const overallDone = countDone(goalProblems, store);
   const overallTotal = goalProblems.length;
   const overallPct = overallTotal ? Math.round((overallDone / overallTotal) * 100) : 0;
 
-  const due = dueIds(v2Store, todayISO());
+  const goalIds = new Set(goalProblems.map((p) => p.id));
+  const allDue = dueIds(v2Store, todayISO());
+  const due = isFullGoal(goal) ? allDue : new Set([...allDue].filter((id) => goalIds.has(id)));
   const visibleCount = ALL_PROBLEMS_WITH_CONTEXT.filter(({ problem, topicName, patternName }) =>
     isProblemVisible(problem, getState(store, problem.id), filters, { topicName, patternName, goal, due })
   ).length;
@@ -266,7 +267,7 @@ export function App() {
                   </button>
                 </div>
               )}
-              <Dashboard allProblems={ALL_PROBLEMS} topics={DATA.topics} onContinue={jumpToProblem} />
+              <Dashboard allProblems={goalProblems} topics={DATA.topics} onContinue={jumpToProblem} />
 
               <div id="problems" className="flex items-center gap-2 mt-7 mb-2.5 scroll-mt-32">
                 <h2 className="font-display text-title font-bold m-0">Problems</h2>

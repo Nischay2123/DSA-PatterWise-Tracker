@@ -77,11 +77,12 @@ export function GoalSettings() {
   return (
     <div>
       <p className="text-micro text-muted mt-0 mb-3 leading-relaxed">
-        Revision unlocks once a topic is 75% complete. A goal narrows what that 75% is measured against, so you start
-        revising sooner. It never hides anything from the problem list.
+        The sheet you pick here drives everything: the progress figure, the problem list, the breakdown, the topic
+        map, due reviews and revision. Revision unlocks once a topic is 75% complete in this sheet. To see every
+        problem anyway, turn off the sheet filter in the toolbar.
       </p>
 
-      <div role="radiogroup" aria-label="Revision goal" className="flex flex-col gap-2">
+      <div role="radiogroup" aria-label="Sheet" className="flex flex-col gap-2">
         {GOAL_PRESETS.map((preset) => {
           const active = activeId === preset.id;
           return (

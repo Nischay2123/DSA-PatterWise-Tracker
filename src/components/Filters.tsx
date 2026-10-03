@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { MOBILE_QUERY } from "../breakpoints";
 import { SOURCES } from "../config";
 import { useFilters, useStore } from "../context";
-import { GOAL_PRESETS, goalPresetId, isDefaultGoal, resolveGoal } from "../revision/goal";
+import { GOAL_PRESETS, goalPresetId, isFullGoal, resolveGoal } from "../revision/goal";
 import { cx } from "../cx";
 import { Icon, type IconName } from "./Icon";
 
@@ -92,7 +92,7 @@ export function Filters() {
   // a control that does nothing. Leaving it switched on is harmless for the
   // same reason, so switching back to the full syllabus can never strand
   // anyone behind an invisible filter.
-  const goalActive = !isDefaultGoal(goal);
+  const goalActive = !isFullGoal(goal);
   const goalName = GOAL_PRESETS.find((p) => p.id === goalPresetId(goal))?.label ?? "Goal";
   const detailsRef = useRef<HTMLDetailsElement>(null);
 

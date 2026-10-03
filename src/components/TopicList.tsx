@@ -1,6 +1,6 @@
 import { REVISION_CONFIG } from "../config";
 import { useFilters, useStore } from "../context";
-import { goalScoped, isDefaultGoal, isTopicOutOfGoalScope, resolveGoal } from "../revision/goal";
+import { goalScoped, isFullGoal, isTopicOutOfGoalScope, resolveGoal } from "../revision/goal";
 import { deriveState, isTopicGated } from "../revision/stateMachine";
 import { countDone, doneTopics, getState, getTopicRevision, isGatingActive, isProblemVisible, todayISO, unmetPrereqs } from "../store";
 import type { Prereqs } from "../store";
@@ -107,7 +107,7 @@ function TopicItem({ topic, index, prereqs }: { topic: Topic; index: number; pre
 
   // This one is display only, and it follows the list: showing 0/14 beside a
   // single visible row is what happens if it does not.
-  const shown = !isDefaultGoal(goal) && filters.goalOnly ? inGoal : allProblems;
+  const shown = !isFullGoal(goal) && filters.goalOnly ? inGoal : allProblems;
   const narrowed = shown.length < allProblems.length;
   const done = countDone(shown, store);
   const total = shown.length;
@@ -148,7 +148,7 @@ function TopicItem({ topic, index, prereqs }: { topic: Topic; index: number; pre
         {lockedBy.length > 0 && (
           <span
             className="pill bg-medium-soft text-medium shrink-0"
-            title={`Finish first: ${lockedBy.map((id) => prereqs.names[id]).join(", ")}`}
+            title={`Suggested first: ${lockedBy.map((id) => prereqs.names[id]).join(", ")}. You can still open and solve everything here; locks can be turned off in Settings.`}
           >
             <Icon name="lock" className="size-3 shrink-0" />
             <span className="max-sm:hidden max-w-40 truncate">after {lockedBy.map((id) => prereqs.names[id]).join(", ")}</span>
@@ -187,7 +187,13 @@ function TopicItem({ topic, index, prereqs }: { topic: Topic; index: number; pre
           <Icon name="book" className="size-3.5 shrink-0" />
           Pattern notes:
           {topic.notes.map((id) => (
-            <a key={id} href={`#/notes/${id}`} className="chip py-0.5 hover:text-accent hover:border-accent-line">
+            <a
+              key={id}
+              href={`#/notes/${id}`}
+              target="_blank"
+              rel="noopener"
+              className="chip py-0.5 hover:text-accent hover:border-accent-line"
+            >
               {NOTES_BY_ID[id]?.title ?? id}
             </a>
           ))}
@@ -195,7 +201,14 @@ function TopicItem({ topic, index, prereqs }: { topic: Topic; index: number; pre
       )}
       <div className="py-1.5">
         {topic.patterns.map((p) => (
-          <PatternGroup key={p.id} pattern={p} topicName={topic.name} gated={gated} prereqs={prereqs} />
+          <PatternGroup
+            key={p.id}
+            pattern={p}
+            topicName={topic.name}
+            topicNotes={topic.notes}
+            gated={gated}
+            prereqs={prereqs}
+          />
         ))}
       </div>
     </details>
@@ -206,7 +219,11 @@ export function TopicList({ topics }: { topics: Topic[] }) {
   const { store, v2Store } = useStore();
   // Once per render for the whole list, not per row.
   const prereqs: Prereqs = {
-    done: doneTopics(topics, store, resolveGoal(v2Store.settings)),
+    // With locks turned off in Settings every topic counts as done, so no chip shows.
+    done:
+      v2Store.settings.prereqLocks === false
+        ? new Set(topics.map((t) => t.id))
+        : doneTopics(topics, store, resolveGoal(v2Store.settings)),
     names: Object.fromEntries(topics.map((t) => [t.id, t.name])),
   };
   return (

@@ -53,9 +53,10 @@ const solved = (ids: string[]): ProgressStore => ({
 describe("list visibility", () => {
   const added = ALL.find((p) => !p.sources?.includes("A2Z"))!;
 
-  it("never hides the merged-in questions under the default goal, even with 'goal only' on", () => {
-    expect(isProblemVisible(added, undone, filters(), { ...ctx, goal: DEFAULT_GOAL })).toBe(true);
-    expect(isProblemVisible(added, undone, filters(), { ...ctx, goal: { ...FULL_GOAL, listId: "a2z", minFreq: "High" } })).toBe(true);
+  it("shows only the chosen sheet while the sheet filter is on, and everything under Full syllabus", () => {
+    expect(isProblemVisible(added, undone, filters(), { ...ctx, goal: DEFAULT_GOAL })).toBe(false);
+    expect(isProblemVisible(added, undone, filters({ goalOnly: false }), { ...ctx, goal: DEFAULT_GOAL })).toBe(true);
+    expect(isProblemVisible(added, undone, filters(), { ...ctx, goal: FULL_GOAL })).toBe(true);
     expect(isProblemVisible(added, undone, filters(), { ...ctx, goal: { ...FULL_GOAL, listId: "blind75" } })).toBe(
       added.sources!.includes("B75")
     );
@@ -94,6 +95,8 @@ describe("topic prerequisites", () => {
     const store = solved(["a1", "a2", "a3", "a4", "b1", "c1"]);
     expect(unmetPrereqs(["d"], doneTopics(topics, store, FULL_GOAL))).toEqual(["d"]);
     expect(findNextUp(topics, store, filters(), FULL_GOAL)?.id).toBe("d1");
+    // With locks off in Settings, Continue ignores prerequisites entirely.
+    expect(findNextUp(topics, solved(["a1", "a2", "a3", "a4", "b1", "c1"]), filters(), FULL_GOAL, false)?.id).toBe("c2");
     // Two topics each waiting on the other: nothing is unlocked, so the first unsolved.
     expect(findNextUp([topic("x", ["x1"], ["y"]), topic("y", ["y1"], ["x"])], solved([]), filters(), FULL_GOAL)?.id).toBe("x1");
   });

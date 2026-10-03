@@ -90,7 +90,7 @@ export function SettingsPanel() {
 
   return (
     <div>
-      <Section title="Revision goal" icon="target">
+      <Section title="Sheet" icon="target">
         <GoalSettings />
       </Section>
 
@@ -210,6 +210,12 @@ export function SettingsPanel() {
                 ? "Turn this off if you'd rather never be blocked from ticking a question."
                 : "Currently inactive anyway: with no API key nothing can grade a revision, so a blocked topic could never be unblocked."
             }
+          />
+          <Switch
+            checked={settings.prereqLocks !== false}
+            onChange={(v) => dispatchV2({ type: "SET_SETTINGS", patch: { prereqLocks: v } })}
+            label="Show prerequisite locks"
+            hint="A lock only suggests finishing another topic first (75% of it in your sheet). It never stops you opening or solving anything. Off hides the locks and lets Continue go to any unsolved question."
           />
         </div>
       </Section>

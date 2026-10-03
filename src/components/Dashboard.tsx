@@ -49,7 +49,7 @@ export function Dashboard({
   const goal = resolveGoal(v2Store.settings);
   // The next problem the list is showing whose prerequisite topics are done,
   // so "Continue" respects the source filter and the roadmap's build-up order.
-  const next = findNextUp(topics, store, filters, goal);
+  const next = findNextUp(topics, store, filters, goal, v2Store.settings.prereqLocks !== false);
   const maxOffset = Math.max(earliestYearOffset(store), 1);
 
   return (

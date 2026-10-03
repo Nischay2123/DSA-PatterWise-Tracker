@@ -213,6 +213,9 @@ export interface AppSettings {
   // so stores written before this existed keep the original behaviour;
   // absent is read as true.
   gateOnRevisionDue?: boolean;
+  // Whether unfinished prerequisite topics show as locks and steer Continue.
+  // Locks never block anything. Optional; absent is read as true.
+  prereqLocks?: boolean;
   llmEnabled: boolean;
   // Narrows the scope revision schedules against (src/revision/goal.ts).
   // Optional so stores written before this existed keep the original

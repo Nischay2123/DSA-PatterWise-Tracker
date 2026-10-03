@@ -1,6 +1,6 @@
 import { useStore } from "../context";
 import { cx } from "../cx";
-import { GOAL_PRESETS, goalPresetId, isDefaultGoal, resolveGoal } from "../revision/goal";
+import { GOAL_PRESETS, goalPresetId, isFullGoal, resolveGoal } from "../revision/goal";
 import type { Theme } from "../useTheme";
 import { Icon, type IconName } from "./Icon";
 import { ImportExport } from "./ImportExport";
@@ -90,7 +90,7 @@ export function SidebarContent({
   const pct = total ? done / total : 0;
   const goal = resolveGoal(v2Store.settings);
   const preset = GOAL_PRESETS.find((p) => p.id === goalPresetId(goal));
-  const goalCaption = isDefaultGoal(goal) ? "problems solved" : `solved in ${preset?.label ?? "your goal"}`;
+  const goalCaption = isFullGoal(goal) ? "problems solved" : `solved in ${preset?.label ?? "your goal"}`;
 
   return (
     <div className="flex h-full flex-col gap-5 p-4">
@@ -155,10 +155,12 @@ export function SidebarContent({
           type="button"
           className="nav-item"
           aria-current={route === "notes" ? "page" : undefined}
-          onClick={() => onNavigate("#/notes")}
+          // From the tracker, notes open in a new tab so the list keeps its place.
+          onClick={() => (route === "notes" ? onNavigate("#/notes") : window.open("#/notes", "_blank", "noopener"))}
         >
           <Icon name="book" className="size-4" />
           Notes
+          {route !== "notes" && <Icon name="external" className="size-3.5 ml-auto text-faint" />}
         </button>
       </nav>
 

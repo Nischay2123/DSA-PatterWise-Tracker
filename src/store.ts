@@ -3,7 +3,7 @@ import { REVISION_CONFIG } from "./config";
 import { isValidAppStoreV2, liftV1Entry } from "./persistence/migrate";
 import { scoreEvaluation } from "./revision/evaluate";
 import { canGradeSolutions } from "./llm/gradeSolution";
-import { isDefaultGoal, isExemptTopic, matchesGoal } from "./revision/goal";
+import { isFullGoal, isExemptTopic, matchesGoal } from "./revision/goal";
 import type { Goal } from "./revision/goal";
 import { recordAttemptOutcome, scheduleInitial } from "./revision/scheduler";
 import { applyReview, mergeReview, scheduleSolve } from "./revision/questionReview";
@@ -67,8 +67,14 @@ export function unmetPrereqs(ids: string[] | undefined, done: Set<string>): stri
 
 // First unsolved problem the list is showing whose topic and own needs are
 // all done -- or, if nothing is unlocked, simply the first unsolved one.
-export function findNextUp(topics: Topic[], store: ProgressStore, filters: FilterState, goal: Goal): Problem | null {
-  const done = doneTopics(topics, store, goal);
+export function findNextUp(
+  topics: Topic[],
+  store: ProgressStore,
+  filters: FilterState,
+  goal: Goal,
+  locks = true
+): Problem | null {
+  const done = locks ? doneTopics(topics, store, goal) : new Set(topics.map((t) => t.id));
   let fallback: Problem | null = null;
   for (const t of topics)
     for (const pat of t.patterns)
@@ -238,7 +244,7 @@ export function isProblemVisible(
   // hide every row just because a caller forgot to pass one. The default goal
   // narrows revision only, never the list.
   const matchesGoalFilter =
-    !filters.goalOnly || !context.goal || isDefaultGoal(context.goal) || matchesGoal(problem, context.goal);
+    !filters.goalOnly || !context.goal || isFullGoal(context.goal) || matchesGoal(problem, context.goal);
   return (
     matchesText &&
     matchesDiff &&

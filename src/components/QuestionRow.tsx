@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useFilters, useStore } from "../context";
 import { SOURCES } from "../config";
 import { problemLink, siteLabel } from "../links";
-import { isDefaultGoal, matchesGoal, resolveGoal } from "../revision/goal";
+import { isFullGoal, matchesGoal, resolveGoal } from "../revision/goal";
 import { daysUntil, dueIds, isMastered } from "../revision/questionReview";
 import { canCompleteFreely, getState, getV2Progress, hasNotes, isProblemVisible, todayISO } from "../store";
 import { cx } from "../cx";
@@ -11,6 +11,7 @@ import { Icon, type IconName } from "./Icon";
 import { MistakeList } from "./MistakeList";
 import { NotesEditor } from "./NotesEditor";
 import { ReviewOutcomeButtons } from "./ReviewOutcome";
+import { NOTES_BY_ID } from "../notes";
 import { SolutionEditor } from "./SolutionEditor";
 import type { Problem } from "../types";
 
@@ -28,6 +29,7 @@ export function QuestionRow({
   patternName,
   gated,
   lockedBy = [],
+  notes = [],
 }: {
   problem: Problem;
   topicName: string;
@@ -35,6 +37,8 @@ export function QuestionRow({
   gated: boolean;
   /** Names of the unfinished topics this problem builds on. */
   lockedBy?: string[];
+  /** Ids of this problem's topic's pattern notes. */
+  notes?: string[];
 }) {
   const { store, dispatch, v2Store, dispatchV2 } = useStore();
   const { filters } = useFilters();
@@ -55,7 +59,7 @@ export function QuestionRow({
   // Marks the rows that count toward the goal -- but only while the list is
   // showing everything. With the list already scoped to the goal, every
   // visible row would carry one, which says nothing.
-  const inGoal = !isDefaultGoal(goal) && !filters.goalOnly && matchesGoal(problem, goal);
+  const inGoal = !isFullGoal(goal) && !filters.goalOnly && matchesGoal(problem, goal);
   const notesIndicator = hasNotes(progress);
   // Gating blocks only a NEW completion (plan §6) -- un-completing, and
   // everything else on an already-done question, stays free.
@@ -193,7 +197,7 @@ export function QuestionRow({
             <span
               key={name}
               className="pill leading-none px-1.5 text-micro bg-medium-soft text-medium"
-              title={`Builds on ${name}, which isn't finished yet`}
+              title={`Builds on ${name}, which isn't finished yet. You can still solve it; locks can be turned off in Settings.`}
             >
               <Icon name="lock" className="size-2.5" />
               {name}
@@ -308,7 +312,7 @@ export function QuestionRow({
               are uncontrolled (defaultValue), so unmounting would discard an
               unblurred draft. */}
           <div className={cx("mt-2 border-l-2 border-accent-line pl-3.5", detailsOpen ? "block" : "hidden")}>
-            {(meta.length > 0 || problem.video || problem.article) && (
+            {(meta.length > 0 || notes.length > 0 || problem.video || problem.article) && (
               <div className="flex flex-wrap gap-1.5 mb-3">
                 {meta.map((m) => (
                   <span key={m.text} className="chip">
@@ -317,6 +321,19 @@ export function QuestionRow({
                   </span>
                 ))}
                 {/* On phones these are the only way to the links: the row's icons are hidden there. */}
+                {notes.map((id) => (
+                  <a
+                    key={id}
+                    className="chip hover:text-accent"
+                    href={`#/notes/${id}`}
+                    target="_blank"
+                    rel="noopener"
+                    title="Opens the pattern notes in a new tab"
+                  >
+                    <Icon name="book" className="size-3" />
+                    {NOTES_BY_ID[id]?.title ?? id} notes
+                  </a>
+                ))}
                 {problem.video && (
                   <a className="chip hover:text-accent" href={problem.video} target="_blank" rel="noopener">
                     <Icon name="play" className="size-3" />

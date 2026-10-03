@@ -152,6 +152,12 @@ export function sameGoal(a: Goal, b: Goal): boolean {
   );
 }
 
+// The chosen sheet narrows the list, counts and revision unless it is Full
+// syllabus, the one goal that keeps every problem.
+export function isFullGoal(goal: Goal): boolean {
+  return sameGoal(goal, FULL_GOAL);
+}
+
 export function isDefaultGoal(goal: Goal): boolean {
   return sameGoal(goal, DEFAULT_GOAL);
 }

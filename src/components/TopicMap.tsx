@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "../context";
-import { isExemptTopic, resolveGoal } from "../revision/goal";
+import { goalScoped, isExemptTopic, resolveGoal } from "../revision/goal";
 import { countDone, doneTopics } from "../store";
 import type { Topic } from "../types";
 import { Icon } from "./Icon";
@@ -22,13 +22,16 @@ export function TopicMap({ topics }: { topics: Topic[] }) {
     const done = doneTopics(topics, store, goal);
     const n = (id: string) => id.replace(/-/g, "_");
     const lines = ["flowchart LR"];
-    for (const t of topics) {
-      const problems = t.patterns.flatMap((p) => p.problems);
+    // Topics with nothing from the chosen sheet are left off, edges included.
+    const shown = topics.filter((t) => goalScoped(t.patterns.flatMap((p) => p.problems), goal).length);
+    const ids = new Set(shown.map((t) => t.id));
+    for (const t of shown) {
+      const problems = goalScoped(t.patterns.flatMap((p) => p.problems), goal);
       const solved = countDone(problems, store);
       // Green means finished; an exempt topic never blocks anything, but isn't that.
       const cls = done.has(t.id) && !isExemptTopic(t.id) ? "done" : solved ? "wip" : "todo";
       lines.push(`  ${n(t.id)}["${t.name.replace(/"/g, "'")}<br/>${solved}/${problems.length}"]:::${cls}`);
-      for (const p of t.prereqs ?? []) lines.push(`  ${n(p)} --> ${n(t.id)}`);
+      for (const p of t.prereqs ?? []) if (ids.has(p)) lines.push(`  ${n(p)} --> ${n(t.id)}`);
     }
     lines.push(
       "  classDef done fill:#0d7a49,stroke:#0d7a49,color:#fff",
