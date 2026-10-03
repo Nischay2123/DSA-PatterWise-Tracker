@@ -24,7 +24,7 @@ interface FundamentalsPattern {
   concepts: FundamentalConcept[];
 }
 
-interface FundamentalsFile {
+export interface FundamentalsFile {
   version: number;
   patterns: Record<string, FundamentalsPattern>;
 }
@@ -32,35 +32,47 @@ interface FundamentalsFile {
 const FUNDAMENTALS = fundamentalsData as FundamentalsFile;
 const QUESTIONS = questionsData as QuestionData;
 
-// Fails loudly at import time (plan §Phase5 risk: "a missing pattern must
-// fail the build loudly") rather than surfacing as a silent empty session
-// later. Content correctness (not just presence) is Opus's job to fix --
+export interface FundamentalsCoverageProblems {
+  missing: string[];
+  duplicates: string[];
+}
+
+// Pure coverage check, enforced loudly by sessionValidation.test.ts against
+// the real dataset (plan §Phase5 risk: "a missing pattern must fail the build
+// loudly"). Content correctness (not just presence) is Opus's job to fix --
 // Sonnet reports the pattern id, never regenerates the file (plan §11).
-function validateFundamentalsCoverage(): void {
+export function findFundamentalsCoverageProblems(
+  questions: QuestionData,
+  fundamentals: FundamentalsFile
+): FundamentalsCoverageProblems {
   const patternIds = new Set<string>();
-  for (const topic of QUESTIONS.topics) {
+  for (const topic of questions.topics) {
     for (const pattern of topic.patterns) patternIds.add(pattern.id);
   }
-
-  const missing = [...patternIds].filter((id) => !(id in FUNDAMENTALS.patterns));
-  if (missing.length > 0) {
-    throw new Error(`fundamentals.json is missing pattern id(s): ${missing.join(", ")}`);
-  }
+  const missing = [...patternIds].filter((id) => !(id in fundamentals.patterns));
 
   const seen = new Set<string>();
   const duplicates = new Set<string>();
-  for (const pattern of Object.values(FUNDAMENTALS.patterns)) {
+  for (const pattern of Object.values(fundamentals.patterns)) {
     for (const concept of pattern.concepts) {
       if (seen.has(concept.id)) duplicates.add(concept.id);
       seen.add(concept.id);
     }
   }
-  if (duplicates.size > 0) {
-    throw new Error(`fundamentals.json has duplicate concept id(s): ${[...duplicates].join(", ")}`);
-  }
+  return { missing, duplicates: [...duplicates] };
 }
 
-validateFundamentalsCoverage();
+// Only warns in the browser. This used to throw at import time, and because
+// every screen imports this module, one uncovered pattern in questions.json
+// blanked the entire app. A pattern without fundamentals is safe at runtime:
+// the panel hides itself and a session draws concepts from the other patterns.
+const coverage = findFundamentalsCoverageProblems(QUESTIONS, FUNDAMENTALS);
+if (coverage.missing.length > 0) {
+  console.error(`fundamentals.json is missing pattern id(s): ${coverage.missing.join(", ")}`);
+}
+if (coverage.duplicates.length > 0) {
+  console.error(`fundamentals.json has duplicate concept id(s): ${coverage.duplicates.join(", ")}`);
+}
 
 export function getFundamentalsForPattern(patternId: string): FundamentalConcept[] {
   return FUNDAMENTALS.patterns[patternId]?.concepts ?? [];
