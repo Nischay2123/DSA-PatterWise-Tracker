@@ -42,7 +42,8 @@ function problem(over: Partial<Problem> = {}): Problem {
   };
 }
 
-const goal = (over: Partial<Goal> = {}): Goal => ({ ...FULL_GOAL, ...over });
+// A bare predicate goal: every frequency and difficulty, no list.
+const goal = (over: Partial<Goal> = {}): Goal => ({ minFreq: "All", difficulties: [...ALL_DIFFICULTIES], ...over });
 
 describe("matchesGoal -- frequency is a floor, not an equality test", () => {
   it("admits everything at or above the floor", () => {
@@ -142,7 +143,7 @@ describe("presets", () => {
   });
 
   it("treats difficulty order as irrelevant when comparing goals", () => {
-    expect(sameGoal(goal({ difficulties: ["Hard", "Easy", "Medium"] }), FULL_GOAL)).toBe(true);
+    expect(sameGoal(goal({ difficulties: ["Hard", "Easy", "Medium"] }), goal())).toBe(true);
     expect(isDefaultGoal({ ...DEFAULT_GOAL, difficulties: ["Hard", "Easy", "Medium"] })).toBe(true);
   });
 
@@ -156,6 +157,15 @@ describe("presets", () => {
 // so a future edit to questions.json that changes them fails here loudly
 // rather than silently shifting what a preset means.
 describe("against the real dataset", () => {
+  it("reads a pre-merge stored 'Full syllabus' as the A2Z sheet it meant, and the new one as everything", () => {
+    // What Settings saved for "Full syllabus" before the NeetCode / LeetCode merge.
+    const legacy = { minFreq: "All", difficulties: ["Easy", "Medium", "Hard"] };
+    expect(resolveGoal({ goal: legacy })).toEqual(DEFAULT_GOAL);
+    expect(goalPresetId(resolveGoal({ goal: legacy }))).toBe("a2z");
+    expect(resolveGoal({ goal: FULL_GOAL })).toEqual(FULL_GOAL);
+    expect(goalPresetId(resolveGoal({ goal: FULL_GOAL }))).toBe("full");
+  });
+
   it("scopes the default goal to exactly the 467-problem A2Z sheet, and Full syllabus to all 649", () => {
     expect(ALL.length).toBe(649);
     expect(goalScoped(ALL, FULL_GOAL)).toHaveLength(649);

@@ -34,7 +34,7 @@ function ScopeLine({ goal }: { goal: Goal }) {
 
   return (
     <span className="flex flex-wrap items-center gap-1.5 mt-1.5">
-      {list && (
+      {list && list.absent.length > 0 && (
         <span
           className="pill bg-sunken text-muted tabular-nums"
           title={`Not in this sheet: ${list.absent.join(", ")}`}

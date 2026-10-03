@@ -73,8 +73,12 @@ export interface Goal {
   listId?: string;
 }
 
-/** Every problem in the tracker, including the NeetCode / LeetCode additions. */
-export const FULL_GOAL: Goal = { minFreq: "All", difficulties: [...ALL_DIFFICULTIES] };
+// Every problem in the tracker, including the NeetCode / LeetCode additions.
+// A pseudo-list rather than the bare predicate, because the bare predicate is
+// what "Full syllabus" stored before the merge, when it meant the A2Z sheet --
+// resolveGoal still reads it that way.
+const ALL_LIST = "all";
+export const FULL_GOAL: Goal = { minFreq: "All", difficulties: [...ALL_DIFFICULTIES], listId: ALL_LIST };
 
 // The goal when none was chosen: the original A2Z sheet. The NeetCode / LeetCode
 // questions merged in later are tracked, but only count toward revision once a
@@ -96,6 +100,7 @@ export function matchesGoal(problem: Problem, goal: Goal): boolean {
   // A curated list is an exhaustive answer, not an extra filter -- narrowing
   // it further by frequency would silently shrink a list whose whole point
   // is being a fixed, known set.
+  if (goal.listId === ALL_LIST) return true;
   const list = getCuratedList(goal.listId);
   if (list) return list.ids.includes(problem.id);
 
@@ -120,7 +125,7 @@ export function resolveGoal(settings: Pick<AppSettings, "goal"> | undefined | nu
   // An unknown list id -- a renamed list, or an import from a newer build --
   // must not silently scope everything to nothing, so it is dropped and the
   // frequency/difficulty fields underneath take over.
-  const listId = getCuratedList(raw.listId) ? raw.listId : undefined;
+  const listId = raw.listId === ALL_LIST || getCuratedList(raw.listId) ? raw.listId : undefined;
   const minFreq = FREQ_FLOORS.includes(raw.minFreq as FreqFloor) ? (raw.minFreq as FreqFloor) : "All";
   // Rebuilt from ALL_DIFFICULTIES rather than copied, so the result is
   // always canonically ordered and free of junk entries.
@@ -129,7 +134,11 @@ export function resolveGoal(settings: Pick<AppSettings, "goal"> | undefined | nu
   // An empty difficulty set would scope every topic to nothing and silently
   // disable revision across the board; that is never what anyone meant.
   const resolved: Goal = { minFreq, difficulties: difficulties.length ? difficulties : [...ALL_DIFFICULTIES] };
-  return listId ? { ...resolved, listId } : resolved;
+  if (listId) return { ...resolved, listId };
+  // "Full syllabus" as stored before the merge: it meant the A2Z sheet then,
+  // so it keeps meaning that and revision state doesn't shift under anyone.
+  if (minFreq === "All" && resolved.difficulties.length === ALL_DIFFICULTIES.length) return DEFAULT_GOAL;
+  return resolved;
 }
 
 export function sameGoal(a: Goal, b: Goal): boolean {
