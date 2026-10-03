@@ -20,6 +20,8 @@ A single-page tracker for the Striver A2Z DSA sheet plus NeetCode 150/250, Blind
 
 **Your data.** Export and import as JSON with a one-step undo, and a merge that unions two devices — nothing already solved is ever un-solved.
 
+**Guide.** *How to use* in the sidebar explains every feature for someone new to the app. Its source is `public/docs/guide.md`; keep it in step when a feature changes.
+
 ## Stack
 
 React 19 + TypeScript + Vite 6 + Tailwind v4. Runtime dependencies beyond React and `idb-keyval` are `marked`, `highlight.js` and `mermaid`, all loaded only when the notes or topic map are opened.

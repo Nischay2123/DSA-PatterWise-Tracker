@@ -11,6 +11,7 @@ import { RevisionDashboard } from "./components/revision/Dashboard";
 import { SessionShell } from "./components/revision/SessionShell";
 import { TopicList } from "./components/TopicList";
 import { NotesPanel } from "./components/NotesPanel";
+import { GuidePage } from "./components/GuidePage";
 import { FiltersContext, StoreContext, useProgressStore } from "./context";
 import { downloadBackupFile } from "./persistence/backup";
 import { goalScoped, isFullGoal, resolveGoal } from "./revision/goal";
@@ -168,6 +169,7 @@ export function App() {
   }
 
   const notesMatch = /^#\/notes(?:\/(.+))?$/.exec(hash);
+  const guide = /^#\/guide\/?$/.test(hash);
 
   const goto = (h: string) => {
     setNavOpen(false);
@@ -182,7 +184,7 @@ export function App() {
 
   const sidebar = (showBrand: boolean) => (
     <SidebarContent
-      route={notesMatch ? "notes" : "tracker"}
+      route={guide ? "guide" : notesMatch ? "notes" : "tracker"}
       dueCount={due.size}
       onShowDue={showDue}
       showBrand={showBrand}
@@ -230,7 +232,11 @@ export function App() {
               </span>
             </div>
 
-            {notesMatch ? (
+            {guide ? (
+              <main className="mx-auto w-full max-w-shell px-3 md:px-6 pt-5 pb-20">
+                <GuidePage />
+              </main>
+            ) : notesMatch ? (
               <main className="mx-auto w-full max-w-shell px-3 md:px-6 pt-5 pb-20">
                 <NotesPanel noteId={notesMatch[1] && decodeURIComponent(notesMatch[1])} onNavigate={goto} />
               </main>

@@ -73,7 +73,7 @@ export function SidebarContent({
   onShowDue,
   showBrand = true,
 }: {
-  route: "tracker" | "revision" | "notes";
+  route: "tracker" | "revision" | "notes" | "guide";
   /** Per-question reviews due today. */
   dueCount?: number;
   onShowDue?: () => void;
@@ -161,6 +161,15 @@ export function SidebarContent({
           <Icon name="book" className="size-4" />
           Notes
           {route !== "notes" && <Icon name="external" className="size-3.5 ml-auto text-faint" />}
+        </button>
+        <button
+          type="button"
+          className="nav-item"
+          aria-current={route === "guide" ? "page" : undefined}
+          onClick={() => onNavigate("#/guide")}
+        >
+          <Icon name="sparkle" className="size-4" />
+          How to use
         </button>
       </nav>
 

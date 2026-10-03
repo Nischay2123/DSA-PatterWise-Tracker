@@ -6,7 +6,7 @@ import { isDarkNow } from "../useTheme";
 
 // Markdown notes (pattern notes, Java, Java core) with highlighted Java and
 // mermaid diagrams. The renderers are only loaded on this page.
-async function render(markdown: string, into: HTMLElement) {
+export async function renderMarkdown(markdown: string, into: HTMLElement) {
   const [{ marked }, { default: hljs }, { default: java }] = await Promise.all([
     import("marked"),
     import("highlight.js/lib/core"),
@@ -16,6 +16,10 @@ async function render(markdown: string, into: HTMLElement) {
   // The notes are this app's own files under public/notes, not user input.
   into.innerHTML = await marked.parse(markdown, { gfm: true });
   into.querySelectorAll("pre code.language-java").forEach((el) => hljs.highlightElement(el as HTMLElement));
+  // Ids on headings, so in-page links like (#sheets) have somewhere to go.
+  into.querySelectorAll("h2, h3").forEach((h) => {
+    h.id = (h.textContent ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  });
 
   const diagrams = [...into.querySelectorAll("pre code.language-mermaid")].map((code) => {
     const pre = code.parentElement!;
@@ -44,7 +48,7 @@ export function NotesPanel({ noteId, onNavigate }: { noteId: string | undefined;
         return res.text();
       })
       .then((md) => {
-        if (!cancelled && article.current) return render(md, article.current);
+        if (!cancelled && article.current) return renderMarkdown(md, article.current);
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));

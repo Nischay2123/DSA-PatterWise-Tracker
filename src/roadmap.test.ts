@@ -135,3 +135,18 @@ describe("questions.json after the roadmap merge", () => {
     expect(new Set(ALL.map((p) => p.id)).size).toBe(ALL.length);
   });
 });
+
+describe("the user guide", () => {
+  const guide = Object.values(
+    import.meta.glob("../public/docs/guide.md", { query: "?raw", import: "default", eager: true })
+  )[0] as string;
+
+  it("ships, and every in-page link points at a real heading", () => {
+    expect(guide).toBeTruthy();
+    const slug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const headings = new Set([...guide.matchAll(/^#{2,3} (.+)$/gm)].map((m) => slug(m[1])));
+    const links = [...guide.matchAll(/\]\(#([^)]+)\)/g)].map((m) => m[1]);
+    expect(links.length).toBeGreaterThan(0);
+    expect(links.filter((l) => !headings.has(l))).toEqual([]);
+  });
+});
