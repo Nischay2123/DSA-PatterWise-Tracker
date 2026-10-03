@@ -10,6 +10,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { RevisionDashboard } from "./components/revision/Dashboard";
 import { SessionShell } from "./components/revision/SessionShell";
 import { TopicList } from "./components/TopicList";
+import { NotesPanel } from "./components/NotesPanel";
 import { FiltersContext, StoreContext, useProgressStore } from "./context";
 import { downloadBackupFile } from "./persistence/backup";
 import { goalScoped, isDefaultGoal, resolveGoal } from "./revision/goal";
@@ -36,6 +37,7 @@ const DEFAULT_FILTERS: FilterState = {
   // list, the counts and the topic rows immediately. Inert under the default
   // goal, which matches every problem.
   goalOnly: true,
+  source: "",
 };
 
 function prefersReducedMotion(): boolean {
@@ -157,14 +159,25 @@ export function App() {
     );
   }
 
+  // Notes route
+  if (/^#\/notes/.test(hash)) {
+    return (
+      <StoreContext.Provider value={{ store, dispatch, v2Store, dispatchV2 }}>
+        <NotesPanel topics={DATA.topics} />
+      </StoreContext.Provider>
+    );
+  }
+
   const goto = (h: string) => {
     setNavOpen(false);
     navigate(h);
   };
 
+  const currentRoute: "tracker" | "revision" | "notes" = /^#\/revision/.test(hash) ? "revision" : /^#\/notes/.test(hash) ? "notes" : "tracker";
+
   const sidebar = (showBrand: boolean) => (
     <SidebarContent
-      route="tracker"
+      route={currentRoute}
       showBrand={showBrand}
       onNavigate={goto}
       done={overallDone}
@@ -225,7 +238,7 @@ export function App() {
             </div>
 
             <main className="mx-auto w-full max-w-shell px-3 md:px-6 pt-5 pb-20">
-              <Dashboard allProblems={ALL_PROBLEMS} goalProblems={goalProblems} onContinue={jumpToProblem} />
+              <Dashboard allProblems={ALL_PROBLEMS} goalProblems={goalProblems} topics={DATA.topics} onContinue={jumpToProblem} />
 
               <div className="flex items-center gap-2 mt-7 mb-2.5">
                 <h2 className="font-display text-title font-bold m-0">Problems</h2>

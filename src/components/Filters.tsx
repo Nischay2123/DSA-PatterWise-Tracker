@@ -14,6 +14,16 @@ const DIFFICULTY_ACTIVE: Record<string, string> = {
   Hard: "bg-hard text-bg",
 };
 
+const SOURCE_OPTIONS = [
+  { value: "", label: "Source: All" },
+  { value: "A2Z", label: "Source: Striver A2Z" },
+  { value: "NC150", label: "Source: NeetCode 150" },
+  { value: "NC250", label: "Source: NeetCode 250" },
+  { value: "B75", label: "Source: Blind 75" },
+  { value: "LC150", label: "Source: LeetCode Top 150" },
+  { value: "LC75", label: "Source: LeetCode 75" },
+] as { value: string; label: string }[];
+
 // A native <select> with its own chevron and no UA arrow, so it matches the
 // segmented control beside it instead of looking like a stray form control.
 function Select({
@@ -174,6 +184,13 @@ export function Filters() {
               </button>
             ))}
           </div>
+
+          <Select
+            label="Filter by source"
+            value={filters.source ?? ""}
+            onChange={(v) => setFilters((f) => ({ ...f, source: v || undefined }))}
+            options={SOURCE_OPTIONS}
+          />
 
           <Select
             label="Filter by importance"

@@ -19,6 +19,16 @@ export const DIFFICULTY_PILL = {
   Hard: "bg-hard-soft text-hard",
 } as const;
 
+// Source chip colors
+const SOURCE_PILL: Record<string, string> = {
+  A2Z: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  NC150: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+  NC250: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+  B75: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+  LC150: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
+  LC75: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
+};
+
 export function QuestionRow({
   problem,
   topicName,
@@ -47,6 +57,10 @@ export function QuestionRow({
   // Gating blocks only a NEW completion (plan §6) -- un-completing, and
   // everything else on an already-done question, stays free.
   const checkboxBlocked = gated && !state.done;
+
+  // Check if question is locked due to unmet prerequisites
+  // We need access to all topics - for now we'll check via the problem's needs
+  const isLocked = problem.needs && problem.needs.length > 0;
 
   // Was one dot-joined string in muted 11px. Chips give each fact an edge so
   // the eye can pick out "Importance: High" without reading the whole line.
@@ -130,6 +144,32 @@ export function QuestionRow({
         >
           {problem.difficulty[0]}
         </span>
+        {/* Source tags */}
+        {problem.sources && problem.sources.length > 0 && (
+          <span className="flex items-center gap-1">
+            {problem.sources.map((src) => (
+              <span
+                key={src}
+                className={cx("pill leading-none px-1.5 shrink-0 font-medium text-[10px]", SOURCE_PILL[src] || "bg-sunken text-faint")}
+                title={src}
+              >
+                {src}
+              </span>
+            ))}
+          </span>
+        )}
+        {/* Lock indicator for prerequisites */}
+        {isLocked && (
+          <span className="pill leading-none px-1.5 shrink-0 font-medium text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" title="Prerequisites not met">
+            <Icon name="lock" className="size-2.5" />
+          </span>
+        )}
+        {/* Premium badge */}
+        {problem.premium && (
+          <span className="pill leading-none px-1.5 shrink-0 font-medium text-[10px] bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" title="LeetCode Premium">
+            <Icon name="star" className="size-2.5" filled />
+          </span>
+        )}
         {link ? (
           <a
             className={cx(
@@ -206,6 +246,53 @@ export function QuestionRow({
                     <Icon name={m.icon} className="size-3" />
                     {m.text}
                   </span>
+                ))}
+              </div>
+            )}
+            {/* Video & Article links */}
+            {(problem.video || problem.article) && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {problem.video && (
+                  <a
+                    href={problem.video}
+                    target="_blank"
+                    rel="noopener"
+                    className="chip"
+                    title="Video solution"
+                  >
+                    <Icon name="play" className="size-3" />
+                    Video
+                  </a>
+                )}
+                {problem.article && (
+                  <a
+                    href={problem.article}
+                    target="_blank"
+                    rel="noopener"
+                    className="chip"
+                    title="Article/explanation"
+                  >
+                    <Icon name="book" className="size-3" />
+                    Article
+                  </a>
+                )}
+              </div>
+            )}
+            {/* Alternative platform links */}
+            {problem.alt && Object.keys(problem.alt).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {Object.entries(problem.alt).map(([label, url]) => (
+                  <a
+                    key={label}
+                    href={url}
+                    target="_blank"
+                    rel="noopener"
+                    className="chip"
+                    title={label}
+                  >
+                    <Icon name="external" className="size-3" />
+                    {label}
+                  </a>
                 ))}
               </div>
             )}

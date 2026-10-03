@@ -40,6 +40,66 @@ export function countDone(problems: { id: string }[], store: ProgressStore): num
   return problems.reduce((n, p) => n + (getState(store, p.id).done ? 1 : 0), 0);
 }
 
+// --- Topic prerequisites & progression ------------------------------------
+
+// Check if a topic's prerequisites are satisfied (enough questions solved)
+export function areTopicPrereqsMet(topic: Topic, allTopics: Topic[], store: ProgressStore): boolean {
+  if (!topic.prereqs || topic.prereqs.length === 0) return true;
+  const PREREQ_THRESHOLD = 0.75; // Same as REVISION_CONFIG.completionThreshold
+  
+  for (const prereqId of topic.prereqs) {
+    const prereqTopic = allTopics.find(t => t.id === prereqId);
+    if (!prereqTopic) continue;
+    const prereqProblems = prereqTopic.patterns.flatMap(p => p.problems);
+    const prereqDone = countDone(prereqProblems, store);
+    const prereqTotal = prereqProblems.length;
+    if (prereqTotal === 0) continue;
+    if (prereqDone / prereqTotal < PREREQ_THRESHOLD) return false;
+  }
+  return true;
+}
+
+// Get all problems for a topic
+export function getTopicProblems(topic: Topic): Problem[] {
+  return topic.patterns.flatMap(p => p.problems);
+}
+
+// Check if a question is locked due to unmet prerequisites
+export function isQuestionLocked(problem: Problem, allTopics: Topic[], store: ProgressStore): boolean {
+  if (!problem.needs || problem.needs.length === 0) return false;
+  for (const needId of problem.needs) {
+    const needTopic = allTopics.find(t => t.id === needId);
+    if (!needTopic) continue;
+    if (!areTopicPrereqsMet(needTopic, allTopics, store)) return true;
+  }
+  return false;
+}
+
+// Find the next unsolved question whose prerequisites are met
+export function findNextUp(
+  topics: Topic[],
+  store: ProgressStore,
+  filters: FilterState,
+  goal: Goal
+): Problem | null {
+  // Flatten all problems in topic order
+  const allProblems = topics.flatMap(t => t.patterns.flatMap(p => p.problems));
+  
+  for (const problem of allProblems) {
+    const state = getState(store, problem.id);
+    if (state.done) continue;
+    
+    // Check if visible under current filters
+    if (!isProblemVisible(problem, state, filters, { topicName: "", patternName: "", goal })) continue;
+    
+    // Check if prerequisites are met
+    if (isQuestionLocked(problem, topics, store)) continue;
+    
+    return problem;
+  }
+  return null;
+}
+
 export function remapIds(problems: Record<string, ProblemState>, idMap: Record<string, string>) {
   const migrated: Record<string, ProblemState> = {};
   const orphaned: string[] = [];
@@ -189,11 +249,12 @@ export function isProblemVisible(
   const matchesFreq = filters.freq === "All" || problem.interviewFreq === filters.freq;
   const matchesCompleted = !filters.hideCompleted || !state.done;
   const matchesRevise = !filters.reviseOnly || state.revise;
+  const matchesSource = !filters.source || (problem.sources ?? []).includes(filters.source);
   // No goal on the context means nothing to narrow to -- the toggle cannot
   // hide every row just because a caller forgot to pass one.
   const matchesGoalFilter = !filters.goalOnly || !context.goal || matchesGoal(problem, context.goal);
   return (
-    matchesText && matchesDiff && matchesImportance && matchesFreq && matchesCompleted && matchesRevise && matchesGoalFilter
+    matchesText && matchesDiff && matchesImportance && matchesFreq && matchesCompleted && matchesRevise && matchesSource && matchesGoalFilter
   );
 }
 
@@ -203,7 +264,8 @@ export function areFiltersActive(filters: FilterState): boolean {
     filters.difficulty !== "All" ||
     filters.importance !== "All" ||
     filters.freq !== "All" ||
-    filters.reviseOnly
+    filters.reviseOnly ||
+    !!filters.source
   );
 }
 

@@ -19,3 +19,15 @@ export const REVISION_CONFIG = {
   gracePeriodDays: 0,
   exemptTopics: ["fundamentals"], // never scheduled, never gated, omitted from every dashboard count
 } as const;
+
+// Source tags from puneetkhatri99/DSA_Tracker (Striver A2Z + NeetCode + Blind 75 + LeetCode lists)
+export const SOURCES = {
+  A2Z: "Striver A2Z",
+  NC150: "NeetCode 150",
+  NC250: "NeetCode 250",
+  B75: "Blind 75",
+  LC150: "LeetCode Top 150",
+  LC75: "LeetCode 75",
+} as const;
+
+export type SourceKey = keyof typeof SOURCES;

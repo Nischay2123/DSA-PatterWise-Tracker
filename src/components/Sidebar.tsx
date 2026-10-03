@@ -71,7 +71,7 @@ export function SidebarContent({
   onOpenSettings,
   showBrand = true,
 }: {
-  route: "tracker" | "revision";
+  route: "tracker" | "revision" | "notes";
   onNavigate: (hash: string) => void;
   done: number;
   total: number;
@@ -138,6 +138,15 @@ export function SidebarContent({
         >
           <Icon name="repeat" className="size-4" />
           Revision
+        </button>
+        <button
+          type="button"
+          className="nav-item"
+          aria-current={route === "notes" ? "page" : undefined}
+          onClick={() => onNavigate("#/notes")}
+        >
+          <Icon name="book" className="size-4" />
+          Notes
         </button>
       </nav>
 

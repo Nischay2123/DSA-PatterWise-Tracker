@@ -1,0 +1,217 @@
+{
+  "topics": [
+    {
+      "id": "basics",
+      "name": "Java Basics & Math",
+      "prereqs": [],
+      "note": "notes/patterns/basics.md",
+      "optional": false
+    },
+    {
+      "id": "patterns",
+      "name": "Logic Building: Patterns (optional)",
+      "prereqs": [
+        "basics"
+      ],
+      "note": "notes/patterns/patterns.md",
+      "optional": true
+    },
+    {
+      "id": "recursion-basics",
+      "name": "Basic Recursion",
+      "prereqs": [
+        "basics"
+      ],
+      "note": "notes/patterns/recursion-basics.md",
+      "optional": false
+    },
+    {
+      "id": "hashing",
+      "name": "Basic Hashing",
+      "prereqs": [
+        "basics"
+      ],
+      "note": "notes/patterns/hashing.md",
+      "optional": false
+    },
+    {
+      "id": "sorting",
+      "name": "Sorting Algorithms",
+      "prereqs": [
+        "recursion-basics"
+      ],
+      "note": "notes/patterns/sorting.md",
+      "optional": false
+    },
+    {
+      "id": "arrays",
+      "name": "Arrays",
+      "prereqs": [
+        "sorting",
+        "hashing"
+      ],
+      "note": "notes/patterns/arrays.md",
+      "optional": false
+    },
+    {
+      "id": "two-pointers",
+      "name": "Two Pointers",
+      "prereqs": [
+        "arrays"
+      ],
+      "note": "notes/patterns/two-pointers.md",
+      "optional": false
+    },
+    {
+      "id": "sliding-window",
+      "name": "Sliding Window",
+      "prereqs": [
+        "two-pointers"
+      ],
+      "note": "notes/patterns/sliding-window.md",
+      "optional": false
+    },
+    {
+      "id": "binary-search",
+      "name": "Binary Search",
+      "prereqs": [
+        "arrays"
+      ],
+      "note": "notes/patterns/binary-search.md",
+      "optional": false
+    },
+    {
+      "id": "strings",
+      "name": "Strings",
+      "prereqs": [
+        "arrays"
+      ],
+      "note": "notes/patterns/strings.md",
+      "optional": false
+    },
+    {
+      "id": "linked-list",
+      "name": "Linked List",
+      "prereqs": [
+        "two-pointers"
+      ],
+      "note": "notes/patterns/linked-list.md",
+      "optional": false
+    },
+    {
+      "id": "recursion",
+      "name": "Recursion & Backtracking",
+      "prereqs": [
+        "recursion-basics",
+        "arrays"
+      ],
+      "note": "notes/patterns/recursion.md",
+      "optional": false
+    },
+    {
+      "id": "bits",
+      "name": "Bit Manipulation",
+      "prereqs": [
+        "basics"
+      ],
+      "note": "notes/patterns/bits.md",
+      "optional": false
+    },
+    {
+      "id": "greedy",
+      "name": "Greedy & Intervals",
+      "prereqs": [
+        "sorting",
+        "arrays"
+      ],
+      "note": "notes/patterns/greedy.md",
+      "optional": false
+    },
+    {
+      "id": "stack-queue",
+      "name": "Stack, Queue & Monotonic Stack",
+      "prereqs": [
+        "linked-list"
+      ],
+      "note": "notes/patterns/stack-queue.md",
+      "optional": false
+    },
+    {
+      "id": "binary-trees",
+      "name": "Binary Trees",
+      "prereqs": [
+        "recursion",
+        "stack-queue"
+      ],
+      "note": "notes/patterns/binary-trees.md",
+      "optional": false
+    },
+    {
+      "id": "bst",
+      "name": "Binary Search Trees",
+      "prereqs": [
+        "binary-trees",
+        "binary-search"
+      ],
+      "note": "notes/patterns/bst.md",
+      "optional": false
+    },
+    {
+      "id": "heaps",
+      "name": "Heaps / Priority Queue",
+      "prereqs": [
+        "binary-trees"
+      ],
+      "note": "notes/patterns/heaps.md",
+      "optional": false
+    },
+    {
+      "id": "graphs",
+      "name": "Graphs",
+      "prereqs": [
+        "binary-trees",
+        "heaps"
+      ],
+      "note": "notes/patterns/graphs.md",
+      "optional": false
+    },
+    {
+      "id": "dp",
+      "name": "Dynamic Programming",
+      "prereqs": [
+        "recursion"
+      ],
+      "note": "notes/patterns/dp.md",
+      "optional": false
+    },
+    {
+      "id": "tries",
+      "name": "Tries",
+      "prereqs": [
+        "strings",
+        "binary-trees"
+      ],
+      "note": "notes/patterns/tries.md",
+      "optional": false
+    },
+    {
+      "id": "strings-advanced",
+      "name": "Advanced Strings",
+      "prereqs": [
+        "strings",
+        "hashing"
+      ],
+      "note": "notes/patterns/strings-advanced.md",
+      "optional": false
+    },
+    {
+      "id": "math",
+      "name": "Math & Geometry",
+      "prereqs": [
+        "basics"
+      ],
+      "note": "notes/patterns/math.md",
+      "optional": false
+    }
+  ]
+}

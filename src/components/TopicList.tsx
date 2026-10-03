@@ -2,7 +2,7 @@ import { REVISION_CONFIG } from "../config";
 import { useFilters, useStore } from "../context";
 import { goalScoped, isDefaultGoal, isTopicOutOfGoalScope, resolveGoal } from "../revision/goal";
 import { deriveState, isTopicGated } from "../revision/stateMachine";
-import { countDone, getState, getTopicRevision, isGatingActive, isProblemVisible } from "../store";
+import { areTopicPrereqsMet, countDone, getState, getTopicRevision, isGatingActive, isProblemVisible } from "../store";
 import { cx } from "../cx";
 import type { Topic } from "../types";
 import { Icon } from "./Icon";
@@ -67,7 +67,7 @@ function ReviseNow({ topic, remaining }: { topic: Topic; remaining: number }) {
   );
 }
 
-function TopicItem({ topic, index }: { topic: Topic; index: number }) {
+function TopicItem({ topic, index, allTopics }: { topic: Topic; index: number; allTopics: Topic[] }) {
   const { store, v2Store } = useStore();
   const { filters } = useFilters();
 
@@ -76,6 +76,9 @@ function TopicItem({ topic, index }: { topic: Topic; index: number }) {
   const anyVisible = allProblems.some((p) =>
     isProblemVisible(p, getState(store, p.id), filters, { topicName: topic.name, patternName: "", goal })
   );
+
+  // Check if topic prerequisites are met
+  const prereqsMet = areTopicPrereqsMet(topic, allTopics, store);
 
   // "Exempt" here means revision ignores this topic entirely -- either it is
   // on the permanent exempt list, or the goal thinned it below the floor.
@@ -136,6 +139,12 @@ function TopicItem({ topic, index }: { topic: Topic; index: number }) {
           {complete ? <Icon name="check" className="size-3.5" /> : index + 1}
         </span>
         <span className="font-display text-head font-bold tracking-tight min-w-0 truncate">{topic.name}</span>
+        {!prereqsMet && topic.prereqs && topic.prereqs.length > 0 && (
+          <span className="pill bg-amber-soft text-amber shrink-0" title="Prerequisites not met">
+            <Icon name="lock" className="size-3" />
+            <span className="max-sm:hidden">Locked</span>
+          </span>
+        )}
         {gated && (
           <span className="pill bg-accent-soft text-accent shrink-0">
             <Icon name="repeat" className="size-3" />
@@ -177,7 +186,7 @@ export function TopicList({ topics }: { topics: Topic[] }) {
   return (
     <div>
       {topics.map((t, i) => (
-        <TopicItem key={t.id} topic={t} index={i} />
+        <TopicItem key={t.id} topic={t} index={i} allTopics={topics} />
       ))}
     </div>
   );

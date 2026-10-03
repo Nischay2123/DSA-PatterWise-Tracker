@@ -9,6 +9,21 @@ export interface Problem {
   estMinutes: string;
   importance: string;
   interviewFreq: string;
+  // --- New fields from puneetkhatri99/DSA_Tracker ---
+  /** Source tags: A2Z, NC150, NC250, B75, LC150, LC75 */
+  sources?: string[];
+  /** Prerequisite topic IDs that must be completed first */
+  needs?: string[];
+  /** Group within the pattern (e.g., "Basic maths", "Star patterns") */
+  group?: string;
+  /** Video solution URL */
+  video?: string;
+  /** Article/explanation URL */
+  article?: string;
+  /** Alternative platform links (e.g., GFG, TUF, LC Premium) */
+  alt?: Record<string, string>;
+  /** Whether this is a LeetCode Premium problem */
+  premium?: boolean;
 }
 
 export interface Pattern {
@@ -21,6 +36,12 @@ export interface Topic {
   id: string;
   name: string;
   patterns: Pattern[];
+  /** Prerequisite topic IDs that must be completed first */
+  prereqs?: string[];
+  /** Optional: path to pattern notes (Markdown + Mermaid) */
+  note?: string;
+  /** Whether this topic is optional (not required for progression) */
+  optional?: boolean;
 }
 
 export interface QuestionData {
@@ -51,6 +72,8 @@ export interface FilterState {
   // Show only the problems the active revision goal counts. Optional so a
   // FilterState built before this existed still type-checks as one.
   goalOnly?: boolean;
+  // Filter by source (A2Z, NC150, NC250, B75, LC150, LC75)
+  source?: string;
 }
 
 export interface HeatmapDay {
