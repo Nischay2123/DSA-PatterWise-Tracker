@@ -22,10 +22,16 @@ function at(step: number, today: string): string | null {
   return step < QUESTION_REVIEW_DAYS.length ? addDays(today, QUESTION_REVIEW_DAYS[step]) : null;
 }
 
-// However the first solve went, the first review is a day later -- a hint or
-// the solution on a first attempt is the normal case, not a demotion.
-export function scheduleSolve(outcome: ReviewOutcome, today: string): QuestionReview {
+// A clean solve needs no reviews. Only a solve that took a hint or the
+// solution goes on the ladder, starting with a review the next day.
+export function scheduleSolve(outcome: ReviewOutcome, today: string): QuestionReview | undefined {
+  if (outcome === "clean") return undefined;
   return { step: 0, dueAt: at(0, today), log: [{ at: today, kind: "solve", outcome }] };
+}
+
+// Schedules made before that rule, from a clean solve and never reviewed since.
+export function isCleanSolveOnly(review: QuestionReview | undefined): boolean {
+  return review?.log.length === 1 && review.log[0].kind === "solve" && review.log[0].outcome === "clean";
 }
 
 // A question solved before reviews existed has no schedule; reviewing it

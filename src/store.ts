@@ -6,7 +6,7 @@ import { canGradeSolutions } from "./llm/gradeSolution";
 import { isFullGoal, isExemptTopic, matchesGoal } from "./revision/goal";
 import type { Goal } from "./revision/goal";
 import { recordAttemptOutcome, scheduleInitial } from "./revision/scheduler";
-import { applyReview, mergeReview, scheduleSolve } from "./revision/questionReview";
+import { applyReview, isCleanSolveOnly, mergeReview, scheduleSolve } from "./revision/questionReview";
 import type {
   AppSettings,
   AppStoreV2,
@@ -745,17 +745,10 @@ export function patchV2FromV1(v2: AppStoreV2, v1: ProgressStore): AppStoreV2 {
     // unrelated dispatch re-patching this id (already done, or still not
     // done) must never disturb what's already recorded for it.
     const justCompleted = state.done && !base.completed;
-    // A tick made today starts the review ladder (unless RECORD_SOLVE already
-    // did, with the real outcome); un-completing ends it. Checked against the
-    // raw entry, since a never-touched question is lifted already completed.
-    // Completions carried in by an import keep their old dates and stay
-    // unscheduled, like everything solved before reviews existed.
-    const ticked = state.done && !v2.progress[id]?.completed && state.completedAt === todayISO();
-    const review = ticked
-      ? (base.review ?? scheduleSolve("clean", todayISO()))
-      : state.done
-        ? base.review
-        : undefined;
+    // Reviews are only ever scheduled by RECORD_SOLVE / RECORD_REVIEW (a clean
+    // solve schedules none). Un-completing ends them, and a leftover schedule
+    // from a clean solve under the old rule is dropped.
+    const review = state.done && !isCleanSolveOnly(base.review) ? base.review : undefined;
     // A gate-verified completion is one that's genuinely new (never
     // completed before -- grandfathered/re-checks are exempt) AND has real
     // evidence recorded at the moment of completion. Everything else --
@@ -878,6 +871,12 @@ export function v2Reducer(v2: AppStoreV2, action: V2Action): AppStoreV2 {
     case "ADD_MISTAKE": {
       const existing = getV2Progress(v2, action.id);
       return patchV2Progress(v2, action.id, { mistakes: [...existing.mistakes, action.mistake] });
+    }
+    case "UPDATE_MISTAKE": {
+      const existing = getV2Progress(v2, action.id);
+      return patchV2Progress(v2, action.id, {
+        mistakes: existing.mistakes.map((m) => (m.at === action.at ? { ...m, what: action.what, remember: action.remember } : m)),
+      });
     }
     case "REMOVE_MISTAKE": {
       const existing = getV2Progress(v2, action.id);

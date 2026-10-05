@@ -9,7 +9,7 @@ Your progress is saved **in this browser only**. There's no account and no sync,
 1. **Pick a sheet.** Open **Settings → Sheet** and choose the list you're working through, for example Striver A2Z, NeetCode 150 or Blind 75. Everything else follows this choice.
 2. **Press Continue** on the dashboard. It takes you to the next problem worth doing.
 3. **Solve it** on LeetCode, GeeksforGeeks or TakeUForward (the links are on the row), then **tick the checkbox** and say how it went: clean, took a hint, or saw the solution.
-4. **Come back when reviews are due.** A 🔔 banner tells you which questions to re-solve today.
+4. **Come back when reviews are due.** Questions you needed help with come back for review; a 🔔 banner tells you which to re-solve today.
 5. **Revise topics.** Once you've done 75% of a topic, the **Revision** page schedules a short quiz on it.
 
 ## Sheets
@@ -74,7 +74,7 @@ Problems are grouped by **topic** (Arrays, Graphs…) and, inside each topic, by
 - links to the topic's pattern notes (they open in a new tab);
 - **Solution**: your approach, pseudocode and code;
 - **Notes**: six short fields (approach, key insight, common mistake, complexity, edge cases, reminder);
-- **Mistakes**: your own list of things you got wrong, to read before re-solving.
+- **Mistakes**: your own list of things you got wrong, to read before re-solving. Each has *what went wrong* and *what to remember*. Both are multi-line boxes that grow as you type (Ctrl/⌘ + Enter saves), and saved mistakes can be edited (✎) or deleted.
 
 Each **pattern** also has a **Fundamentals** button that lists the core ideas of that pattern, and a 📖 icon that opens its notes.
 
@@ -108,13 +108,15 @@ The gate can be turned off in **Settings → Completion rules**.
 - **Took a hint**: needed a nudge.
 - **Saw the solution**: looked at the answer.
 
-The completion panel asks before the tick. A plain tick records *clean* and then offers the choice right away, so you can correct it.
+The completion panel asks before the tick. A plain tick records *clean* and then offers the choice right away, so you can correct it. Only *took a hint* and *saw the solution* schedule reviews; a clean solve doesn't need one.
 
 ## Per-question reviews
 
-A light spaced-repetition schedule for each question you solve, so you can still do it next month.
+A light spaced-repetition schedule for the questions you needed help with, so you can do them on your own next month.
 
-**The schedule.** After a solve, the question comes back after **1 day**, then **3, 7, 15, 30 and 60 days**.
+**Which questions get reviews.** Only ones you solved after **taking a hint** or **seeing the solution**. A clean solve needs no review and never comes back.
+
+**The schedule.** The question comes back after **1 day**, then **3, 7, 15, 30 and 60 days**.
 
 **Doing a review.** When a review is due, re-solve the question *without looking at your old code*. Then click **🔔 Review due** on the row and choose how it went:
 
@@ -135,7 +137,7 @@ Passing the 60-day review **cleanly** makes the question **mastered**, and it st
 
 Only questions in your current sheet count.
 
-**Questions solved before reviews existed** aren't scheduled automatically, so you don't start with a pile of reviews. To add one, expand it and choose an outcome under **Start spaced reviews**. You can also review any solved question early the same way.
+**Changed your mind?** Expand a solved question that has no reviews and choose **Took a hint** or **Saw the solution** under *Needed help with this one?* to put it on the schedule. A question that already has reviews can be reviewed early from the same place.
 
 **Unticking** a question clears its schedule.
 
@@ -225,6 +227,6 @@ Open **Settings** from the sidebar.
 
 **A topic says "after Arrays". Can I still do it?** Yes. Locks are suggestions only.
 
-**What's the difference between a review and a revision?** A *review* is re-solving one question on a 1-to-60-day schedule. A *revision* is a graded quiz on a whole topic once you've done 75% of it.
+**What's the difference between a review and a revision?** A *review* is re-solving one question you needed help with, on a 1-to-60-day schedule. A *revision* is a graded quiz on a whole topic once you've done 75% of it.
 
 **Do I need an API key?** No. Without one, everything works except AI grading: the completion gate only checks that you wrote something, and you mark revisions as done yourself.

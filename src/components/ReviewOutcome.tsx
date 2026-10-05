@@ -2,9 +2,9 @@ import { cx } from "../cx";
 import type { ReviewOutcome } from "../types";
 
 const OUTCOMES: { value: ReviewOutcome; label: string; title: string }[] = [
-  { value: "clean", label: "Clean", title: "Solved it without help" },
-  { value: "hint", label: "Took a hint", title: "Needed a nudge: the same interval comes round again" },
-  { value: "solution", label: "Saw the solution", title: "Looked at the answer: back to a 1-day review" },
+  { value: "clean", label: "Clean", title: "Solved it without help. A clean solve needs no reviews; a clean review moves to the next, longer interval" },
+  { value: "hint", label: "Took a hint", title: "Needed a nudge: it comes back for review" },
+  { value: "solution", label: "Saw the solution", title: "Looked at the answer: it comes back for review tomorrow" },
 ];
 
 // How a solve or a review went. Drives the per-question review ladder in
@@ -13,15 +13,18 @@ export function ReviewOutcomeButtons({
   value,
   onPick,
   label,
+  only,
 }: {
   value?: ReviewOutcome;
   onPick: (outcome: ReviewOutcome) => void;
   label: string;
+  /** Limit the choices, e.g. to the outcomes that schedule a review. */
+  only?: ReviewOutcome[];
 }) {
   return (
     <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label={label}>
       <span className="text-caption text-muted mr-0.5">{label}</span>
-      {OUTCOMES.map((o) => (
+      {OUTCOMES.filter((o) => !only || only.includes(o.value)).map((o) => (
         <button
           key={o.value}
           type="button"

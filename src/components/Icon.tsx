@@ -161,6 +161,12 @@ const PATHS = {
     </>
   ),
   play: <path d="M8 5.5v13l10.5-6.5z" />,
+  pencil: (
+    <>
+      <path d="M15.5 5.5l3 3L8 19H5v-3z" />
+      <path d="M13.5 7.5l3 3" />
+    </>
+  ),
   bell: (
     <>
       <path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z" />

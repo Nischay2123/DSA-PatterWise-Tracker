@@ -420,6 +420,16 @@ describe("v2Reducer -- v2-only fields are never clobbered by legacy v1 actions",
     expect(v2.progress.a.mistakes).toEqual([{ at: "t2", what: "z", remember: "w" }]);
   });
 
+  it("UPDATE_MISTAKE edits only the targeted entry, keeping line breaks and its date", () => {
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "ADD_MISTAKE", id: "a", mistake: { at: "t1", what: "x", remember: "y" } });
+    v2 = v2Reducer(v2, { type: "ADD_MISTAKE", id: "a", mistake: { at: "t2", what: "z", remember: "w" } });
+    v2 = v2Reducer(v2, { type: "UPDATE_MISTAKE", id: "a", at: "t1", what: "line 1\nline 2", remember: "" });
+    expect(v2.progress.a.mistakes).toEqual([
+      { at: "t1", what: "line 1\nline 2", remember: "" },
+      { at: "t2", what: "z", remember: "w" },
+    ]);
+  });
+
   it("existing v2 revisionStats survive legacy v1 actions", () => {
     const seeded: AppStoreV2 = {
       ...emptyAppStoreV2(),

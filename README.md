@@ -10,7 +10,7 @@ A single-page tracker for the Striver A2Z DSA sheet plus NeetCode 150/250, Blind
 
 **Roadmap.** Topics have prerequisites and some problems build on other topics; unfinished ones show as 🔒 chips, and a collapsible topic map draws the whole graph. Markdown notes — a pattern note per topic, plus Java and Java-core notes — render with highlighted code and mermaid diagrams under Notes.
 
-**Per-question review.** Solving a problem schedules reviews 1, 3, 7, 15, 30 and 60 days out. Each solve and review records how it went: clean moves up a step, a hint repeats the step, seeing the solution starts again at 1 day, and only a clean pass of the last step is mastery. Due reviews show a 🔔 on the row, a banner, a sidebar count and a count in the tab title. Problems solved before this existed aren't scheduled until you review them once.
+**Per-question review.** A problem solved after taking a hint or seeing the solution is reviewed 1, 3, 7, 15, 30 and 60 days out; a clean solve needs no review. In a review, clean moves up a step, a hint repeats the step, seeing the solution starts again at 1 day, and only a clean pass of the last step is mastery. Due reviews show a 🔔 on the row, a banner, a sidebar count and a count in the tab title.
 
 **The completion gate.** Marking a never-completed problem done asks for an approach plus pseudocode or code. With an API key configured, that solution is graded before the tick lands, and your six note fields are then written for you from it. Without a key the gate falls back to a presence check — a personal tracker must not hold your own progress hostage to a third-party credential. The whole gate is one switch in Settings.
 

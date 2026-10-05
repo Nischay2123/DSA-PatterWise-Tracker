@@ -288,7 +288,7 @@ export function QuestionRow({
             <div className="mt-1.5 flex items-center gap-2 flex-wrap">
               <ReviewOutcomeButtons
                 label={asking === "solve" ? "How did the solve go?" : "How did the review go?"}
-                value={asking === "solve" ? progress.review?.log.at(-1)?.outcome : undefined}
+                value={asking === "solve" ? (progress.review?.log.at(-1)?.outcome ?? "clean") : undefined}
                 onPick={(outcome) => {
                   dispatchV2({ type: asking === "solve" ? "RECORD_SOLVE" : "RECORD_REVIEW", id: problem.id, outcome, at: today });
                   setAsking(null);
@@ -350,10 +350,19 @@ export function QuestionRow({
             )}
             {state.done && !reviewDue && (
               <div className="mb-3">
-                <ReviewOutcomeButtons
-                  label={review ? "Reviewed it early?" : "Start spaced reviews:"}
-                  onPick={(outcome) => dispatchV2({ type: "RECORD_REVIEW", id: problem.id, outcome, at: today })}
-                />
+                {review ? (
+                  <ReviewOutcomeButtons
+                    label="Reviewed it early?"
+                    onPick={(outcome) => dispatchV2({ type: "RECORD_REVIEW", id: problem.id, outcome, at: today })}
+                  />
+                ) : (
+                  // No schedule means it was solved clean (or before reviews existed).
+                  <ReviewOutcomeButtons
+                    label="Needed help with this one? Schedule reviews:"
+                    only={["hint", "solution"]}
+                    onPick={(outcome) => dispatchV2({ type: "RECORD_SOLVE", id: problem.id, outcome, at: today })}
+                  />
+                )}
               </div>
             )}
             <SolutionEditor problemId={problem.id} />

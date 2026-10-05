@@ -265,6 +265,7 @@ export type V2Action =
   | { type: "RECORD_SOLVE"; id: string; outcome: ReviewOutcome; at: string }
   | { type: "RECORD_REVIEW"; id: string; outcome: ReviewOutcome; at: string }
   | { type: "ADD_MISTAKE"; id: string; mistake: { at: string; what: string; remember: string } }
+  | { type: "UPDATE_MISTAKE"; id: string; at: string; what: string; remember: string }
   | { type: "REMOVE_MISTAKE"; id: string; at: string }
   // Wholesale replace, for importing/restoring a complete v2 export or backup --
   // mirrors the v1 reducer's own "IMPORT" case.
