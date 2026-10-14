@@ -7297,6 +7297,82 @@
           ]
         }
       ]
+    },
+    "binary-search__2d-search": {
+      "patternName": "2D Search",
+      "topicId": "binary-search",
+      "concepts": [
+        {
+          "id": "binary-search__2d-search__c1",
+          "prompt": "Search a 2D Matrix (each row sorted, first of a row > last of the previous): how do you binary search it as one array, and what is the complexity?",
+          "expectedConcepts": [
+            "treat the m x n matrix as one sorted array of length m*n",
+            "map a flat index mid to (mid / n, mid % n)",
+            "O(log(m*n)) time, O(1) space"
+          ],
+          "criticality": "core",
+          "tags": [
+            "technique"
+          ]
+        },
+        {
+          "id": "binary-search__2d-search__c2",
+          "prompt": "Search a 2D Matrix II (rows and columns sorted independently): why doesn't flattening work, and what search do you use instead?",
+          "expectedConcepts": [
+            "rows overlap in value, so the flattened array is not sorted",
+            "start at the top-right (or bottom-left) corner",
+            "if the cell is bigger than target move left, if smaller move down: each step discards a row or a column",
+            "O(m + n) time"
+          ],
+          "criticality": "core",
+          "tags": [
+            "technique",
+            "recognition"
+          ]
+        },
+        {
+          "id": "binary-search__2d-search__c3",
+          "prompt": "Row with maximum 1s, rows sorted 0s then 1s: how does binary search find it faster than counting every cell?",
+          "expectedConcepts": [
+            "each row is sorted, so the first 1 is a lower bound: ones = n - lowerBound(row, 1)",
+            "binary search each row: O(m log n)",
+            "track the row with the most ones, first row wins ties"
+          ],
+          "criticality": "core",
+          "tags": [
+            "technique"
+          ]
+        },
+        {
+          "id": "binary-search__2d-search__c4",
+          "prompt": "Peak Element II (2D): what do you binary search over, and why does moving toward the larger neighbour guarantee a peak?",
+          "expectedConcepts": [
+            "binary search on columns",
+            "in column mid find the row of the maximum element",
+            "compare it with its left and right neighbours: if one is bigger, a peak exists on that side; otherwise it is a peak",
+            "O(m log n)"
+          ],
+          "criticality": "core",
+          "tags": [
+            "technique",
+            "invariant"
+          ]
+        },
+        {
+          "id": "binary-search__2d-search__c5",
+          "prompt": "Matrix Median (rows sorted, odd total): why do you binary search on the answer value rather than on positions?",
+          "expectedConcepts": [
+            "the median is the smallest value x with more than (m*n)/2 elements <= x",
+            "count elements <= x by an upper bound in every row: O(m log n) per guess",
+            "binary search x between the matrix min and max: O(log(range) * m log n)"
+          ],
+          "criticality": "supporting",
+          "tags": [
+            "technique",
+            "applicability"
+          ]
+        }
+      ]
     }
   }
 }

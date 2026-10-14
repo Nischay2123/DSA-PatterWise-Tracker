@@ -173,3 +173,21 @@ describe("loadAppStore -- concurrency", () => {
     expect(backupCalls).toHaveLength(1);
   });
 });
+
+describe("loadAppStore -- problems moved to another pattern", () => {
+  it("re-keys a stored v2 store once, keeping the untouched original as a backup", async () => {
+    const { loadAppStore, PRE_MOVE_BACKUP_KEY } = await import("./db");
+    const entry = { completed: true } as AppStoreV2["progress"][string];
+    const stale = { ...validV2(), progress: { "dp__1d-dp__decode-ways": entry } };
+    idbStore.set(V2_KEY, stale);
+
+    const v2 = await loadAppStore();
+    expect(v2.progress).toEqual({ "dp__fibonacci-pattern__decode-ways": entry });
+    expect(idbStore.get(V2_KEY)).toEqual(v2);
+    expect(idbStore.get(PRE_MOVE_BACKUP_KEY)).toEqual(stale);
+
+    idbStore.delete(PRE_MOVE_BACKUP_KEY);
+    await loadAppStore();
+    expect(idbStore.has(PRE_MOVE_BACKUP_KEY)).toBe(false); // already current: nothing rewritten
+  });
+});

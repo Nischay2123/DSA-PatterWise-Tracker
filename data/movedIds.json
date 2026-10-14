@@ -1,0 +1,11 @@
+{
+  "binary-search__classic-search__find-row-with-maximum-1-s": "binary-search__2d-search__find-row-with-maximum-1-s",
+  "binary-search__classic-search__search-in-a-2d-matrix": "binary-search__2d-search__search-in-a-2d-matrix",
+  "binary-search__classic-search__search-in-2d-matrix-ii": "binary-search__2d-search__search-in-2d-matrix-ii",
+  "binary-search__search-space-reduction__find-peak-element-ii": "binary-search__2d-search__find-peak-element-ii",
+  "binary-search__median-problems__matrix-median": "binary-search__2d-search__matrix-median",
+  "dp__1d-dp__decode-ways": "dp__fibonacci-pattern__decode-ways",
+  "dp__1d-dp__integer-break": "dp__knapsack__integer-break",
+  "dp__1d-dp__stone-game-ii": "dp__partition-dp__stone-game-ii",
+  "dp__1d-dp__stone-game-iii": "dp__partition-dp__stone-game-iii"
+}

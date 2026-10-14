@@ -42,6 +42,7 @@ const PREREQS = {
 
 // Hand-checked renames: his id -> sheet id. Wins over every automatic match.
 const ALIAS = {
+  'rotate-array': 'arrays__simulation-traversal__left-rotate-array-by-k-places',
   'missing-number': 'arrays__hashing__find-missing-number',
   'coin-change-ii': 'dp__knapsack__coin-change-2-dp-22',
   'kth-largest-element-in-an-array': 'heaps__top-k-elements__k-th-largest-element-in-an-array',
@@ -134,17 +135,19 @@ const PLACE = {
   'graphs__topological-sort': ['course-schedule-iv', 'minimum-height-trees', 'build-a-matrix-with-conditions'],
   'graphs__minimum-spanning-tree': ['min-cost-to-connect-all-points', 'find-critical-and-pseudo-critical-edges-in-minimum-spanning-tree'],
   'graphs__union-find': ['redundant-connection', 'graph-valid-tree', 'greatest-common-divisor-traversal'],
-  'dp__1d-dp': ['decode-ways', 'integer-break', 'stone-game-ii', 'stone-game-iii'],
-  'dp__fibonacci-pattern': ['min-cost-climbing-stairs', 'n-th-tribonacci-number', 'domino-and-tromino-tiling'],
-  'dp__knapsack': ['combination-sum-iv', 'perfect-squares'],
+  'dp__fibonacci-pattern': ['min-cost-climbing-stairs', 'n-th-tribonacci-number', 'domino-and-tromino-tiling', 'decode-ways'],
+  'dp__knapsack': ['combination-sum-iv', 'perfect-squares', 'integer-break'],
   'dp__grid-dp': ['minimum-path-sum', 'maximal-square', 'longest-increasing-path-in-a-matrix'],
   'dp__string-dp': ['palindromic-substrings', 'interleaving-string', 'regular-expression-matching'],
-  'dp__partition-dp': ['stone-game'],
+  'dp__partition-dp': ['stone-game', 'stone-game-ii', 'stone-game-iii'],
   'tries__trie-string-applications': ['design-add-and-search-words-data-structure', 'extra-characters-in-a-string',
     'search-suggestions-system', 'word-search-ii'],
 };
 // Patterns the sheet has no slot for. Created on first run, after the topic's last pattern.
-const NEW_PATTERNS = { 'backtracking__permutations': { topic: 'backtracking', name: 'Permutations' } };
+const NEW_PATTERNS = {
+  'backtracking__permutations': { topic: 'backtracking', name: 'Permutations' },
+  'binary-search__2d-search': { topic: 'binary-search', name: '2D Search' },
+};
 
 const slugify = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 const norm = s => s.toLowerCase().replace(/\(.*?\)|\|.*$/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -159,11 +162,28 @@ for (const [id, { topic, name }] of Object.entries(NEW_PATTERNS)) {
   const t = data.topics.find(t => t.id === topic);
   if (!t.patterns.some(p => p.id === id)) t.patterns.push({ id, name, problems: [] });
 }
+// Problems moved to a better pattern after release (data/movedIds.json; the app re-keys saved
+// progress with the same map). Applied before anything reads an id, so a fresh sheet and an
+// already-merged file come out the same. A merge-added problem is placed straight into its new
+// pattern by PLACE instead.
+const MOVED = JSON.parse(fs.readFileSync('data/movedIds.json', 'utf8'));
+const patternOf = id => id.split('__').slice(0, 2).join('__');
+const allPatterns = () => data.topics.flatMap(t => t.patterns);
+for (const [from, to] of Object.entries(MOVED)) {
+  const src = allPatterns().find(p => p.id === patternOf(from));
+  const i = src ? src.problems.findIndex(q => q.id === from) : -1;
+  if (i < 0) continue; // already moved, or not added yet
+  const dest = allPatterns().find(p => p.id === patternOf(to)) ?? (() => { throw new Error(`MOVED: unknown pattern for ${to}`); })();
+  const [q] = src.problems.splice(i, 1);
+  dest.problems.push({ ...q, id: to, subpattern: q.subpattern === src.name ? dest.name : q.subpattern });
+}
 const patternById = new Map(data.topics.flatMap(t => t.patterns.map(p => [p.id, { p, t }])));
 const mine = data.topics.flatMap(t => t.patterns.flatMap(p => p.problems.map(q => ({ q, t }))));
 const mineById = new Map(mine.map(x => [x.q.id, x]));
 const by = { lc: new Map(), gfg: new Map(), title: new Map() };
-for (const { q } of mine) {
+// Two rows can share a link or title (e.g. "Postorder Traversal" and "...using 1 stack"); the later
+// one wins the map. Walk in id order, not file order, so data/order.json can't change who matches.
+for (const { q } of [...mine].sort((a, b) => (a.q.id < b.q.id ? -1 : 1))) {
   if (lc(q.link)) by.lc.set(lc(q.link), q);
   if (gf(gfg[q.id] || q.link)) by.gfg.set(gf(gfg[q.id] || q.link), q);
   by.title.set(norm(q.question), q);
@@ -253,7 +273,8 @@ for (const { h, t } of H) {
 for (const id of placeOf.keys()) if (!H.some(x => x.h.id === id)) throw new Error(`PLACE names unknown question ${id}`);
 
 // Every sheet question (idRegistry.json is exactly the sheet's ids) is from Striver A2Z, matched or not.
-const sheet = JSON.parse(fs.readFileSync('data/idRegistry.json', 'utf8'));
+const sheet = Object.fromEntries(Object.entries(JSON.parse(fs.readFileSync('data/idRegistry.json', 'utf8')))
+  .map(([id, title]) => [MOVED[id] ?? id, title]));
 for (const { q } of mine) if (q.id in sheet && !q.sources?.includes('A2Z')) q.sources = ['A2Z', ...(q.sources || [])];
 
 const NOTES = {
@@ -269,6 +290,34 @@ for (const t of data.topics) {
   t.notes = NOTES[t.id];
 }
 
+// Learning order (data/order.json): patterns within a topic, problems within a pattern, so each
+// problem comes after the ones it builds on. Order only -- nothing moves between patterns, so ids hold.
+const ORDER = JSON.parse(fs.readFileSync('data/order.json', 'utf8'));
+const arrange = (items, slugs, where) => {
+  const byId = new Map(items.map(x => [x.id, x]));
+  const ids = slugs.map(s => `${where}__${s}`);
+  const missing = items.filter(x => !ids.includes(x.id)).map(x => x.id);
+  const unknown = ids.filter(id => !byId.has(id));
+  if (missing.length || unknown.length || new Set(ids).size !== ids.length)
+    throw new Error(`order.json ${where}: missing ${missing}, unknown ${unknown}, or a duplicate`);
+  return ids.map(id => byId.get(id));
+};
+for (const [tid, { patterns, problems = {} }] of Object.entries(ORDER)) {
+  const t = data.topics.find(t => t.id === tid) ?? (() => { throw new Error(`order.json: unknown topic ${tid}`); })();
+  if (patterns) t.patterns = arrange(t.patterns, patterns, tid);
+  for (const [pslug, slugs] of Object.entries(problems)) {
+    const p = t.patterns.find(p => p.id === `${tid}__${pslug}`) ?? (() => { throw new Error(`order.json: unknown pattern ${pslug}`); })();
+    p.problems = arrange(p.problems, slugs, p.id);
+  }
+}
+// Sheet difficulty tags that were swapped against their siblings (LeetCode's own ratings).
+const DIFFICULTY = {
+  'graphs__topological-sort__course-schedule-i': 'Medium',
+  'trees__tree-properties__maximum-depth-in-bt': 'Easy',
+  'trees__tree-properties__count-total-nodes-in-a-complete-bt': 'Medium',
+};
+for (const [id, d] of Object.entries(DIFFICULTY)) (mineById.get(id)?.q ?? (() => { throw new Error(`DIFFICULTY: unknown ${id}`); })()).difficulty = d;
+
 fs.writeFileSync(QUESTIONS, JSON.stringify(data, null, 1) + '\n');
 
 // Blind 75: the sheet covered 51; the added questions fill in what it lacked.
@@ -283,7 +332,7 @@ const B75_SKIP = new Set([
 ]);
 const covers = (q, title) => norm(q.question).includes(norm(title));
 const fromAbsent = b75.absent.flatMap(title => all.filter(q => norm(q.question) === norm(title)).map(q => q.id));
-b75.ids = [...new Set([...b75.ids, ...all.filter(q => q.sources?.includes('B75') && !B75_SKIP.has(q.id)).map(q => q.id), ...fromAbsent])];
+b75.ids = [...new Set([...b75.ids.map(id => MOVED[id] ?? id), ...all.filter(q => q.sources?.includes('B75') && !B75_SKIP.has(q.id)).map(q => q.id), ...fromAbsent])];
 const hisByTitle = H.filter(x => x.h.src.includes('B75')).map(x => [norm(x.h.title), x.h.id]);
 b75.absent = b75.absent.filter(title => {
   const hid = hisByTitle.find(([n]) => n.includes(norm(title)))?.[1];

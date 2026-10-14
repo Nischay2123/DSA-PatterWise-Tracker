@@ -1,9 +1,10 @@
 import { get, set } from "idb-keyval";
 import type { AppStoreV2, ProgressStore } from "../types";
 import { backupLegacy } from "./backup";
-import { emptyAppStoreV2, isValidAppStoreV2, migrateV1ToV2 } from "./migrate";
+import { emptyAppStoreV2, isValidAppStoreV2, migrateV1ToV2, renameMovedIds } from "./migrate";
 
 const APP_STORE_KEY = "dsa-tracker-v2";
+export const PRE_MOVE_BACKUP_KEY = "dsa-tracker-v2-before-id-moves";
 const LEGACY_STORE_KEY = "dsa-tracker-progress";
 const LEGACY_BACKUP_KEY = "dsa-tracker-progress-backup";
 
@@ -44,7 +45,13 @@ async function loadAppStoreUncached(): Promise<AppStoreV2> {
     // Backfills the marker for browsers that migrated under a build that
     // predates this check, so the very next boot is already protected.
     markV2Initialized();
-    return existing;
+    const current = renameMovedIds(existing);
+    if (current !== existing) {
+      // The untouched store goes aside first, so the rename can always be undone by hand.
+      await set(PRE_MOVE_BACKUP_KEY, existing);
+      await set(APP_STORE_KEY, current);
+    }
+    return current;
   }
 
   if (isV2Initialized()) {

@@ -1,7 +1,7 @@
 import type { ChangeEvent } from "react";
 import { useStore } from "../context";
 import { Icon } from "./Icon";
-import { isValidAppStoreV2, migrateV1ToV2 } from "../persistence/migrate";
+import { isValidAppStoreV2, migrateV1ToV2, renameMovedIds } from "../persistence/migrate";
 import {
   countDoneInStoreV2,
   isValidStore,
@@ -31,7 +31,7 @@ export function MergeImport({ onBackupChange }: { onBackupChange: () => void }) 
       // only the five legacy fields. Both merge -- the v1 file is lifted to
       // v2 first so a single merge path handles both (Phase 8).
       const incoming = isValidAppStoreV2(parsed)
-        ? parsed
+        ? renameMovedIds(parsed)
         : isValidStore(parsed)
           ? migrateV1ToV2(parsed)
           : null;

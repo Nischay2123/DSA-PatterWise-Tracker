@@ -1,6 +1,6 @@
 import idMapRaw from "../data/idMap.json";
 import { REVISION_CONFIG } from "./config";
-import { isValidAppStoreV2, liftV1Entry } from "./persistence/migrate";
+import { isValidAppStoreV2, liftV1Entry, renameMovedIds, renameMovedIdsV1 } from "./persistence/migrate";
 import { scoreEvaluation } from "./revision/evaluate";
 import { canGradeSolutions } from "./llm/gradeSolution";
 import { isFullGoal, isExemptTopic, matchesGoal } from "./revision/goal";
@@ -99,8 +99,12 @@ export function remapIds(problems: Record<string, ProblemState>, idMap: Record<s
 }
 
 export function migrateIdsIfNeeded(store: ProgressStore): { store: ProgressStore; migrated: boolean } {
-  if (store.idsMigrated) return { store, migrated: false };
-  const { migrated: problems, orphaned } = remapIds(store.problems, ID_MAP);
+  if (store.idsMigrated) {
+    const problems = renameMovedIdsV1(store.problems);
+    return problems === store.problems ? { store, migrated: false } : { store: { ...store, problems }, migrated: true };
+  }
+  const { migrated: remapped, orphaned } = remapIds(store.problems, ID_MAP);
+  const problems = renameMovedIdsV1(remapped);
   const next: ProgressStore = { ...store, problems, idsMigrated: true };
   if (orphaned.length) {
     console.warn(`ID migration: ${orphaned.length} unmapped id(s) preserved as-is (not dropped):`, orphaned);
@@ -151,7 +155,7 @@ export function loadBackupV2(): AppStoreV2 | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    return isValidAppStoreV2(parsed) ? parsed : null;
+    return isValidAppStoreV2(parsed) ? renameMovedIds(parsed) : null;
   } catch {
     return null;
   }

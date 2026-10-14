@@ -1,7 +1,63 @@
 import idMapRaw from "../../data/idMap.json";
+import movedIdsRaw from "../../data/movedIds.json";
 import type { AppSettings, AppStoreV2, ProblemState, ProgressStore, QuestionProgressV2 } from "../types";
 
 const ID_MAP: Record<string, string> = idMapRaw;
+
+// Problems moved to a better pattern after release. An id carries its pattern, so a move renames
+// it; anything written before the move still says the old id. Append-only, like idMap.json.
+export const MOVED_IDS: Record<string, string> = movedIdsRaw;
+const renamed = (id: string) => MOVED_IDS[id] ?? id;
+
+// Re-keys a v2 store written before a move: progress, and the question ids inside revision
+// attempts. Returns the same object when nothing moved, so callers can tell whether to save.
+// If both the old and new id hold progress, the new one stays and the old goes to
+// orphanedProgress -- never overwritten, never dropped.
+export function renameMovedIds(store: AppStoreV2): AppStoreV2 {
+  const attempts = Object.values(store.attempts);
+  const stale =
+    Object.keys(store.progress).some((id) => id in MOVED_IDS) ||
+    attempts.some(
+      (a) =>
+        a?.questions?.some((q) => q.questionId in MOVED_IDS) ||
+        a?.evaluation?.perQuestion?.some((q) => q.questionId in MOVED_IDS)
+    );
+  if (!stale) return store;
+
+  const progress: Record<string, QuestionProgressV2> = {};
+  const orphanedProgress = { ...store.orphanedProgress };
+  const entries = Object.entries(store.progress);
+  for (const [id, entry] of entries) if (!(id in MOVED_IDS)) progress[id] = entry;
+  for (const [id, entry] of entries) {
+    if (!(id in MOVED_IDS)) continue;
+    if (progress[MOVED_IDS[id]]) orphanedProgress[id] = entry;
+    else progress[MOVED_IDS[id]] = entry;
+  }
+
+  const fixAttempts: AppStoreV2["attempts"] = {};
+  for (const [key, a] of Object.entries(store.attempts)) {
+    fixAttempts[key] = !a
+      ? a
+      : {
+          ...a,
+          questions: a.questions?.map((q) => ({ ...q, questionId: renamed(q.questionId) })),
+          evaluation: a.evaluation && {
+            ...a.evaluation,
+            perQuestion: a.evaluation.perQuestion?.map((q) => ({ ...q, questionId: renamed(q.questionId) })),
+          },
+        };
+  }
+  return { ...store, progress, orphanedProgress, attempts: fixAttempts };
+}
+
+// The v1 shape of the same rename. A collision keeps the entry already under the new id.
+export function renameMovedIdsV1(problems: Record<string, ProblemState>): Record<string, ProblemState> {
+  if (!Object.keys(problems).some((id) => id in MOVED_IDS)) return problems;
+  const out: Record<string, ProblemState> = {};
+  for (const [id, state] of Object.entries(problems)) if (!(id in MOVED_IDS)) out[id] = state;
+  for (const [id, state] of Object.entries(problems)) if (id in MOVED_IDS && !out[MOVED_IDS[id]]) out[MOVED_IDS[id]] = state;
+  return out;
+}
 
 export const DEFAULT_SETTINGS: AppSettings = {
   requireEvidence: true,
@@ -90,5 +146,5 @@ export function migrateV1ToV2(v1: ProgressStore | null | undefined): AppStoreV2 
       result.orphanedProgress[key] = liftV1Entry(state);
     }
   }
-  return result;
+  return renameMovedIds(result);
 }

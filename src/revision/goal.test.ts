@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import idRegistry from "../../data/idRegistry.json";
+import { MOVED_IDS } from "../persistence/migrate";
 import questionsData from "../../data/questions.json";
 import { emptyAppStoreV2 } from "../persistence/migrate";
 import { buildTopicRows, canReviseManually, problemsUntilRevisable } from "./dashboard";
@@ -169,7 +170,8 @@ describe("against the real dataset", () => {
   it("scopes the default goal to exactly the 467-problem A2Z sheet, and Full syllabus to all 649", () => {
     expect(ALL.length).toBe(649);
     expect(goalScoped(ALL, FULL_GOAL)).toHaveLength(649);
-    const sheet = Object.keys(idRegistry).sort();
+    // The sheet's ids, under their new names where a problem was moved to another pattern.
+    const sheet = Object.keys(idRegistry).map((id) => MOVED_IDS[id] ?? id).sort();
     expect(goalScoped(ALL, DEFAULT_GOAL).map((p) => p.id).sort()).toEqual(sheet);
     expect(sheet).toHaveLength(467);
   });
@@ -191,11 +193,11 @@ describe("against the real dataset", () => {
   // preset means fails loudly here instead of quietly changing the product.
   it.each([
     ["full", 604, 17, 0],
-    ["no-hard", 450, 16, 1],
+    ["no-hard", 451, 16, 1],
     ["a2z", 422, 17, 0],
     ["nc250", 249, 14, 3],
     ["sprint", 239, 14, 3],
-    ["hard-only", 154, 13, 4],
+    ["hard-only", 153, 13, 4],
     ["lc150", 149, 14, 3],
     ["nc150", 149, 14, 3],
     ["blind75", 75, 10, 7],

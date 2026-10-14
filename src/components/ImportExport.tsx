@@ -1,6 +1,6 @@
 import type { ChangeEvent } from "react";
 import { useStore } from "../context";
-import { isValidAppStoreV2 } from "../persistence/migrate";
+import { isValidAppStoreV2, renameMovedIds } from "../persistence/migrate";
 import { Icon } from "./Icon";
 import {
   clearBackupV2,
@@ -56,8 +56,9 @@ export function ImportExport({
       // legacy fields. Both remain importable -- checked in that order since
       // the shapes never overlap (`.progress` vs. `.problems`).
       if (isValidAppStoreV2(parsed)) {
+        const incoming = renameMovedIds(parsed);
         const currentDone = countDoneInStoreV2(v2Store);
-        const incomingDone = countDoneInStoreV2(parsed);
+        const incomingDone = countDoneInStoreV2(incoming);
         if (currentDone > 0) {
           const ok = confirm(
             "Replace your current progress?\n\n" +
@@ -70,8 +71,8 @@ export function ImportExport({
           saveBackupV2(v2Store);
           onBackupChange();
         }
-        dispatchV2({ type: "REPLACE_STORE", store: parsed });
-        dispatch({ type: "IMPORT", store: v2ProgressToV1Store(parsed) });
+        dispatchV2({ type: "REPLACE_STORE", store: incoming });
+        dispatch({ type: "IMPORT", store: v2ProgressToV1Store(incoming) });
         return;
       }
 

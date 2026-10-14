@@ -1,0 +1,141 @@
+{
+  "fundamentals": {
+    "problems": {
+      "language-basics": ["input-output", "cpp-basics", "if-elseif", "switch-case", "what-are-arrays-strings", "for-loops", "while-loops", "functions-pass-by-reference-and-value", "theory-with-examples", "stl", "java-collections"]
+    }
+  },
+  "recursion": {
+    "problems": {
+      "functional-recursion": ["fibonacci-number", "pow-x-n", "count-good-numbers"],
+      "recursion-on-strings": ["check-if-string-is-palindrome-or-not", "recursive-implementation-of-atoi"]
+    }
+  },
+  "sorting": {
+    "problems": {
+      "comparison-sorts": ["selection-sort", "bubble-sort", "insertion-sorting", "merge-sorting", "recursive-bubble-sort", "recursive-insertion-sort", "quick-sorting"],
+      "divide-conquer-applications": ["sort-an-array", "count-inversions", "reverse-pairs"]
+    }
+  },
+  "arrays": {
+    "problems": {
+      "simulation-traversal": ["largest-element", "second-largest-element", "check-if-the-array-is-sorted-ii", "linear-search", "left-rotate-array-by-one", "left-rotate-array-by-k-places", "maximum-consecutive-ones", "concatenation-of-array", "kids-with-the-greatest-number-of-candies", "plus-one", "leaders-in-an-array", "majority-element-i", "majority-element-ii", "next-permutation", "pascal-s-triangle-i", "h-index"],
+      "hashing": ["contains-duplicate", "two-sum", "find-the-difference-of-two-arrays", "unique-number-of-occurrences", "find-missing-number", "longest-consecutive-sequence-in-an-array", "find-the-repeating-and-missing-number", "first-missing-positive", "verifying-an-alien-dictionary", "design-hashset", "design-hashmap", "insert-delete-getrandom-o-1", "detect-squares", "max-points-on-a-line"],
+      "prefix-sum": ["find-the-highest-altitude", "find-pivot-index", "product-of-array-except-self", "range-sum-query-2d-immutable", "car-pooling", "count-subarrays-with-given-sum", "longest-subarray-with-sum-k", "largest-subarray-with-sum-0", "count-subarrays-with-given-xor-k", "kadane-s-algorithm", "print-subarray-with-maximum-subarray-sum-extended-version-of-above-problem", "maximum-sum-circular-subarray", "maximum-product-subarray-in-an-array"],
+      "two-pointers": ["reverse-string", "reverse-vowels-of-a-string", "two-sum-ii-input-array-is-sorted", "3-sum", "4-sum", "container-with-most-water", "boats-to-save-people", "max-number-of-k-sum-pairs", "remove-element", "remove-duplicates-from-sorted-array", "remove-duplicates-from-sorted-array-ii", "move-zeros-to-end", "string-compression", "rearrange-array-elements-by-sign", "merge-strings-alternately", "is-subsequence", "union-of-two-sorted-arrays", "merge-two-sorted-arrays-without-extra-space", "sort-an-array-of-0-s-1-s-and-2-s"],
+      "sliding-window": ["maximum-average-subarray-i", "maximum-number-of-vowels-in-a-substring-of-given-length", "maximum-points-you-can-obtain-from-cards", "contains-duplicate-ii", "permutation-in-string", "find-k-closest-elements", "longest-substring-without-repeating-characters", "max-consecutive-ones-iii", "longest-subarray-of-1-s-after-deleting-one-element", "fruit-into-baskets", "longest-substring-with-at-most-k-distinct-characters", "longest-repeating-character-replacement", "longest-subarray-with-given-sum-k-positives", "longest-turbulent-subarray", "minimum-size-subarray-sum", "minimum-window-substring", "minimum-window-subsequence", "number-of-substrings-containing-all-three-characters", "binary-subarrays-with-sum", "count-number-of-nice-subarrays", "count-number-of-substrings", "subarrays-with-k-different-integers", "substring-with-concatenation-of-all-words"],
+      "intervals": ["summary-ranges", "meeting-rooms", "merge-overlapping-subintervals", "insert-interval", "non-overlapping-intervals", "partition-labels"],
+      "matrix": ["transpose-matrix", "rotate-matrix-by-90-degrees", "print-the-matrix-in-spiral-manner", "set-matrix-zeroes", "equal-row-and-column-pairs", "valid-sudoku", "game-of-life"]
+    }
+  },
+  "binary-search": {
+    "problems": {
+      "classic-search": ["search-x-in-sorted-array", "guess-number-higher-or-lower"],
+      "lower-bound": ["lower-bound", "search-insert-position", "floor-and-ceil-in-sorted-array", "successful-pairs-of-spells-and-potions"],
+      "search-space-reduction": ["first-and-last-occurrence", "count-occurrences-in-a-sorted-array", "search-in-rotated-sorted-array-i", "search-in-rotated-sorted-array-ii", "find-minimum-in-rotated-sorted-array", "find-out-how-many-times-the-array-is-rotated", "single-element-in-a-sorted-array", "find-peak-element", "find-in-mountain-array"],
+      "binary-search-on-answer": ["find-square-root-of-a-number", "find-nth-root-of-a-number", "koko-eating-bananas", "minimum-days-to-make-m-bouquets", "find-the-smallest-divisor", "capacity-to-ship-packages-within-d-days", "kth-missing-positive-number", "aggressive-cows", "book-allocation-problem", "split-array-largest-sum", "painter-s-partition", "minimize-max-distance-to-gas-station"],
+      "median-problems": ["median-of-2-sorted-arrays", "kth-element-of-2-sorted-arrays"],
+      "2d-search": ["find-row-with-maximum-1-s", "search-in-a-2d-matrix", "search-in-2d-matrix-ii", "find-peak-element-ii", "matrix-median"]
+    },
+    "patterns": ["classic-search", "lower-bound", "upper-bound", "search-space-reduction", "binary-search-on-answer", "median-problems", "2d-search"]
+  },
+  "strings": {
+    "problems": {
+      "basic-string-ops": ["length-of-last-word", "largest-odd-number-in-a-string", "longest-common-prefix", "reverse-every-word-in-a-string", "remove-outermost-parentheses", "rotate-string", "find-the-index-of-the-first-occurrence-in-a-string", "greatest-common-divisor-of-strings", "count-and-say"],
+      "anagram-frequency": ["ransom-note", "check-if-two-strings-are-anagram-of-each-other", "group-anagrams", "isomorphic-string", "word-pattern", "determine-if-two-strings-are-close", "sort-characters-by-frequency", "sum-of-beauty-of-all-substrings"],
+      "string-parsing": ["roman-to-integer", "integer-to-roman", "string-to-integer-atoi", "encode-and-decode-strings", "zigzag-conversion", "multiply-strings", "text-justification"],
+      "palindrome-patterns": ["reverse-words-in-a-given-string-palindrome-check", "valid-palindrome-ii", "longest-palindromic-substring"]
+    }
+  },
+  "linked-list": {
+    "problems": {
+      "traversal": ["introduction-to-singly-linkedlist", "insertion-at-the-head-of-linked-list", "deletion-of-the-head-of-ll", "find-the-length-of-the-linked-list", "search-in-linked-list", "introduction-to-doubly-ll", "insert-node-before-head-in-doubly-linked-list", "delete-head-of-doubly-linked-list", "delete-all-occurrences-of-a-key-in-dll", "remove-duplicates-from-sorted-dll", "remove-duplicates-from-sorted-list-ii", "segregate-odd-and-even-nodes-in-linked-list", "sort-a-linked-list-of-0-s-1-s-and-2-s", "partition-list", "insert-greatest-common-divisors-in-linked-list"],
+      "reverse": ["reverse-a-linkedlist-iterative", "reverse-a-ll", "reverse-a-doubly-linked-list", "reverse-linked-list-ii", "add-one-to-a-number-represented-by-ll", "rotate-a-ll"],
+      "merge": ["merge-two-sorted-lists", "add-two-numbers-in-linked-list", "sort-ll", "flattening-of-ll"]
+    }
+  },
+  "bit-manipulation": {
+    "problems": {
+      "bit-basics": ["introduction-to-bits-and-tricks", "check-if-the-i-th-bit-is-set-or-not", "check-if-a-number-is-odd-or-not", "check-if-a-number-is-power-of-2-or-not", "count-the-number-of-set-bits", "counting-bits", "set-unset-the-rightmost-unset-bit", "swap-two-numbers", "reverse-bits", "add-binary", "sum-of-two-integers", "divide-two-numbers-without-multiplication-and-division", "bitwise-and-of-numbers-range", "minimum-flips-to-make-a-or-b-equal-to-c", "minimum-array-end"],
+      "xor-properties": ["single-number-i", "single-number-ii", "single-number-iii", "minimum-bit-flips-to-convert-number", "xor-of-numbers-in-a-given-range", "power-set-bit-manipulation"]
+    }
+  },
+  "backtracking": {
+    "patterns": ["subsequences", "subsets", "combination-sum", "combinations", "permutations", "constraint-problems", "n-queens", "sudoku", "word-search"],
+    "problems": {
+      "subsequences": ["learn-all-patterns-of-subsequences-theory", "generate-binary-strings-without-consecutive-1s", "check-if-there-exists-a-subsequence-with-sum-k", "count-all-subsequences-with-sum-k"],
+      "subsets": ["subsets-i", "power-set", "subsets-ii", "sum-of-all-subset-xor-totals"],
+      "combination-sum": ["combination-sum", "combination-sum-ii", "combination-sum-iii"],
+      "constraint-problems": ["palindrome-partitioning", "word-break", "word-break-ii", "rat-in-a-maze", "m-coloring-problem", "matchsticks-to-square", "partition-to-k-equal-sum-subsets", "expression-add-operators"]
+    }
+  },
+  "stack-queue": {
+    "patterns": ["basic-stack", "basic-queue", "expression-problems", "next-greater-pattern", "monotonic-stack", "histogram-pattern", "monotonic-queue"],
+    "problems": {
+      "basic-stack": ["implement-stack-using-arrays", "implement-stack-using-linkedlist", "implement-stack-using-queue", "baseball-game", "implement-min-stack", "removing-stars-from-a-string", "simplify-path", "decode-string", "maximum-frequency-stack", "celebrity-problem"],
+      "basic-queue": ["implement-queue-using-arrays", "implement-queue-using-linkedlist", "implement-queue-using-stack", "design-circular-queue", "number-of-recent-calls", "dota2-senate"],
+      "expression-problems": ["balanced-paranthesis", "maximum-nesting-depth-of-the-parentheses", "minimum-number-of-bracket-reversals-to-make-an-expression-balanced", "evaluate-reverse-polish-notation", "infix-to-postfix-conversion", "infix-to-prefix-conversion", "postfix-to-infix-conversion", "prefix-to-infix-conversion", "postfix-to-prefix-conversion", "prefix-to-postfix-conversion", "basic-calculator"],
+      "next-greater-pattern": ["next-greater-element", "next-greater-element-2", "next-smaller-element", "daily-temperatures", "stock-span-problem", "number-of-greater-elements-to-the-right"],
+      "monotonic-stack": ["asteroid-collision", "remove-k-digits", "car-fleet", "trapping-rainwater", "sum-of-subarray-minimums", "sum-of-subarray-ranges"]
+    }
+  },
+  "heaps": {
+    "problems": {
+      "top-k-elements": ["k-th-largest-element-in-an-array", "kth-smallest-element-in-an-array-use-priority-queue", "kth-largest-element-in-a-stream-of-running-integers", "top-k-frequent-elements", "k-closest-points-to-origin", "replace-elements-by-their-rank", "sort-k-sorted-array", "merge-k-sorted-lists", "find-k-pairs-with-smallest-sums", "maximum-sum-combination"],
+      "heap-with-greedy": ["task-scheduler", "hand-of-straights", "reorganize-string", "longest-happy-string", "minimum-cost-to-connect-sticks", "single-threaded-cpu", "meeting-rooms-iii", "minimum-interval-to-include-each-query", "maximum-subsequence-score", "design-twitter"]
+    }
+  },
+  "greedy": {
+    "problems": {
+      "basic-greedy": ["assign-cookies", "lemonade-change", "can-place-flowers", "fractional-knapsack", "increasing-triplet-subsequence", "gas-station", "merge-triplets-to-form-target-triplet", "valid-paranthesis-checker"],
+      "activity-selection": ["n-meetings-in-one-room", "minimum-number-of-arrows-to-burst-balloons", "minimum-number-of-platforms-required-for-a-railway", "meeting-rooms-ii", "job-sequencing-problem", "shortest-job-first"],
+      "jump-game-pattern": ["jump-game-i", "jump-game-ii", "jump-game-vii"]
+    }
+  },
+  "trees": {
+    "patterns": ["dfs-traversals", "tree-properties", "bfs-traversals", "root-to-leaf-problems", "lca", "construction", "serialization", "advanced-trees"],
+    "problems": {
+      "dfs-traversals": ["introduction-to-trees", "binary-tree-representation-in-java", "preorder-traversal", "inorder-traversal-of-binary-tree", "postorder-traversal", "iterative-preorder-traversal-of-binary-tree", "iterative-inorder-traversal-of-binary-tree", "post-order-traversal-of-binary-tree-using-2-stack", "post-order-traversal-of-binary-tree-using-1-stack", "pre-post-inorder-in-one-traversal", "preorder-inorder-and-postorder-traversal-in-one-traversal", "leaf-similar-trees", "delete-leaves-with-a-given-value", "morris-inorder-traversal-of-a-binary-tree", "morris-preorder-traversal-of-a-binary-tree"],
+      "tree-properties": ["maximum-depth-in-bt", "check-for-balanced-binary-tree", "diameter-of-binary-tree", "maximum-path-sum", "check-if-two-trees-are-identical-or-not", "invert-binary-tree", "symmetric-binary-tree", "subtree-of-another-tree", "count-total-nodes-in-a-complete-bt", "children-sum-property-in-binary-tree", "longest-zigzag-path-in-a-binary-tree"],
+      "bfs-traversals": ["level-order-traversal", "average-of-levels-in-binary-tree", "maximum-level-sum-of-a-binary-tree", "zig-zag-or-spiral-traversal", "right-left-view-of-binary-tree", "vertical-order-traversal", "top-view-of-bt", "bottom-view-of-bt", "boundary-traversal", "maximum-width-of-bt", "populating-next-right-pointers-in-each-node-ii"],
+      "root-to-leaf-problems": ["path-sum", "print-root-to-leaf-path-in-bt", "sum-root-to-leaf-numbers", "count-good-nodes-in-binary-tree", "path-sum-iii"],
+      "lca": ["lca-in-bt", "print-all-nodes-at-a-distance-of-k-in-bt", "minimum-time-taken-to-burn-the-bt-from-a-given-node"]
+    }
+  },
+  "bst": {
+    "problems": {
+      "search-basics": ["introduction-to-bst", "search-in-a-binary-search-tree", "find-min-max-in-bst", "insert-a-given-node-in-bst", "delete-a-node-in-bst", "lca-in-bst"],
+      "floor-ceil": ["floor-in-a-binary-search-tree", "floor-and-ceil-in-a-bst"],
+      "construction": ["convert-sorted-array-to-binary-search-tree", "construct-a-bst-from-a-preorder-traversal"],
+      "advanced-bst": ["binary-search-tree-iterator", "two-sum-in-bst-check-if-there-exists-a-pair-with-sum-k", "merge-2-bst-s", "largest-bst-in-binary-tree"]
+    }
+  },
+  "graphs": {
+    "patterns": ["representation", "bfs", "dfs", "connected-components", "cycle-detection", "topological-sort", "shortest-path", "union-find", "minimum-spanning-tree", "bridges", "articulation-points", "strongly-connected-components"],
+    "problems": {
+      "bfs": ["traversal-techniques", "rotten-oranges", "walls-and-gates", "distance-of-nearest-cell-having-one", "number-of-enclaves", "nearest-exit-from-entrance-in-maze", "open-the-lock", "minimum-genetic-mutation", "snakes-and-ladders", "word-ladder-i", "word-ladder-ii"],
+      "dfs": ["dfs", "flood-fill-algorithm", "island-perimeter", "keys-and-rooms", "surrounded-regions", "pacific-atlantic-water-flow", "clone-graph", "reorder-routes-to-make-all-paths-lead-to-the-city-zero", "evaluate-division", "reconstruct-itinerary"],
+      "cycle-detection": ["cycle-detection-in-undirected-graph-bfs", "detect-a-cycle-in-an-undirected-graph", "bipartite-graph-dfs", "cycle-detection-in-directed-graph-dfs"],
+      "topological-sort": ["topo-sort", "topological-sort-or-kahn-s-algorithm", "course-schedule-i", "course-schedule-ii", "find-eventual-safe-states", "alien-dictionary", "course-schedule-iv", "minimum-height-trees", "build-a-matrix-with-conditions"],
+      "shortest-path": ["shortest-path-in-dag", "shortest-path-in-undirected-graph-with-unit-weights", "djisktra-s-algorithm", "why-priority-queue-is-used-in-djisktra-s-algorithm", "shortest-distance-in-a-binary-maze", "path-with-minimum-effort", "cheapest-flight-within-k-stops", "network-delay-time", "number-of-ways-to-arrive-at-destination", "minimum-multiplications-to-reach-end", "bellman-ford-algorithm", "floyd-warshall-algorithm", "find-the-city-with-the-smallest-number-of-neighbors"],
+      "union-find": ["disjoint-set", "redundant-connection", "graph-valid-tree", "number-of-operations-to-make-network-connected", "accounts-merge", "most-stones-removed-with-same-row-or-column", "number-of-islands-ii", "making-a-large-island", "swim-in-rising-water", "greatest-common-divisor-traversal"],
+      "minimum-spanning-tree": ["mst-theory", "prim-s-algorithm", "find-the-mst-weight", "min-cost-to-connect-all-points", "find-critical-and-pseudo-critical-edges-in-minimum-spanning-tree"]
+    }
+  },
+  "dp": {
+    "patterns": ["1d-dp", "fibonacci-pattern", "house-robber-pattern", "grid-dp", "subset-dp", "knapsack", "string-dp", "stock-dp", "lis-pattern", "partition-dp"],
+    "problems": {
+      "fibonacci-pattern": ["climbing-stairs", "min-cost-climbing-stairs", "n-th-tribonacci-number", "frog-jump", "frog-jump-with-k-distances", "decode-ways", "domino-and-tromino-tiling"],
+      "grid-dp": ["ninja-s-training", "grid-unique-paths-dp-on-grids-dp8", "unique-paths-ii", "minimum-path-sum", "triangle", "minimum-falling-path-sum", "ninja-and-his-friends", "longest-increasing-path-in-a-matrix", "maximal-square", "count-square-submatrices-with-all-ones-dp-56"],
+      "knapsack": ["unbounded-knapsack", "minimum-coins-dp-20", "coin-change-2-dp-22", "rod-cutting-problem-dp-24", "integer-break", "perfect-squares", "combination-sum-iv"],
+      "string-dp": ["longest-common-subsequence", "print-longest-common-subsequence-dp-26", "longest-common-substring", "longest-palindromic-subsequence", "minimum-insertions-to-make-string-palindrome-dp-29", "minimum-insertions-or-deletions-to-convert-string-a-to-b", "shortest-common-supersequence", "distinct-subsequences", "edit-distance", "wildcard-matching", "regular-expression-matching", "interleaving-string", "palindromic-substrings", "count-palindromic-subsequences"],
+      "stock-dp": ["best-time-to-buy-and-sell-stock", "best-time-to-buy-and-sell-stock-ii", "best-time-to-buy-and-sell-stock-iii", "best-time-to-buy-and-sell-stock-iv", "best-time-to-buy-and-sell-stock-with-cooldown", "best-time-to-buy-and-sell-stock-with-transaction-fees"],
+      "partition-dp": ["matrix-chain-multiplication", "matrix-chain-multiplication-bottom-up-dp-49", "minimum-cost-to-cut-the-stick", "burst-balloons", "different-ways-to-evaluate-a-boolean-expression", "palindrome-partitioning-ii", "partition-array-for-maximum-sum", "stone-game", "stone-game-ii", "stone-game-iii"]
+    }
+  },
+  "tries": {
+    "problems": {
+      "trie-implementation": ["trie-implementation-and-operations", "trie-implementation-and-advanced-operations"],
+      "trie-string-applications": ["longest-word-with-all-prefixes", "number-of-distinct-substrings-in-a-string", "design-add-and-search-words-data-structure", "search-suggestions-system", "word-search-ii", "extra-characters-in-a-string"]
+    }
+  }
+}
