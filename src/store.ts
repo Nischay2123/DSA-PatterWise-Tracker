@@ -7,6 +7,7 @@ import { isFullGoal, isExemptTopic, matchesGoal } from "./revision/goal";
 import type { Goal } from "./revision/goal";
 import { recordAttemptOutcome, scheduleInitial } from "./revision/scheduler";
 import { applyReview, isCleanSolveOnly, mergeReview, scheduleSolve } from "./revision/questionReview";
+import { mergeSweep, rateSweep } from "./revision/sweepSchedule";
 import type {
   AppSettings,
   AppStoreV2,
@@ -530,6 +531,7 @@ function mergeProgressEntry(a: QuestionProgressV2, b: QuestionProgressV2): Quest
       lastConfidence: richer.revisionStats.lastConfidence,
     },
     ...(completed && { review: mergeReview(a.review, b.review) }),
+    ...((a.sweep || b.sweep) && { sweep: mergeSweep(a.sweep, b.sweep) }),
   };
 }
 
@@ -886,6 +888,10 @@ export function v2Reducer(v2: AppStoreV2, action: V2Action): AppStoreV2 {
       const existing = getV2Progress(v2, action.id);
       return patchV2Progress(v2, action.id, { mistakes: existing.mistakes.filter((m) => m.at !== action.at) });
     }
+    case "RATE_SWEEP":
+      return patchV2Progress(v2, action.id, {
+        sweep: rateSweep(getV2Progress(v2, action.id).sweep, action.rating, action.at),
+      });
     case "REPLACE_STORE":
       return action.store;
 

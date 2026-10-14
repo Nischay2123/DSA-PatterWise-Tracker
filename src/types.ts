@@ -127,6 +127,20 @@ export interface QuestionProgressV2 {
   // or was solved before this existed. Optional so older stores and backups
   // still load as-is.
   review?: QuestionReview;
+  // The weekly sweep's flashcard: how its last recall went. Absent until the
+  // card is first rated. Optional so older stores and backups load as-is.
+  sweep?: SweepCard;
+}
+
+// A weekly-sweep recall rating (src/revision/sweepSchedule.ts).
+export type SweepRating = "knew" | "fuzzy" | "blank";
+
+export interface SweepCard {
+  /** Local date of the last rating, YYYY-MM-DD. */
+  at: string;
+  rating: SweepRating;
+  /** "knew" ratings in a row; any other rating resets it to 0. */
+  streak: number;
 }
 
 // How a solve or a per-question review went.
@@ -267,6 +281,7 @@ export type V2Action =
   | { type: "ADD_MISTAKE"; id: string; mistake: { at: string; what: string; remember: string } }
   | { type: "UPDATE_MISTAKE"; id: string; at: string; what: string; remember: string }
   | { type: "REMOVE_MISTAKE"; id: string; at: string }
+  | { type: "RATE_SWEEP"; id: string; rating: SweepRating; at: string }
   // Wholesale replace, for importing/restoring a complete v2 export or backup --
   // mirrors the v1 reducer's own "IMPORT" case.
   | { type: "REPLACE_STORE"; store: AppStoreV2 }

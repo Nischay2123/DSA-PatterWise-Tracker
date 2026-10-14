@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import questionsData from "../../data/questions.json";
 import { useStore } from "../context";
 import { cx } from "../cx";
@@ -8,7 +8,7 @@ import { GOAL_PRESETS, goalPresetId, isFullGoal, resolveGoal } from "../revision
 import type { QuestionData } from "../types";
 import { Icon } from "./Icon";
 import { FIELDS } from "./NotesEditor";
-import { DIFFICULTY_PILL } from "./QuestionRow";
+import { CheatSheet, CompactView, DifficultyPill } from "./StudyCards";
 
 const DATA = questionsData as QuestionData;
 
@@ -27,41 +27,70 @@ function Block({ label, children, className }: { label: string; children: React.
 const prose = "text-body leading-relaxed whitespace-pre-wrap break-words m-0";
 const mono = "card-inset p-3 m-0 font-mono text-caption leading-relaxed overflow-x-auto whitespace-pre";
 
-function Entry({ entry }: { entry: NotebookEntry }) {
+type View = "cheat" | "compact" | "full";
+const VIEWS: { id: View; label: string }[] = [
+  { id: "cheat", label: "Cheat sheet" },
+  { id: "compact", label: "Compact" },
+  { id: "full", label: "Full notes" },
+];
+const VIEW_KEY = "dsa-tracker-notebook-view";
+
+// A per-browser convenience only; any failure just falls back to the default.
+function loadView(): View {
+  try {
+    const v = localStorage.getItem(VIEW_KEY);
+    return v === "cheat" || v === "compact" || v === "full" ? v : "compact";
+  } catch {
+    return "compact";
+  }
+}
+
+function EntryHeader({ entry }: { entry: NotebookEntry }) {
   const { problem, progress: p } = entry;
   const link = problemLink(problem);
+  return (
+    <header className="flex items-center gap-2 flex-wrap mb-3">
+      <DifficultyPill problem={problem} />
+      {link ? (
+        <a
+          href={link}
+          target="_blank"
+          rel="noopener"
+          className="font-display text-head font-bold text-fg hover:text-accent decoration-accent/40 underline-offset-2 hover:underline"
+        >
+          {problem.question}
+        </a>
+      ) : (
+        <span className="font-display text-head font-bold">{problem.question}</span>
+      )}
+      {p.lastCompletedAt && <span className="ml-auto text-micro text-faint tabular-nums">Solved {p.lastCompletedAt}</span>}
+    </header>
+  );
+}
+
+const NOTHING = "Nothing written for this one yet — add notes from its row in the tracker.";
+
+function CompactEntry({ entry }: { entry: NotebookEntry }) {
+  return (
+    <article className="py-4 border-t border-border first:border-t-0 first:pt-2">
+      <EntryHeader entry={entry} />
+      {entry.written ? <CompactView progress={entry.progress} /> : <p className="text-caption text-faint m-0">{NOTHING}</p>}
+    </article>
+  );
+}
+
+export function FullEntry({ entry, bare = false }: { entry: NotebookEntry; bare?: boolean }) {
+  const { problem, progress: p } = entry;
   const notes = FIELDS.filter((f) => p.notes[f.key].trim());
   const hasSolution = !!(p.approach.trim() || p.pseudocode.trim() || p.code.trim());
   const hasNotesSide = notes.length > 0 || !!p.notes.legacy.trim() || p.mistakes.length > 0;
 
   return (
-    <article className="py-5 border-t border-border first:border-t-0 first:pt-2" id={`nb-${problem.id}`}>
-      <header className="flex items-center gap-2 flex-wrap mb-3">
-        <span
-          className={cx("pill leading-none px-1.5 shrink-0 font-bold tracking-wide", DIFFICULTY_PILL[problem.difficulty])}
-          title={problem.difficulty}
-        >
-          {problem.difficulty[0]}
-        </span>
-        {link ? (
-          <a
-            href={link}
-            target="_blank"
-            rel="noopener"
-            className="font-display text-head font-bold text-fg hover:text-accent decoration-accent/40 underline-offset-2 hover:underline"
-          >
-            {problem.question}
-          </a>
-        ) : (
-          <span className="font-display text-head font-bold">{problem.question}</span>
-        )}
-        {p.lastCompletedAt && (
-          <span className="ml-auto text-micro text-faint tabular-nums">Solved {p.lastCompletedAt}</span>
-        )}
-      </header>
+    <article className={cx(!bare && "py-5 border-t border-border first:border-t-0 first:pt-2")} id={`nb-${problem.id}`}>
+      {!bare && <EntryHeader entry={entry} />}
 
       {!entry.written ? (
-        <p className="text-caption text-faint m-0">Nothing written for this one yet — add notes from its row in the tracker.</p>
+        <p className="text-caption text-faint m-0">{NOTHING}</p>
       ) : (
         <div className={cx("grid gap-6", hasSolution && hasNotesSide && "xl:grid-cols-2")}>
           {hasNotesSide && (
@@ -127,7 +156,7 @@ function Entry({ entry }: { entry: NotebookEntry }) {
   );
 }
 
-function TopicView({ topic }: { topic: NotebookTopic }) {
+function TopicView({ topic, view }: { topic: NotebookTopic; view: View }) {
   const body = useRef<HTMLDivElement>(null);
   const setAll = (open: boolean) =>
     body.current?.querySelectorAll("details").forEach((d) => ((d as HTMLDetailsElement).open = open));
@@ -163,9 +192,13 @@ function TopicView({ topic }: { topic: NotebookTopic }) {
               </span>
             </summary>
             <div className="px-3 md:px-4 pb-2">
-              {pattern.entries.map((e) => (
-                <Entry key={e.problem.id} entry={e} />
-              ))}
+              {view === "cheat" ? (
+                <CheatSheet entries={pattern.entries} />
+              ) : (
+                pattern.entries.map((e) =>
+                  view === "compact" ? <CompactEntry key={e.problem.id} entry={e} /> : <FullEntry key={e.problem.id} entry={e} />
+                )
+              )}
             </div>
           </details>
         ))}
@@ -180,6 +213,15 @@ export function NotebookPage({ topicId, onNavigate }: { topicId: string | undefi
   const sheet = isFullGoal(goal) ? "Full syllabus" : (GOAL_PRESETS.find((p) => p.id === goalPresetId(goal))?.label ?? "your goal");
   const book = buildNotebook(DATA.topics, v2Store, goal);
   const topic = book.find((t) => t.id === topicId) ?? book[0];
+  const [view, setView] = useState<View>(loadView);
+  const pickView = (v: View) => {
+    setView(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      // not remembered this time; the view still switches
+    }
+  };
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -200,10 +242,28 @@ export function NotebookPage({ topicId, onNavigate }: { topicId: string | undefi
 
   return (
     <>
-      <p className="text-caption text-muted mt-0 mb-4">
-        Your notes, solutions and mistakes for every problem you've solved in <b>{sheet}</b>, in sheet order. Read-only —
-        edit them from the problem's row in the tracker.
-      </p>
+      <div className="flex items-start gap-3 flex-wrap mb-4">
+        <p className="text-caption text-muted m-0 flex-1 min-w-[16rem]">
+          Your notes, solutions and mistakes for every problem you've solved in <b>{sheet}</b>, in sheet order.
+          Read-only — edit them from the problem's row in the tracker.
+        </p>
+        <div role="group" aria-label="View" className="flex gap-0.5 rounded-lg border border-border bg-bg p-0.5">
+          {VIEWS.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              aria-pressed={view === v.id}
+              onClick={() => pickView(v.id)}
+              className={cx(
+                "h-7 px-2.5 rounded-md border-0 cursor-pointer text-caption font-semibold transition-colors",
+                view === v.id ? "bg-accent text-accent-fg" : "bg-transparent text-muted hover:text-fg hover:bg-row-hover"
+              )}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="md:grid md:grid-cols-[13rem_minmax(0,1fr)] gap-6">
         <select
           className="field md:hidden mb-4"
@@ -236,7 +296,7 @@ export function NotebookPage({ topicId, onNavigate }: { topicId: string | undefi
           ))}
         </nav>
 
-        <TopicView key={topic.id} topic={topic} />
+        <TopicView key={topic.id} topic={topic} view={view} />
       </div>
     </>
   );

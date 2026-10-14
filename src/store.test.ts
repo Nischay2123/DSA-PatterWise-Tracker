@@ -1171,3 +1171,17 @@ describe("a failed evaluation feeds weak questions back into next session's sele
     expect(v2.revision["advanced-strings"].history[0].passed).toBe(true);
   });
 });
+
+describe("weekly sweep ratings", () => {
+  it("RATE_SWEEP records the rating on the problem and builds the knew streak", async () => {
+    const { v2Reducer, mergeStoresV2 } = await import("./store");
+    const { emptyAppStoreV2 } = await import("./persistence/migrate");
+    let v2 = v2Reducer(emptyAppStoreV2(), { type: "RATE_SWEEP", id: "x", rating: "knew", at: "2026-10-04" });
+    v2 = v2Reducer(v2, { type: "RATE_SWEEP", id: "x", rating: "knew", at: "2026-10-11" });
+    expect(v2.progress.x.sweep).toEqual({ at: "2026-10-11", rating: "knew", streak: 2 });
+
+    const other = v2Reducer(emptyAppStoreV2(), { type: "RATE_SWEEP", id: "x", rating: "blank", at: "2026-10-12" });
+    expect(mergeStoresV2(v2, other).progress.x.sweep).toEqual({ at: "2026-10-12", rating: "blank", streak: 0 });
+    expect(mergeStoresV2(v2, emptyAppStoreV2()).progress.x.sweep).toEqual(v2.progress.x.sweep);
+  });
+});

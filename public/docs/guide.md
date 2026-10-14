@@ -204,10 +204,27 @@ These are reference notes. Your own per-problem notes live on each problem row.
 **My notebook** in the sidebar collects what *you* wrote, so you can read it back without opening problems one at a time. It's laid out like the problem list — topic, then pattern, then each problem you've solved in sheet order — and follows the sheet chosen in Settings.
 
 - Pick a topic on the left (a dropdown on a phone), then open a pattern, or **Open all**.
-- Each problem shows your notes (key insight, common mistake, edge cases, complexity, reminder), your approach, pseudocode and code, and the mistakes you logged.
+- Three views, switched at the top (your choice is remembered in this browser):
+  - **Cheat sheet**: one row per problem — the trick, your top trap, the complexity. A whole pattern in about a minute.
+  - **Compact**: per problem, the insight, a short approach, your traps, the complexity and pseudocode. No code.
+  - **Full notes**: everything — every note field, your approach, pseudocode, code and logged mistakes.
 - Solved problems with nothing written show a one-line reminder instead.
 
 It's read-only and separate from Topic revision: nothing here is graded or scheduled. Edit from the problem's row in the tracker.
+
+## Weekly sweep
+
+**Weekly sweep** in the sidebar is a fast pass over everything you've solved, built to be done once a week. The badge shows how many cards are due. The start page shows the cards due and a time estimate (about 8 seconds a card), overall and per topic.
+
+For each pattern with something due:
+
+1. **Pattern card** — read once: the core ideas on when and why the pattern works, and every trap you've written down for its problems, each once.
+2. **Flashcards** — one per solved problem. The front is just the title: say the trick to yourself first, then **Reveal** (Space) to see your key insight and reminder. **More** (M) adds the compact card; **Full notes** (F) shows everything.
+3. **Rate it** — **Blank** (1), **Fuzzy** (2) or **Knew it** (3).
+
+Cards you know drop out: *Knew it* twice in a row moves a card to every 14 days, three times to every 28. *Fuzzy* or *Blank* brings it back next week, and blanks come first. Ratings save as you go, so you can stop (Esc) at any card and pick up later. The end screen lists the cards worth a re-solve.
+
+A solved problem needs a key insight, reminder or approach written to become a card; the start page says how many don't have one. Like the notebook, the sweep is separate from Topic revision: nothing is graded, and it never blocks anything. Ratings are included in exports and merges.
 
 ## Your data
 

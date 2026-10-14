@@ -70,10 +70,13 @@ export function SidebarContent({
   onBackupChange,
   onOpenSettings,
   dueCount = 0,
+  sweepDue = 0,
   onShowDue,
   showBrand = true,
 }: {
-  route: "tracker" | "revision" | "notes" | "notebook" | "guide";
+  route: "tracker" | "revision" | "notes" | "notebook" | "sweep" | "guide";
+  /** Weekly-sweep cards due. */
+  sweepDue?: number;
   /** Per-question reviews due today. */
   dueCount?: number;
   onShowDue?: () => void;
@@ -151,6 +154,17 @@ export function SidebarContent({
             <span className="ml-auto pill bg-accent text-accent-fg tabular-nums">{dueCount}</span>
           </button>
         )}
+        <button
+          type="button"
+          className="nav-item"
+          aria-current={route === "sweep" ? "page" : undefined}
+          onClick={() => onNavigate("#/sweep")}
+          title="A fast weekly pass: pattern cards and flashcards"
+        >
+          <Icon name="flame" className="size-4" />
+          Weekly sweep
+          {sweepDue > 0 && <span className="ml-auto pill bg-accent-soft text-accent tabular-nums">{sweepDue}</span>}
+        </button>
         <button
           type="button"
           className="nav-item"

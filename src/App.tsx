@@ -12,6 +12,7 @@ import { SessionShell } from "./components/revision/SessionShell";
 import { TopicList } from "./components/TopicList";
 import { NotesPanel } from "./components/NotesPanel";
 import { NotebookPage } from "./components/NotebookPage";
+import { SweepPage, sweepDeckFor } from "./components/SweepPage";
 import { GuidePage } from "./components/GuidePage";
 import { FiltersContext, StoreContext, useProgressStore } from "./context";
 import { downloadBackupFile } from "./persistence/backup";
@@ -116,6 +117,7 @@ export function App() {
   const overallPct = overallTotal ? Math.round((overallDone / overallTotal) * 100) : 0;
 
   const goalIds = new Set(goalProblems.map((p) => p.id));
+  const sweepDue = sweepDeckFor(v2Store).reduce((n, t) => n + t.due, 0);
   const allDue = dueIds(v2Store, todayISO());
   const due = isFullGoal(goal) ? allDue : new Set([...allDue].filter((id) => goalIds.has(id)));
   const visibleCount = ALL_PROBLEMS_WITH_CONTEXT.filter(({ problem, topicName, patternName }) =>
@@ -172,6 +174,7 @@ export function App() {
   const notesMatch = /^#\/notes(?:\/(.+))?$/.exec(hash);
   const guide = /^#\/guide\/?$/.test(hash);
   const notebookMatch = /^#\/notebook(?:\/(.+))?$/.exec(hash);
+  const sweepMatch = /^#\/sweep(?:\/(.+))?$/.exec(hash);
 
   const goto = (h: string) => {
     setNavOpen(false);
@@ -186,7 +189,8 @@ export function App() {
 
   const sidebar = (showBrand: boolean) => (
     <SidebarContent
-      route={guide ? "guide" : notesMatch ? "notes" : notebookMatch ? "notebook" : "tracker"}
+      route={guide ? "guide" : notesMatch ? "notes" : notebookMatch ? "notebook" : sweepMatch ? "sweep" : "tracker"}
+      sweepDue={sweepDue}
       dueCount={due.size}
       onShowDue={showDue}
       showBrand={showBrand}
@@ -237,6 +241,14 @@ export function App() {
             {guide ? (
               <main className="mx-auto w-full max-w-shell px-3 md:px-6 pt-5 pb-20">
                 <GuidePage />
+              </main>
+            ) : sweepMatch ? (
+              <main className="mx-auto w-full max-w-shell px-3 md:px-6 pt-5 pb-20">
+                <SweepPage
+                  key={sweepMatch[1] ?? "home"}
+                  scope={sweepMatch[1] && decodeURIComponent(sweepMatch[1])}
+                  onNavigate={goto}
+                />
               </main>
             ) : notebookMatch ? (
               <main className="mx-auto w-full max-w-shell px-3 md:px-6 pt-5 pb-20">
