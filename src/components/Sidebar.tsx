@@ -73,7 +73,7 @@ export function SidebarContent({
   onShowDue,
   showBrand = true,
 }: {
-  route: "tracker" | "revision" | "notes" | "guide";
+  route: "tracker" | "revision" | "notes" | "notebook" | "guide";
   /** Per-question reviews due today. */
   dueCount?: number;
   onShowDue?: () => void;
@@ -151,6 +151,16 @@ export function SidebarContent({
             <span className="ml-auto pill bg-accent text-accent-fg tabular-nums">{dueCount}</span>
           </button>
         )}
+        <button
+          type="button"
+          className="nav-item"
+          aria-current={route === "notebook" ? "page" : undefined}
+          onClick={() => onNavigate("#/notebook")}
+          title="Read your notes, solutions and mistakes, topic by topic"
+        >
+          <Icon name="pencil" className="size-4" />
+          My notebook
+        </button>
         <button
           type="button"
           className="nav-item"

@@ -199,6 +199,16 @@ You can also open notes from:
 
 These are reference notes. Your own per-problem notes live on each problem row.
 
+## My notebook
+
+**My notebook** in the sidebar collects what *you* wrote, so you can read it back without opening problems one at a time. It's laid out like the problem list — topic, then pattern, then each problem you've solved in sheet order — and follows the sheet chosen in Settings.
+
+- Pick a topic on the left (a dropdown on a phone), then open a pattern, or **Open all**.
+- Each problem shows your notes (key insight, common mistake, edge cases, complexity, reminder), your approach, pseudocode and code, and the mistakes you logged.
+- Solved problems with nothing written show a one-line reminder instead.
+
+It's read-only and separate from Topic revision: nothing here is graded or scheduled. Edit from the problem's row in the tracker.
+
 ## Your data
 
 Everything is stored in this browser's local database. Clearing site data or switching browsers or devices loses it, unless you have a backup.

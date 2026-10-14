@@ -18,13 +18,13 @@ import type { Problem, StructuredNoteField } from "../types";
 // cards. They are the order you re-learn a problem in -- what it does, why it
 // works, what bites, what it costs, what you told yourself -- and each one is
 // shaped like what it holds:
-type Tone =
+export type Tone =
   | "prose" // the explanation: plain paragraphs, reading measure
   | "warn" // the traps: ruled down the left so they're findable at a glance
   | "fact" // complexity: notation, not prose, so it is set as notation
   | "mine"; // the reminder: tinted, because it is addressed to you
 
-const FIELDS: { key: StructuredNoteField; label: string; tone: Tone }[] = [
+export const FIELDS: { key: StructuredNoteField; label: string; tone: Tone }[] = [
   { key: "approach", label: "Approach", tone: "prose" },
   { key: "keyInsight", label: "Key insight", tone: "prose" },
   { key: "commonMistake", label: "Common mistake", tone: "warn" },
