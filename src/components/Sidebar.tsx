@@ -5,6 +5,7 @@ import type { Theme } from "../useTheme";
 import { Icon, type IconName } from "./Icon";
 import { ImportExport } from "./ImportExport";
 import { Ring } from "./Ring";
+import { SyncStatusItem } from "./SyncSettings";
 
 const THEMES: { id: Theme; label: string; icon: IconName }[] = [
   { id: "light", label: "Light", icon: "sun" },
@@ -200,6 +201,7 @@ export function SidebarContent({
       <div className="flex flex-col gap-0.5">
         <span className="field-label px-2.5">Your data</span>
         <ImportExport backupExists={backupExists} onBackupChange={onBackupChange} />
+        <SyncStatusItem onOpenSettings={onOpenSettings} />
       </div>
 
       <div className="mt-auto flex flex-col gap-2 pt-2">

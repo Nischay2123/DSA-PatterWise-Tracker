@@ -18,7 +18,8 @@ import { FiltersContext, StoreContext, useProgressStore } from "./context";
 import { downloadBackupFile } from "./persistence/backup";
 import { goalScoped, isFullGoal, resolveGoal } from "./revision/goal";
 import { dueIds } from "./revision/questionReview";
-import { countDone, getState, hasBackupV2, isProblemVisible, todayISO } from "./store";
+import { countDone, getState, hasBackupV2, isProblemVisible, todayISO, v2ProgressToV1Store } from "./store";
+import { SyncContext, useGistSync } from "./sync/useGistSync";
 import { useFilterAccordions } from "./useFilterAccordions";
 import { useTheme } from "./useTheme";
 import { useHash } from "./useHash";
@@ -107,6 +108,16 @@ export function App() {
   const [hash, navigate] = useHash();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  // Same two steps as a merge import: the merged store replaces both the v2
+  // store and the v1 view the list reads from.
+  const sync = useGistSync({
+    ready: status === "ready",
+    v2Store,
+    apply: (merged) => {
+      dispatchV2({ type: "REPLACE_STORE", store: merged });
+      dispatch({ type: "IMPORT", store: v2ProgressToV1Store(merged) });
+    },
+  });
 
   // Everything on the page -- headline figure, list, breakdown, due reviews --
   // follows the sheet chosen in Settings. Only Full syllabus keeps all 649.
@@ -208,6 +219,7 @@ export function App() {
 
   return (
     <StoreContext.Provider value={{ store, dispatch, v2Store, dispatchV2 }}>
+      <SyncContext.Provider value={sync}>
       <FiltersContext.Provider value={{ filters, setFilters }}>
         {/* The whole chrome moved out of the top of the screen and into a
             persistent left rail. On a phone the rail becomes a drawer and
@@ -318,7 +330,7 @@ export function App() {
               <footer className="mt-10 border-t border-border pt-5 text-center text-caption text-muted">
                 <p className="m-0 flex items-center justify-center gap-1.5">
                   <Icon name="alert" className="size-3.5 shrink-0" />
-                  Progress is saved in this browser only — no account, no sync. Export regularly as a backup.
+                  Progress is saved in this browser. Turn on Sync devices in the sidebar to share it with your other devices, and export now and then as a backup.
                 </p>
                 <MergeImport onBackupChange={refreshBackup} />
               </footer>
@@ -347,6 +359,7 @@ export function App() {
           <SettingsPanel />
         </Drawer>
       </FiltersContext.Provider>
+      </SyncContext.Provider>
     </StoreContext.Provider>
   );
 }

@@ -2,7 +2,7 @@
 
 DSA Tracker is a checklist for interview DSA practice that also makes you revise what you've solved, so it sticks. It holds 649 problems from six well-known lists, grouped by topic and pattern. This page explains every feature: what it means, how it works and how to use it.
 
-Your progress is saved **in this browser only**. There's no account and no sync, so export a backup now and then (see [Your data](#your-data)).
+Your progress is saved **in this browser**. To use it on your phone too, turn on [sync](#sync-across-devices); either way, export a backup now and then (see [Your data](#your-data)).
 
 ## Quick start
 
@@ -233,6 +233,26 @@ Everything is stored in this browser's local database. Clearing site data or swi
 - **Export backup** (sidebar): downloads everything as a JSON file, including progress, solutions, notes, mistakes, review schedules, revision history and settings. Your API key is never included.
 - **Import backup**: replaces your current data with a backup file. **Undo import** restores what you had just before.
 - **Advanced — merge a backup** (bottom of the tracker page): combines a backup from another device with this one instead of replacing it. A problem solved in either copy stays solved, differing notes are kept side by side, and review schedules and revision history are combined.
+
+## Sync across devices
+
+Keeps your laptop and phone in step through one file in a **secret gist on your own GitHub account**. There's no server or database behind the app; your browser talks to GitHub directly.
+
+**Set it up once per device:**
+
+1. **Sync devices** in the sidebar (or **Settings → Sync across devices**) → **Create a GitHub token**. Tick only **gist**, pick a long expiry, generate, copy.
+2. Paste it and **Connect**. The first device creates the gist; any later device finds it and merges.
+3. On your other device, open the tracker and paste the same token.
+
+**After that it's automatic:** when the app opens, a few seconds after any change, when you come back to the tab and when the network returns. The sidebar shows *Synced 2 min ago*; tap it to sync right away.
+
+Good to know:
+
+- **It only ever adds**, using the same merge as *merge a backup*: a problem solved on either device stays solved, notes are combined, ratings and reviews keep the latest. So **un-doing** doesn't carry over: un-ticking a problem or deleting a mistake on one device comes back from the other.
+- **Settings stay per device**: theme, sheet, AI provider and key.
+- **Your typing is safe**: if changes arrive while you're typing in a box, they wait until you leave it.
+- **Privacy**: the token is saved only in that browser, never in exports or the gist. Your AI key is never uploaded. A secret gist is unlisted — readable only by someone with its exact link — so don't share that link.
+- **Disconnect this device** (Settings) stops syncing there; your progress and the gist stay as they are. To stop everywhere, delete the gist or the token on GitHub.
 
 ## Settings
 

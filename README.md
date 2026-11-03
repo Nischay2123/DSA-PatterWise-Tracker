@@ -26,7 +26,7 @@ A single-page tracker for the Striver A2Z DSA sheet plus NeetCode 150/250, Blind
 
 React 19 + TypeScript + Vite 6 + Tailwind v4. Runtime dependencies beyond React and `idb-keyval` are `marked`, `highlight.js` and `mermaid`, all loaded only when the notes or topic map are opened.
 
-Progress lives in IndexedDB, per-device, no sync. Two schemas coexist: the v2 `AppStoreV2` is the source of truth, and the older flat v1 `ProgressStore` survives as a UI-facing view over it — `v2ProgressToV1Store` reads, `patchV2FromV1` patches. Revision state is *derived* from completion and history, never stored, which is why a goal can change what revision measures without touching the scheduler.
+Progress lives in IndexedDB. Optional sync (`src/sync/`) keeps devices in step through one file in a secret GitHub Gist on the user's own account, with their gist-scoped token, straight from the browser: pull, union-merge with `mergeStoresV2` (the same merge as merge-import, so nothing is ever un-solved), push only if the gist lacks something. The token lives in localStorage, never in the store, so it can't reach an export or the gist. Two schemas coexist: the v2 `AppStoreV2` is the source of truth, and the older flat v1 `ProgressStore` survives as a UI-facing view over it — `v2ProgressToV1Store` reads, `patchV2FromV1` patches. Revision state is *derived* from completion and history, never stored, which is why a goal can change what revision measures without touching the scheduler.
 
 LLM grading and note-writing are optional and bring-your-own-key (Gemini or Groq). The key is stored locally and never leaves the browser except to the provider you chose; it is never written into an export, a log or a URL.
 

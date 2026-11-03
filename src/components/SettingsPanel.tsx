@@ -4,6 +4,7 @@ import { ERROR_MESSAGE, validateKey } from "../llm/client";
 import { getProvider, PROVIDERS, resolveModel } from "../llm/providers";
 import type { ProviderId } from "../llm/providers";
 import { GoalSettings } from "./GoalSettings";
+import { SyncSettings } from "./SyncSettings";
 import { Icon, type IconName } from "./Icon";
 
 type ProbeState = { kind: "idle" } | { kind: "checking" } | { kind: "ok" } | { kind: "error"; message: string };
@@ -92,6 +93,10 @@ export function SettingsPanel() {
     <div>
       <Section title="Sheet" icon="target">
         <GoalSettings />
+      </Section>
+
+      <Section title="Sync across devices" icon="repeat">
+        <SyncSettings />
       </Section>
 
       <Section title="Evaluation provider" icon="brain">
