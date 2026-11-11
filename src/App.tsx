@@ -14,6 +14,7 @@ import { NotesPanel } from "./components/NotesPanel";
 import { NotebookPage } from "./components/NotebookPage";
 import { SweepPage, sweepDeckFor } from "./components/SweepPage";
 import { GuidePage } from "./components/GuidePage";
+import { OOPJavaPage } from "./components/OOPJavaPage";
 import { FiltersContext, StoreContext, useProgressStore } from "./context";
 import { downloadBackupFile } from "./persistence/backup";
 import { goalScoped, isFullGoal, resolveGoal } from "./revision/goal";
@@ -186,6 +187,7 @@ export function App() {
   const guide = /^#\/guide\/?$/.test(hash);
   const notebookMatch = /^#\/notebook(?:\/(.+))?$/.exec(hash);
   const sweepMatch = /^#\/sweep(?:\/(.+))?$/.exec(hash);
+  const oopJavaMatch = /^#\/oop-java\/?$/.test(hash);
 
   const goto = (h: string) => {
     setNavOpen(false);
@@ -200,7 +202,7 @@ export function App() {
 
   const sidebar = (showBrand: boolean) => (
     <SidebarContent
-      route={guide ? "guide" : notesMatch ? "notes" : notebookMatch ? "notebook" : sweepMatch ? "sweep" : "tracker"}
+      route={guide ? "guide" : oopJavaMatch ? "oop-java" : notesMatch ? "notes" : notebookMatch ? "notebook" : sweepMatch ? "sweep" : "tracker"}
       sweepDue={sweepDue}
       dueCount={due.size}
       onShowDue={showDue}
@@ -253,6 +255,10 @@ export function App() {
             {guide ? (
               <main className="mx-auto w-full max-w-shell px-3 md:px-6 pt-5 pb-20">
                 <GuidePage />
+              </main>
+            ) : oopJavaMatch ? (
+              <main className="mx-auto w-full max-w-shell px-3 md:px-6 pt-5 pb-20">
+                <OOPJavaPage />
               </main>
             ) : sweepMatch ? (
               <main className="mx-auto w-full max-w-shell px-3 md:px-6 pt-5 pb-20">

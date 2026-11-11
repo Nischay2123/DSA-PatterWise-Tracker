@@ -75,7 +75,7 @@ export function SidebarContent({
   onShowDue,
   showBrand = true,
 }: {
-  route: "tracker" | "revision" | "notes" | "notebook" | "sweep" | "guide";
+  route: "tracker" | "revision" | "notes" | "notebook" | "sweep" | "guide" | "oop-java";
   /** Weekly-sweep cards due. */
   sweepDue?: number;
   /** Per-question reviews due today. */
@@ -165,6 +165,16 @@ export function SidebarContent({
           <Icon name="flame" className="size-4" />
           Weekly sweep
           {sweepDue > 0 && <span className="ml-auto pill bg-accent-soft text-accent tabular-nums">{sweepDue}</span>}
+        </button>
+        <button
+          type="button"
+          className="nav-item"
+          aria-current={route === "oop-java" ? "page" : undefined}
+          onClick={() => onNavigate("#/oop-java")}
+          title="Object-Oriented Programming in Java course"
+        >
+          <Icon name="monitor" className="size-4" />
+          OOP in Java
         </button>
         <button
           type="button"
